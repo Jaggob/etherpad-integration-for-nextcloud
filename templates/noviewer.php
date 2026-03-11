@@ -1,0 +1,19 @@
+<?php
+/**
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ * Copyright (c) 2026 Jacob Bühler
+ */
+/** @var array $_ */
+/** @var \OCP\IL10N $l */
+?>
+<div class="section">
+	<h2><?php p($l->t('Unable to open pad')); ?></h2>
+	<p><?php p((string)($_['error'] ?? $l->t('Unknown error.'))); ?></p>
+	<?php if (!empty($_['back_url'])): ?>
+		<p>
+			<a href="<?php p((string)$_['back_url']); ?>">
+				<?php p((string)($_['back_label'] ?? $l->t('Back'))); ?>
+			</a>
+		</p>
+	<?php endif; ?>
+</div>

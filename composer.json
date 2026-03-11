@@ -1,0 +1,22 @@
+{
+  "name": "jaggob/etherpad-nextcloud-plugin",
+  "description": "Development tooling for Etherpad Integration for Nextcloud",
+  "type": "project",
+  "license": "AGPL-3.0-or-later",
+  "require-dev": {
+    "phpunit/phpunit": "^11.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "OCA\\EtherpadNextcloud\\": "lib/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "OCA\\EtherpadNextcloud\\Tests\\": "tests/phpunit/"
+    }
+  },
+  "scripts": {
+    "test:phpunit": "phpunit --testsuite unit"
+  }
+}

@@ -1,0 +1,161 @@
+# Etherpad Integration for Nextcloud
+
+SPDX-License-Identifier: AGPL-3.0-or-later
+
+Etherpad plugin for Nextcloud (`etherpad_nextcloud`), focused on secure `.pad` files, native Nextcloud viewer flow, and robust trash/restore lifecycle handling.
+
+## Core Features
+
+- `.pad` files open directly in the Nextcloud viewer
+- Protected and public pad modes
+- Public folder/file share support for `.pad`
+- Periodic sync from Etherpad into `.pad` snapshots
+- Trash deletes on Etherpad (with deferred retry when Etherpad is temporarily unavailable)
+- Restore recreates pads from `.pad` snapshot data
+
+## Requirements
+
+- Nextcloud `30` to `33` (see [appinfo/info.xml](appinfo/info.xml))
+- Etherpad reachable from Nextcloud server
+- Etherpad API key
+- HTTPS for production deployments
+- For protected pads: run Nextcloud and Etherpad on the same registrable domain (same-site), for example `cloud.example.org` + `pad.example.org`, so session cookies work reliably in iframe viewer flows.
+
+## Etherpad Compatibility
+
+- Works with different Etherpad releases via API version detection (fallback supported).
+- This plugin requires Etherpad API key mode (`authenticationMethod: "apikey"`).
+- OAuth-only Etherpad setups are not supported by this plugin.
+
+## Ownpad Compatibility
+
+- Running this app and Ownpad at the same time is not supported.
+  - Both apps hook into `.pad` MIME/viewer handling, which leads to ambiguous file-type resolution and open-action conflicts.
+- This app does currently not automatically import Ownpad legacy `.pad` files.
+- Ownpad `.pad` files (`[InternetShortcut]` + `URL=...`) are currently rejected by default because of a different binding/lifecycle model than Ownpad (including database state handling), so a safe migration is non-trivial.
+- A dedicated, explicit migration/import flow for legacy Ownpad `.pad` files is planned for the future. Feel free to commit your solutions for that!
+
+## Install
+
+### 1) Copy app into Nextcloud
+
+Place this repository as:
+
+`<nextcloud-root>/apps/etherpad_nextcloud`
+
+### 2) Enable app
+
+```bash
+php occ app:enable etherpad_nextcloud
+```
+
+### 3) (If needed) rebuild mimetype caches
+
+Run this if `.pad` icons/actions do not appear correctly after install/upgrade:
+
+```bash
+php occ maintenance:mimetype:update-js
+php occ maintenance:mimetype:update-db
+```
+
+### 4) Open admin settings
+
+Go to:
+
+`Settings -> Administration -> Pads`
+
+and configure:
+
+- Etherpad Base URL
+- Etherpad API URL (optional; defaults to Base URL)
+- Etherpad API key (OAuth is not required; Etherpad API key auth is used)
+- Copy content to `.pad` file interval
+- Delete-on-trash policy
+- External public pad policy
+
+## Upgrade
+
+1. Replace app files in `apps/etherpad_nextcloud`
+2. Run:
+
+```bash
+php occ app:disable etherpad_nextcloud
+php occ app:enable etherpad_nextcloud
+php occ maintenance:mimetype:update-js
+php occ maintenance:mimetype:update-db
+```
+
+For deployment, copy the app to `apps/etherpad_nextcloud` and exclude development-only content such as `.git/`, `tests/`, `docs/`, `.phpunit.cache/`, and local temp files.
+
+## Usage
+
+### Create pads
+
+- `+ New -> New pad`
+- `+ New -> Public pad` (internal public pad on the configured Etherpad instance, or external public pad by URL)
+
+### Open pads
+
+- Click `.pad` file in Files app
+- App uses Nextcloud native viewer flow (`openfile=true`)
+
+### Sync
+
+- One-way sync only: content is copied from Etherpad into the `.pad` file snapshot.
+- No automatic reverse sync from `.pad` file content back into Etherpad.
+- Automatic while viewer is open (interval from admin settings).
+- Manual via Files sidebar action `Pad in Datei speichern`.
+
+### Trash/Restore
+
+- When a `.pad` file is moved to the Nextcloud trash, the linked Etherpad pad is deleted.
+- If Etherpad is temporarily unavailable, delete is deferred and retried.
+- When the `.pad` file is restored from the Nextcloud trash, a new pad is recreated and the snapshot from the `.pad` file is replayed.
+
+## Troubleshooting
+
+### `.pad` downloads instead of opening in viewer
+
+- Ensure app is enabled:
+  - `php occ app:list | grep etherpad_nextcloud`
+- Rebuild mimetype caches:
+  - `php occ maintenance:mimetype:update-js`
+  - `php occ maintenance:mimetype:update-db`
+- Reload browser with hard refresh
+
+### Wrong `.pad` icon (fallback/red icon)
+
+- Re-run mimetype update commands above
+- Check that app CSS loads
+- Confirm app migration alias is applied (app re-enable usually handles this)
+
+### `+ New` entries missing
+
+- Hard refresh browser once
+- Confirm Files app JS loaded without fatal errors in browser console
+
+### Protected pad permission errors
+
+- Verify Etherpad API key and Etherpad auth mode
+- Run admin `Health check` in `Settings -> Administration -> Pads`
+
+## Documentation
+
+- Architecture: [docs/architecture.md](docs/architecture.md)
+- API routes: [docs/api-reference.md](docs/api-reference.md)
+- Etherpad integration details: [docs/etherpad-integration.md](docs/etherpad-integration.md)
+- `.pad` format: [docs/pad-format.md](docs/pad-format.md)
+- I18N: [docs/i18n.md](docs/i18n.md)
+- UI icons: [docs/ui-icons.md](docs/ui-icons.md)
+- Testing and release checks: [docs/release-process.md](docs/release-process.md)
+
+## License
+
+- App code: AGPL-3.0-or-later (full text: [LICENSES/AGPL-3.0.txt](LICENSES/AGPL-3.0.txt))
+- Etherpad logo assets in `img/etherpad-icon-*.svg`: Apache-2.0 (see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md))
+
+## Acknowledgements
+
+- Thanks to the Ownpad project for the groundwork, ideas, and lessons learned that inspired and shaped this plugin.
+- Thanks to the Nextcloud and Etherpad communities for the underlying platforms and documentation.
+- This project is not affiliated with, endorsed by, or operated by the Ownpad, Nextcloud, or Etherpad projects.

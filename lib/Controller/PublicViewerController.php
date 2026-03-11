@@ -1,0 +1,312 @@
+<?php
+
+declare(strict_types=1);
+/**
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Copyright (c) 2026 Jacob Bühler
+ *
+ */
+
+namespace OCA\EtherpadNextcloud\Controller;
+
+use OCA\EtherpadNextcloud\Exception\BindingException;
+use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
+use OCA\EtherpadNextcloud\Exception\PadFileFormatException;
+use OCA\EtherpadNextcloud\Service\BindingService;
+use OCA\EtherpadNextcloud\Service\EtherpadClient;
+use OCA\EtherpadNextcloud\Service\PadFileService;
+use OCA\EtherpadNextcloud\Service\PadSessionService;
+use OCA\EtherpadNextcloud\Util\PathNormalizer;
+use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http\DataResponse;
+use OCP\AppFramework\Http;
+use OCP\AppFramework\Http\RedirectResponse;
+use OCP\AppFramework\Http\TemplateResponse;
+use OCP\Constants;
+use OCP\Files\File;
+use OCP\Files\Folder;
+use OCP\Files\NotFoundException;
+use OCP\IRequest;
+use OCP\IURLGenerator;
+use OCP\Share\Exceptions\ShareNotFound;
+use OCP\Share\IManager;
+
+class PublicViewerController extends Controller {
+	public function __construct(
+		string $appName,
+		IRequest $request,
+		private IManager $shareManager,
+		private PathNormalizer $pathNormalizer,
+		private PadFileService $padFileService,
+		private BindingService $bindingService,
+		private EtherpadClient $etherpadClient,
+		private PadSessionService $padSessionService,
+		private IURLGenerator $urlGenerator,
+	) {
+		parent::__construct($appName, $request);
+	}
+
+	#[\OCP\AppFramework\Http\Attribute\PublicPage]
+	#[\OCP\AppFramework\Http\Attribute\NoCSRFRequired]
+	public function showPad(string $token): RedirectResponse|TemplateResponse {
+		try {
+			$target = $this->buildPublicShareRedirectUrl($token, $this->request->getParam('file', ''));
+		} catch (\RuntimeException $e) {
+			$status = $e->getCode() > 0 ? $e->getCode() : Http::STATUS_BAD_REQUEST;
+			return $this->publicErrorResponse($token, $e->getMessage(), $status);
+		}
+		return new RedirectResponse($target);
+	}
+
+	#[\OCP\AppFramework\Http\Attribute\PublicPage]
+	#[\OCP\AppFramework\Http\Attribute\NoCSRFRequired]
+	public function openPadData(string $token, mixed $file = ''): DataResponse {
+		try {
+			$context = $this->resolvePublicPadContext($token, $file);
+		} catch (\RuntimeException $e) {
+			$status = $e->getCode() > 0 ? $e->getCode() : Http::STATUS_BAD_REQUEST;
+			return new DataResponse(['message' => $e->getMessage()], $status);
+		}
+
+		$response = new DataResponse([
+			'title' => $context['title'],
+			'url' => $context['url'],
+			'is_external' => $context['is_external'],
+			'original_pad_url' => $context['original_pad_url'],
+		]);
+		if (($context['cookie_header'] ?? '') !== '') {
+			$response->addHeader('Set-Cookie', (string)$context['cookie_header']);
+		}
+		return $response;
+	}
+
+	private function resolvePublicPadContext(string $token, mixed $fileParam): array {
+		try {
+			$share = $this->shareManager->getShareByToken($token);
+		} catch (ShareNotFound) {
+			$this->publicFail('This share link is invalid or has expired.', Http::STATUS_NOT_FOUND);
+		}
+
+		try {
+			$node = $share->getNode();
+		} catch (NotFoundException) {
+			$this->publicFail('This shared item is no longer available.', Http::STATUS_NOT_FOUND);
+		}
+
+		$isFolderShare = $node instanceof Folder;
+		$selectedRelativePath = '';
+
+		if ($node instanceof Folder) {
+			try {
+				$normalized = $this->pathNormalizer->normalizePublicShareFilePath($fileParam, $token);
+			} catch (\Throwable) {
+				$this->publicFail('Invalid file path.', Http::STATUS_BAD_REQUEST);
+			}
+			if ($normalized === '') {
+				$this->publicFail('No .pad file selected. Open a .pad file from this shared folder.', Http::STATUS_BAD_REQUEST);
+			}
+			$selectedRelativePath = $normalized;
+			try {
+				$node = $node->get($normalized);
+			} catch (NotFoundException) {
+				$this->publicFail('The selected file does not exist in this share.', Http::STATUS_NOT_FOUND);
+			}
+		}
+
+		if (!$node instanceof File) {
+			$this->publicFail('The selected item is not a file.', Http::STATUS_NOT_FOUND);
+		}
+		if (!str_ends_with(strtolower($node->getName()), '.pad')) {
+			$this->publicFail('The selected file is not a .pad document.', Http::STATUS_BAD_REQUEST);
+		}
+
+		$content = (string)$node->getContent();
+		$fileId = (int)$node->getId();
+		$readOnly = (((int)$share->getPermissions()) & Constants::PERMISSION_UPDATE) === 0;
+
+		try {
+			$parsed = $this->padFileService->parsePadFile($content);
+			$meta = $parsed['frontmatter'];
+			$padId = (string)$meta['pad_id'];
+			$accessMode = (string)$meta['access_mode'];
+			$padUrl = isset($meta['pad_url']) ? trim((string)$meta['pad_url']) : '';
+			$isExternal = $this->padFileService->isExternalFrontmatter($meta, $padId);
+
+			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
+			$openTarget = $this->resolvePublicOpenTarget($padId, $accessMode, $readOnly, $token, $isExternal, $padUrl);
+		} catch (PadFileFormatException|BindingException|EtherpadClientException $e) {
+			$this->publicFail($this->mapPublicOpenError($e), Http::STATUS_BAD_REQUEST);
+		}
+
+		return [
+			'title' => $node->getName(),
+			'url' => $openTarget['url'],
+			'is_external' => $isExternal,
+			'is_public_pad' => $accessMode === BindingService::ACCESS_PUBLIC,
+			'open_new_tab_url' => $accessMode === BindingService::ACCESS_PUBLIC ? $openTarget['url'] : '',
+			'original_pad_url' => $openTarget['original_pad_url'],
+			'cookie_header' => $openTarget['cookie_header'],
+			'files_url' => $this->buildShareBaseUrl($token),
+			'download_url' => $this->buildPublicDownloadUrl($token, $selectedRelativePath, $isFolderShare, $node->getName()),
+		];
+	}
+
+	private function publicFail(string $message, int $status): never {
+		throw new \RuntimeException($message, $status);
+	}
+
+	private function publicErrorResponse(string $token, string $error, int $status = Http::STATUS_BAD_REQUEST): TemplateResponse {
+		$response = new TemplateResponse($this->appName, 'noviewer', [
+			'error' => $error,
+			'back_url' => $this->buildShareBaseUrl($token),
+			'back_label' => 'Back to shared files',
+		], 'blank');
+		$response->setStatus($status);
+		return $response;
+	}
+
+	private function buildShareBaseUrl(string $token): string {
+		$webroot = rtrim($this->urlGenerator->getWebroot(), '/');
+		return $webroot . '/s/' . rawurlencode($token);
+	}
+
+	private function mapPublicOpenError(\Throwable $error): string {
+		$message = $error->getMessage();
+		if ($error instanceof PadFileFormatException) {
+			if (str_contains($message, 'Missing YAML frontmatter')) {
+				return 'The selected .pad file is missing required metadata.';
+			}
+			return 'The selected .pad file has an invalid format.';
+		}
+		if ($error instanceof BindingException) {
+			if (trim($message) === 'No binding exists for this file.') {
+				return 'The selected .pad file is a copied file without an active pad binding. Please open the original shared .pad file.';
+			}
+			return 'Pad binding is inconsistent. Please contact the share owner.';
+		}
+		if ($error instanceof EtherpadClientException) {
+			return 'Etherpad is currently unavailable for this shared pad.';
+		}
+		return 'Unable to open pad.';
+	}
+
+	private function buildPublicShareRedirectUrl(string $token, mixed $fileParam): string {
+		$base = $this->buildShareBaseUrl($token);
+		$rawFile = is_scalar($fileParam) ? trim((string)$fileParam) : '';
+		if ($rawFile === '') {
+			return $base . '?dir=' . rawurlencode('/');
+		}
+
+		try {
+			$normalized = $this->pathNormalizer->normalizePublicShareFilePath($fileParam, $token);
+		} catch (\Throwable) {
+			$this->publicFail('Invalid file path.', Http::STATUS_BAD_REQUEST);
+		}
+		if ($normalized === '') {
+			return $base . '?dir=' . rawurlencode('/');
+		}
+
+		$path = trim($normalized, '/');
+		if ($path === '') {
+			return $base . '?dir=' . rawurlencode('/');
+		}
+
+		$dir = dirname($path);
+		if ($dir === '.' || $dir === '') {
+			$dir = '/';
+		} else {
+			$dir = '/' . $dir;
+		}
+		$fileName = basename($path);
+		if ($fileName === '' || !str_ends_with(strtolower($fileName), '.pad')) {
+			$this->publicFail('The selected file is not a .pad document.', Http::STATUS_BAD_REQUEST);
+		}
+
+		return $base . '?path=' . rawurlencode($dir) . '&files=' . rawurlencode($fileName);
+	}
+
+	private function buildPublicDownloadUrl(string $token, string $selectedRelativePath, bool $isFolderShare, string $fileName): string {
+		$base = $this->buildShareBaseUrl($token) . '/download';
+		if (!$isFolderShare) {
+			return $base;
+		}
+
+		$path = trim($selectedRelativePath, '/');
+		if ($path === '') {
+			return '';
+		}
+
+		$dir = dirname($path);
+		if ($dir === '.' || $dir === '') {
+			$dir = '/';
+		} else {
+			$dir = '/' . $dir;
+		}
+		$name = basename($path);
+		if ($name === '') {
+			$name = $fileName;
+		}
+		if ($name === '') {
+			return '';
+		}
+
+		return $base . '?path=' . rawurlencode($dir) . '&files=' . rawurlencode($name);
+	}
+
+	/** @return array{url:string,original_pad_url:string,cookie_header:string} */
+	private function resolvePublicOpenTarget(
+		string $padId,
+		string $accessMode,
+		bool $readOnly,
+		string $token,
+		bool $isExternal,
+		string $padUrl = ''
+	): array {
+		if ($accessMode === BindingService::ACCESS_PROTECTED) {
+			$authorUid = 'public-share:' . $token;
+			$authorName = 'Public share';
+			$openContext = $this->padSessionService->createProtectedOpenContext($authorUid, $authorName, $padId, 3600);
+			$cookieHeader = $this->padSessionService->buildSetCookieHeader($openContext['cookie']);
+			if ($readOnly) {
+				return [
+					'url' => $this->etherpadClient->getReadOnlyPadUrl($padId),
+					'original_pad_url' => '',
+					'cookie_header' => $cookieHeader,
+				];
+			}
+			return [
+				'url' => $openContext['url'],
+				'original_pad_url' => '',
+				'cookie_header' => $cookieHeader,
+			];
+		}
+
+		if ($isExternal) {
+			if ($padUrl === '') {
+				throw new EtherpadClientException('External pad URL metadata is missing or invalid.');
+			}
+			$normalized = $this->etherpadClient->normalizeAndValidateExternalPublicPadUrl($padUrl);
+			return [
+				'url' => $normalized['pad_url'],
+				'original_pad_url' => $normalized['pad_url'],
+				'cookie_header' => '',
+			];
+		}
+
+		if ($readOnly) {
+			return [
+				'url' => $this->etherpadClient->getReadOnlyPadUrl($padId),
+				'original_pad_url' => '',
+				'cookie_header' => '',
+			];
+		}
+
+		return [
+			'url' => $this->etherpadClient->buildPadUrl($padId),
+			'original_pad_url' => '',
+			'cookie_header' => '',
+		];
+	}
+
+}

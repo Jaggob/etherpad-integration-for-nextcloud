@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+	<id>etherpad_nextcloud</id>
+	<name>Etherpad Integration for Nextcloud</name>
+	<summary>Standalone Etherpad integration for Nextcloud</summary>
+	<description>Standalone Etherpad integration for Nextcloud with binding-based lifecycle and secure viewer flows.</description>
+	<version>1.0.0</version>
+	<licence>agpl</licence>
+	<author>Jacob Bühler</author>
+	<namespace>EtherpadNextcloud</namespace>
+	<types>
+		<filesystem/>
+	</types>
+	<dependencies>
+		<nextcloud min-version="30" max-version="33"/>
+	</dependencies>
+	<settings>
+		<admin-section>OCA\EtherpadNextcloud\Settings\AdminSection</admin-section>
+		<admin>OCA\EtherpadNextcloud\Settings\AdminSettings</admin>
+	</settings>
+	<repair-steps>
+		<post-migration>
+			<step>OCA\EtherpadNextcloud\Migration\RegisterMimeType</step>
+			<step>OCA\EtherpadNextcloud\Migration\BackfillPadMimeType</step>
+		</post-migration>
+	</repair-steps>
+</info>

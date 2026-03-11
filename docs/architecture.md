@@ -1,0 +1,169 @@
+# Etherpad Nextcloud Plugin Architecture
+
+SPDX-License-Identifier: AGPL-3.0-or-later
+
+## Goal
+
+The `etherpad_nextcloud` app integrates Etherpad for `.pad` files in Nextcloud with a native-viewer-first approach.
+Etherpad is the editing source of truth; the `.pad` file acts as binding storage and snapshot container.
+
+## Core Components
+
+- `lib/Service/BindingService.php`
+  - Manages the central DB table `ep_pad_bindings`.
+  - Owns mapping `file_id <-> pad_id` and states (`active`, `trashed`, `pending_delete`, `purged`).
+- `lib/Service/LifecycleService.php`
+  - Trash/restore flow.
+  - Snapshot on trash, re-provisioning on restore.
+  - On Etherpad delete failures: `pending_delete` instead of blocking Nextcloud trash.
+- `lib/BackgroundJob/RetryPendingDeleteJob.php`
+  - Daily retry for deferred Etherpad deletions:
+    - unresolved `pending_delete`
+    - stale `trashed` bindings where the file is no longer present in Nextcloud storage/trashbin
+- `lib/Service/EtherpadClient.php`
+  - Adapter for Etherpad HTTP API (pad create/delete/session/read-only/export).
+- `lib/Service/PadFileService.php`
+  - Parser/serializer for `.pad` v1 (YAML + snapshot body).
+  - Revision metadata and snapshot body structure (`[TEXT]`, `[HTML-BEGIN]`, `[HTML-END]`).
+- `lib/Service/PadSessionService.php`
+  - Session-cookie flow for protected GroupPads.
+- `lib/Service/ConsistencyCheckService.php`
+  - Optional admin integrity scan:
+    - bindings without file
+    - `.pad` files without binding
+    - invalid/mismatching frontmatter on bound files
+- `lib/Controller/ViewerController.php`
+  - Compatibility redirect adapter:
+    - resolves `.pad` path/id to stable Nextcloud files viewer URL.
+- `lib/Controller/PublicViewerController.php`
+  - Public-share API + compatibility redirect adapter (`/public/{token}` -> `/s/{token}` with file selection).
+- `lib/Controller/PadController.php`
+  - API for create/open/resolve/sync/trash/restore.
+  - For protected pad opens, attaches explicit Etherpad `Set-Cookie` session header via response header.
+
+## Persistence Model
+
+- DB table `ep_pad_bindings` (migration: `lib/Migration/Version000001Date20260304222000.php`)
+  - `file_id`
+  - `pad_id`
+  - `access_mode`
+  - `state`
+  - `deleted_at`
+  - `created_at`
+  - `updated_at`
+- `.pad` file
+  - Frontmatter: format, binding metadata, state, export metadata.
+  - Body: text and HTML snapshot.
+
+## Main Flows
+
+### 1) Create
+
+1. `PadController::create` creates an Etherpad pad (public or protected/group).
+2. Creates the `.pad` file.
+3. Writes initial frontmatter.
+4. Creates DB binding.
+
+### 2) Open (authenticated)
+
+Primary flow (native viewer):
+
+1. `js/files-main.js` opens `.pad` in Nextcloud Files viewer route (`/apps/files/files/{fileId}?openfile=true`).
+2. `js/viewer-main.js` resolves Etherpad open data via API:
+   - preferred: `POST /api/v1/pads/open-by-id` (`fileId`, CSRF `requesttoken`)
+   - fallback: `POST /api/v1/pads/open` (`file`, CSRF `requesttoken`) if no stable `fileId` is available
+3. `PadController` validates frontmatter/binding and resolves secure open URL:
+   - `protected`: session URL via `PadSessionService`
+   - `public`: direct/read-only URL as appropriate
+4. For protected pads, response includes one Etherpad session `Set-Cookie` header.
+5. Legacy app routes (`/apps/etherpad_nextcloud`, `/by-id/{fileId}`) redirect into the same native files viewer URL.
+
+### 3) Open (public share)
+
+Primary flow (native viewer when available):
+
+1. Public share routes stay on Nextcloud share URL (`/s/{token}`).
+2. `js/viewer-main.js` detects public share context and resolves open data via:
+   - `GET /api/v1/public/open/{token}?file=...`
+3. Same open-target rules apply:
+   - read-only share: Etherpad read-only URL
+   - editable share: regular URL/session
+4. For protected share-open flows, session bootstrap uses one explicit `Set-Cookie` header.
+5. Compatibility route `/apps/etherpad_nextcloud/public/{token}` redirects to native share route `/s/{token}`.
+
+## Cookie Header Model
+
+- Cookie construction is centralized in `PadSessionService` (`buildSetCookieHeader()`).
+- We intentionally use explicit attributes required for Etherpad iframe sessions across subdomains:
+  - `Domain`
+  - `Secure`
+  - `SameSite=None`
+- Domain source:
+  - explicit `etherpad_cookie_domain` app setting when configured
+  - otherwise derived from `etherpad_host` with label-aware fallback rules
+  - explicit config is recommended for proxy-heavy or non-standard subdomain setups
+- Current app-level contract:
+  - one custom Etherpad `Set-Cookie` line per protected-open response
+  - no additional app-level custom cookies on these same responses
+- If we later need multiple custom cookies on the same response, header handling must be extended as a dedicated change (with targeted controller tests), because multi-`Set-Cookie` behavior is a framework-sensitive edge case.
+
+### 4) Sync
+
+1. Frontend (`js/viewer-main.js`) triggers periodic sync while a pad is open in native viewer.
+2. `PadController::syncById` fetches revision state from Etherpad.
+3. `.pad` snapshot is updated only for newer revision (or `force=1`).
+4. External pads are synced as text only (no HTML import).
+5. Final flush on `visibilitychange`/`pagehide`.
+6. Files sidebar panel uses revision-based status:
+   - `GET /api/v1/pads/sync-status/{fileId}` compares `snapshot_rev` with `current_rev`.
+   - Sidebar shows `synced` vs `pending`.
+   - Manual action `Pad in Datei speichern` calls `syncById` with `force=1`.
+
+### 5) Trash/Restore
+
+- Trash: persist snapshot, switch state to `trashed`, delete pad in Etherpad.
+- If Etherpad is unavailable during delete: switch state to `pending_delete`, keep Nextcloud trash successful.
+- Restore: provision new pad, replay snapshot, switch binding/frontmatter back to `active`.
+
+### 6) Admin Integrity Check (optional)
+
+1. Admin runs `POST /api/v1/admin/consistency-check`.
+2. Service scans DB/file metadata consistency.
+3. Returns aggregate counters and bounded sample lists for diagnostics.
+
+## Main Frontend Files
+
+- `js/files-main.js`
+  - Files/public-share open handling and viewer redirect.
+  - In authenticated files app routes, `.pad` open is handled via registered Nextcloud file action (`setDefault`) instead of global click interception.
+    - Reason: preserves native list interactions (checkbox selection, multi-select, row actions) without accidental auto-open.
+  - Global click interception is scoped to public-share routes only, where direct share download links must be remapped to the pad viewer.
+  - Public-share strategy: native viewer only.
+  - `+ Neu` integration for `Public pad` is API-only with runtime capability checks:
+    - modern API: `addNewFileMenuEntry` / `getNewFileMenu().registerEntry`
+    - legacy API fallback: `OC.Plugins.register('OCA.Files.NewFileMenu', ...)`
+  - In files app, `.pad` is opened through Nextcloud router with `fileid` + `openfile=true`:
+    - Target route: `/index.php/apps/files/files/{fileId}?dir=...&editing=false&openfile=true`
+  - Router edge-case fallback: hard navigation to same files URL.
+  - Stale-route guard: `/apps/files/files/{fileId}?dir=...` without `openfile=true` is normalized to `/apps/files/files?dir=...` for `.pad`.
+  - New-pad menu integration.
+- `js/viewer-main.js`
+  - Registers Nextcloud viewer handler for MIME `application/x-etherpad-nextcloud`.
+  - Open URL resolution via CSRF-protected `POST` endpoints:
+    - `open-by-id` (preferred)
+    - `open` (fallback)
+  - Handles initialize-retry when frontmatter is missing.
+  - Triggers periodic/unload-safe sync loop for authenticated native viewer sessions.
+
+## Event Integration
+
+- `OCA\Files\Event\LoadAdditionalScriptsEvent`
+  - Load scripts for files app.
+- `OCA\Viewer\Event\LoadViewer`
+  - Load viewer handler.
+- `OCA\Files_Sharing\Event\BeforeTemplateRenderedEvent`
+  - Load scripts on public-share pages.
+- `OCA\Files_Trashbin\Events\MoveToTrashEvent`
+  - Trash lifecycle.
+- `OCA\Files_Trashbin\Events\NodeRestoredEvent`
+  - Restore lifecycle.

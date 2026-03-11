@@ -1,0 +1,77 @@
+#etherpad-nextcloud-admin-settings {
+	max-width: 900px;
+}
+
+#etherpad-nextcloud-admin-settings form p {
+	margin: 0 0 14px;
+}
+
+#etherpad-nextcloud-admin-settings .settings-hint {
+	display: block;
+}
+
+#etherpad-nextcloud-admin-settings .ep-field-hint {
+	margin-top: -8px;
+	margin-bottom: 14px;
+}
+
+#etherpad-nextcloud-admin-settings #allow-external-pads-row {
+	margin-bottom: 6px;
+}
+
+#etherpad-nextcloud-admin-settings #external-pad-allowlist-row {
+	margin-bottom: 6px;
+}
+
+#etherpad-nextcloud-admin-settings #external-pad-allowlist-hint {
+	margin-top: 0;
+}
+
+#etherpad-nextcloud-admin-settings label {
+	display: block;
+	font-weight: 600;
+	margin-bottom: 6px;
+}
+
+#etherpad-nextcloud-admin-settings input[type="url"],
+#etherpad-nextcloud-admin-settings input[type="password"],
+#etherpad-nextcloud-admin-settings input[type="text"],
+#etherpad-nextcloud-admin-settings input[type="number"],
+#etherpad-nextcloud-admin-settings textarea {
+	width: 100%;
+	max-width: 640px;
+}
+
+#etherpad-nextcloud-admin-settings label.checkbox {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	font-weight: 400;
+}
+
+#etherpad-nextcloud-admin-settings .etherpad-nextcloud-admin-actions {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+#etherpad-nextcloud-admin-settings #etherpad-nextcloud-admin-status.ep-status-success,
+#etherpad-nextcloud-admin-settings #etherpad-nextcloud-admin-status.ep-status-error {
+	color: var(--color-main-text, var(--color-text-maxcontrast, #1f2937));
+}
+
+#etherpad-nextcloud-admin-settings .ep-field-error {
+	display: none;
+	margin-top: 6px;
+	color: var(--color-error, #c62828);
+	font-size: 0.875rem;
+}
+
+#etherpad-nextcloud-admin-settings .ep-field-error.is-visible {
+	display: block;
+}
+
+#etherpad-nextcloud-admin-settings .ep-input-error {
+	border-color: var(--color-error, #c62828) !important;
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-error, #c62828) 40%, transparent) !important;
+}

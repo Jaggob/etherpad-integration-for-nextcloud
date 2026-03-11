@@ -1,0 +1,131 @@
+<?php
+/**
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ * Copyright (c) 2026 Jacob Bühler
+ */
+?>
+<div id="etherpad-nextcloud-admin-settings"
+	class="section"
+	data-save-url="<?php p((string)$_['save_settings_url']); ?>"
+	data-health-url="<?php p((string)$_['health_check_url']); ?>"
+	data-consistency-url="<?php p((string)$_['consistency_check_url']); ?>"
+	data-retry-pending-url="<?php p((string)$_['retry_pending_deletes_url']); ?>"
+	data-l10n-saving="<?php p((string)$_['l10n']['saving']); ?>"
+	data-l10n-saved="<?php p((string)$_['l10n']['saved']); ?>"
+	data-l10n-checking="<?php p((string)$_['l10n']['checking']); ?>"
+	data-l10n-consistency-running="<?php p((string)$_['l10n']['consistency_running']); ?>"
+	data-l10n-health-ok="<?php p((string)$_['l10n']['health_ok']); ?>"
+	data-l10n-consistency-ok="<?php p((string)$_['l10n']['consistency_ok']); ?>"
+	data-l10n-request-failed="<?php p((string)$_['l10n']['request_failed']); ?>"
+	data-l10n-saving-failed="<?php p((string)$_['l10n']['saving_failed']); ?>"
+	data-l10n-health-failed="<?php p((string)$_['l10n']['health_failed']); ?>"
+	data-l10n-consistency-failed="<?php p((string)$_['l10n']['consistency_failed']); ?>"
+	data-l10n-pending-delete-label="<?php p((string)$_['l10n']['pending_delete_label']); ?>"
+	data-l10n-trashed-without-file-label="<?php p((string)$_['l10n']['trashed_without_file_label']); ?>"
+	data-l10n-retry-failed="<?php p((string)$_['l10n']['retry_failed']); ?>">
+	<h2><?php p((string)$_['l10n']['section_title']); ?></h2>
+	<p class="settings-hint">
+		<?php p((string)$_['l10n']['intro']); ?>
+	</p>
+
+	<form id="etherpad-nextcloud-admin-form">
+		<p>
+			<label for="etherpad-host"><?php p((string)$_['l10n']['etherpad_base_url']); ?></label>
+			<input
+				type="url"
+				id="etherpad-host"
+				name="etherpad_host"
+				required
+				placeholder="https://pad.example.org"
+				value="<?php p((string)$_['etherpad_host']); ?>">
+			<span class="ep-field-error" data-field-error="etherpad_host" aria-live="polite"></span>
+		</p>
+
+		<p>
+			<label for="etherpad-api-host"><?php p((string)$_['l10n']['etherpad_api_url']); ?></label>
+			<input
+				type="url"
+				id="etherpad-api-host"
+				name="etherpad_api_host"
+				placeholder="https://etherpad.internal"
+				value="<?php p((string)$_['etherpad_api_host']); ?>">
+			<span class="ep-field-error" data-field-error="etherpad_api_host" aria-live="polite"></span>
+		</p>
+		<p class="settings-hint ep-field-hint"><?php p((string)$_['l10n']['etherpad_api_url_hint']); ?></p>
+
+		<p>
+			<label for="etherpad-api-key"><?php p((string)$_['l10n']['etherpad_api_key']); ?></label>
+			<input
+				type="password"
+				id="etherpad-api-key"
+				name="etherpad_api_key"
+				autocomplete="off"
+				placeholder="••••••••••••••••">
+			<span class="ep-field-error" data-field-error="etherpad_api_key" aria-live="polite"></span>
+		</p>
+
+		<p class="settings-hint ep-field-hint">
+			<?php p((string)$_['l10n']['detected_api_version']); ?> <strong><?php p((string)$_['etherpad_api_version']); ?></strong>
+		</p>
+
+		<p>
+			<label for="sync-interval-seconds"><?php p((string)$_['l10n']['copy_interval']); ?></label>
+			<input
+				type="number"
+				id="sync-interval-seconds"
+				name="sync_interval_seconds"
+				min="5"
+				max="3600"
+				step="1"
+				value="<?php p((string)$_['sync_interval_seconds']); ?>">
+			<span class="ep-field-error" data-field-error="sync_interval_seconds" aria-live="polite"></span>
+		</p>
+		<p class="settings-hint ep-field-hint"><?php p((string)$_['l10n']['copy_interval_hint']); ?></p>
+
+		<p id="delete-on-trash-row">
+			<label class="checkbox">
+				<input
+					type="checkbox"
+					name="delete_on_trash"
+					value="1"
+					<?php if ((bool)$_['delete_on_trash']): ?>checked<?php endif; ?>>
+				<?php p((string)$_['l10n']['delete_on_trash']); ?>
+			</label>
+		</p>
+		<p class="settings-hint ep-field-hint"><?php p((string)$_['l10n']['delete_on_trash_hint']); ?></p>
+
+		<p id="allow-external-pads-row">
+			<label class="checkbox">
+				<input
+					type="checkbox"
+					name="allow_external_pads"
+					value="1"
+					<?php if ((bool)$_['allow_external_pads']): ?>checked<?php endif; ?>>
+				<?php p((string)$_['l10n']['allow_external_pads']); ?>
+			</label>
+		</p>
+
+		<p id="external-pad-allowlist-row">
+			<label for="external-pad-allowlist"><?php p((string)$_['l10n']['external_allowlist']); ?></label>
+			<textarea
+				id="external-pad-allowlist"
+				name="external_pad_allowlist"
+				rows="5"
+				placeholder="pad.example.org&#10;etherpad.example.net"><?php p((string)$_['external_pad_allowlist']); ?></textarea>
+			<span class="ep-field-error" data-field-error="external_pad_allowlist" aria-live="polite"></span>
+		</p>
+		<p id="external-pad-allowlist-hint" class="settings-hint ep-field-hint"><?php p((string)$_['l10n']['external_allowlist_hint']); ?></p>
+
+		<div class="etherpad-nextcloud-admin-actions">
+			<button type="submit" class="primary"><?php p((string)$_['l10n']['save_button']); ?></button>
+			<button type="button" id="etherpad-nextcloud-health-check"><?php p((string)$_['l10n']['health_button']); ?></button>
+			<button type="button" id="etherpad-nextcloud-consistency-check"><?php p((string)$_['l10n']['consistency_button']); ?></button>
+		</div>
+		<div id="etherpad-nextcloud-pending-actions" class="etherpad-nextcloud-admin-actions" style="display:none;">
+			<button type="button" id="etherpad-nextcloud-retry-pending"><?php p((string)$_['l10n']['retry_pending_button']); ?></button>
+			<span id="etherpad-nextcloud-pending-count" class="settings-hint"></span>
+		</div>
+
+		<p id="etherpad-nextcloud-admin-status" class="settings-hint" aria-live="polite"></p>
+	</form>
+</div>

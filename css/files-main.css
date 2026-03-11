@@ -1,0 +1,131 @@
+/**
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ * Copyright (c) 2026 Jacob Bühler
+ */
+
+/* NC Viewer scoped CSS sets height:auto on .modal-container.
+ * Scope override to our viewer only to avoid affecting other file types. */
+.viewer .modal-wrapper .modal-container:has(.epnc-native-shell) {
+	height: unset !important;
+	bottom: 0 !important;
+}
+
+.epnc-native-shell {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	min-height: 0;
+}
+
+.epnc-native-iframe {
+	display: block;
+	width: 100%;
+	height: 100%;
+	min-height: 0;
+	border: 0;
+	background: var(--color-main-background, #fff);
+}
+
+.epnc-native-status {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 100%;
+	color: var(--color-text-maxcontrast, #6b7280);
+	font-size: 14px;
+}
+
+.epnc-native-status--error {
+	color: var(--color-main-text, #111827);
+	padding: 24px;
+	justify-content: center;
+	align-items: flex-start;
+}
+
+.epnc-native-error-card {
+	width: 100%;
+	max-width: 840px;
+	padding: 14px 16px;
+	border-radius: 10px;
+	border: 1px solid var(--color-error, #d1242f);
+	background: var(--color-main-background, #fff);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.epnc-native-error-title {
+	font-size: 15px;
+	font-weight: 600;
+	line-height: 1.35;
+	color: var(--color-main-text, #111827);
+	margin-bottom: 6px;
+}
+
+.epnc-native-error-message {
+	font-size: 14px;
+	line-height: 1.5;
+	color: var(--color-text-maxcontrast, #374151);
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.epnc-sidebar-sync-panel {
+	margin: 10px;
+	padding: 12px;
+	border-radius: 10px;
+	border: 1px solid var(--color-border, #d1d5db);
+	background: var(--color-main-background, #fff);
+}
+
+.epnc-sidebar-sync-mount {
+	display: block;
+}
+
+.epnc-sidebar-sync-panel__header {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 10px;
+}
+
+.epnc-sidebar-sync-panel__icon {
+	display: inline-block;
+	width: 18px;
+	height: 18px;
+	flex: 0 0 18px;
+	background-repeat: no-repeat;
+	background-position: center;
+	background-size: 18px 18px;
+}
+
+.epnc-sidebar-sync-panel__status {
+	font-size: 13px;
+	color: var(--color-text-maxcontrast, #4b5563);
+}
+
+.epnc-sidebar-sync-panel__button {
+	width: 100%;
+	justify-content: center;
+}
+
+.epnc-sidebar-sync-panel__button--public-open {
+	margin-top: 8px;
+}
+
+#body-public[data-epnc-single-file-share="1"] .modal-header .icons-menu,
+#body-public[data-epnc-single-file-share="1"] .modal-header .header-close {
+	display: none !important;
+}
+
+#body-public[data-epnc-single-file-share="1"] .viewer .modal-header {
+	display: none !important;
+	opacity: 0 !important;
+	visibility: hidden !important;
+	pointer-events: none !important;
+}
+
+#body-public[data-epnc-single-file-share="1"] .viewer .modal-wrapper--full > .modal-container {
+	top: 0 !important;
+	height: 100% !important;
+	max-height: 100% !important;
+}
