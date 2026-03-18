@@ -193,7 +193,8 @@ Base: `/apps/etherpad_nextcloud`
 ## Frontend API Usage
 
 - `js/files-main.js`
-  - uses `GET /api/v1/pads/resolve` for file-id/path resolution.
+  - extracts `fileId` directly from the authenticated Files action context whenever available.
+  - uses `GET /api/v1/pads/resolve` mainly as a fallback to convert file path -> `fileId` when no stable `fileId` is available.
   - opens in files view through Nextcloud router (`fileid`, `openfile=true`).
   - registers `Public pad` in `+ Neu` via API-only runtime capability checks:
     - modern: `addNewFileMenuEntry` / `getNewFileMenu().registerEntry`

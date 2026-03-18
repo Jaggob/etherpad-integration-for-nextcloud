@@ -69,6 +69,8 @@ Etherpad is the editing source of truth; the `.pad` file acts as binding storage
 Primary flow (native viewer):
 
 1. `js/files-main.js` opens `.pad` in Nextcloud Files viewer route (`/apps/files/files/{fileId}?openfile=true`).
+   - on authenticated files routes, it now extracts the stable `fileId` directly from the Nextcloud file-action context whenever available
+   - path-based resolve is only a fallback for contexts without a usable `fileId`
 2. `js/viewer-main.js` resolves Etherpad open data via API:
    - preferred: `POST /api/v1/pads/open-by-id` (`fileId`, CSRF `requesttoken`)
    - fallback: `POST /api/v1/pads/open` (`file`, CSRF `requesttoken`) if no stable `fileId` is available
