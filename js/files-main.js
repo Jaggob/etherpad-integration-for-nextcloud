@@ -31,6 +31,7 @@
 	const PUBLIC_SINGLE_SHARE_ATTR = 'data-epnc-single-file-share'
 	const PUBLIC_PAD_MENU_ENTRY_ID = APP_ID + '_public_pad'
 	const PUBLIC_PAD_MENU_ICON_CLASS = 'icon-filetype-etherpad-nextcloud-pad'
+	const PUBLIC_PAD_MENU_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2" clip-rule="evenodd" viewBox="0 0 355 355"><path fill="#5ac395" d="M317 89v177c0 28-23 51-51 51H89c-28 0-51-23-51-51V89c0-28 23-51 51-51h177c28 0 51 23 51 51"/><path fill="#4aa57f" fill-rule="nonzero" d="M240 144q-4-3-8 0-6 6 0 9a36 36 0 0 1 0 52 6 6 0 0 0 3 12q3 0 5-3c19-18 19-50 0-70"/><path fill="#479a76" fill-rule="nonzero" d="M267 122q-4-5-9 0-4 4 0 10c25 26 25 68 0 93q-4 5 0 9 5 4 9 0c30-31 30-81 0-112"/><path fill="#fff" d="M192 130v2q-1 8-10 10H76q-9-2-11-10v-2q1-10 11-10h106q9 0 10 10m24 51v2q-1 11-12 11H78q-10 0-12-11v-2q2-10 12-11h126q12 1 12 11"/><path fill="#fff" d="M216 181v2q-1 11-12 11H78q-10 0-12-11v-2q2-10 12-11h126q12 1 12 11m-57 52v1q-1 11-10 11H76q-9 0-11-11v-1q1-10 11-11h73q9 1 10 11"/><path fill="#fff" d="M159 233v1q-1 11-10 11H76q-9 0-11-11v-1q1-10 11-11h73q9 1 10 11"/></svg>'
 	const PAD_MENU_ORDER = 98
 	const PUBLIC_PAD_MENU_REGISTRATION_MAX_ATTEMPTS = 120
 	const PUBLIC_PAD_MENU_REGISTRATION_RETRY_MS = 500
@@ -1436,14 +1437,6 @@
 	}
 
 	const resolveNewFileMenuApi = () => {
-		const globalMenu = window._nc_newfilemenu
-		if (globalMenu && typeof globalMenu === 'object' && typeof globalMenu.registerEntry === 'function') {
-			return {
-				type: 'global-registry',
-				register: globalMenu.registerEntry.bind(globalMenu),
-				unregister: (typeof globalMenu.unregisterEntry === 'function') ? globalMenu.unregisterEntry.bind(globalMenu) : null,
-			}
-		}
 		const roots = [
 			window.OCP && window.OCP.Files,
 			window.OCA && window.OCA.Files,
@@ -1475,6 +1468,15 @@
 				}
 			}
 		}
+		// Internal global fallback used by some Nextcloud builds.
+		const globalMenu = window._nc_newfilemenu
+		if (globalMenu && typeof globalMenu === 'object' && typeof globalMenu.registerEntry === 'function') {
+			return {
+				type: 'global-registry',
+				register: globalMenu.registerEntry.bind(globalMenu),
+				unregister: (typeof globalMenu.unregisterEntry === 'function') ? globalMenu.unregisterEntry.bind(globalMenu) : null,
+			}
+		}
 		return null
 	}
 
@@ -1491,7 +1493,7 @@
 		const entry = {
 			id: PUBLIC_PAD_MENU_ENTRY_ID,
 			displayName: t(APP_ID, 'Public pad'),
-			iconClass: PUBLIC_PAD_MENU_ICON_CLASS,
+			iconSvgInline: PUBLIC_PAD_MENU_ICON_SVG,
 			order: PAD_MENU_ORDER,
 			enabled: () => true,
 			handler: () => {
@@ -1554,7 +1556,7 @@
 						menu.registerEntry({
 							id: PUBLIC_PAD_MENU_ENTRY_ID,
 							displayName: t(APP_ID, 'Public pad'),
-							iconClass: PUBLIC_PAD_MENU_ICON_CLASS,
+							iconSvgInline: PUBLIC_PAD_MENU_ICON_SVG,
 							order: PAD_MENU_ORDER,
 							enabled: () => true,
 							handler: () => {
