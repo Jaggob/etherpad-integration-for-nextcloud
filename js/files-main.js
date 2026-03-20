@@ -53,6 +53,38 @@
 		const numeric = Number(value)
 		return Number.isFinite(numeric) && numeric > 0 ? numeric : 1
 	}
+	const ocPermissionCreate = () => {
+		const value = window.OC && window.OC.PERMISSION_CREATE
+		const numeric = Number(value)
+		return Number.isFinite(numeric) && numeric > 0 ? numeric : 4
+	}
+	const nextcloudMajorVersion = () => {
+		const candidates = [
+			window.OC && window.OC.config && window.OC.config.version,
+			window.OC && window.OC.config && window.OC.config.versionstring,
+			window.oc_appconfig && window.oc_appconfig.core && window.oc_appconfig.core.version,
+			document.documentElement && document.documentElement.getAttribute('data-version'),
+		]
+		for (const candidate of candidates) {
+			const value = String(candidate || '').trim()
+			if (value === '') {
+				continue
+			}
+			const match = value.match(/^(\d+)/)
+			if (!match) {
+				continue
+			}
+			const parsed = parseInt(match[1], 10)
+			if (Number.isFinite(parsed) && parsed > 0) {
+				return parsed
+			}
+		}
+		return null
+	}
+	const supportsInlineNewFileMenuSvg = () => {
+		const major = nextcloudMajorVersion()
+		return major !== null && major >= 33
+	}
 
 	const normalizeFilePath = (dir, filename) => {
 		const cleanDir = !dir || dir === '/' ? '' : String(dir)
@@ -274,6 +306,77 @@
 	}
 
 	const isPadName = (name) => typeof name === 'string' && name.toLowerCase().endsWith('.pad')
+
+	const isDuplicateError = (error) => {
+		const message = (error && error.message) ? String(error.message) : ''
+		return message.toLowerCase().includes('duplicate')
+	}
+
+	const extractCreateCapabilityFromMenuContext = (arg) => {
+		if (!arg || typeof arg !== 'object') {
+			return null
+		}
+		if (arg.hasCreatePermission === false) {
+			return false
+		}
+		if (arg.hasCreatePermission === true) {
+			return true
+		}
+		if (typeof arg.canCreate === 'boolean') {
+			return arg.canCreate
+		}
+		const requiredPermission = ocPermissionCreate()
+		const permissionCandidates = [
+			arg.permissions,
+			arg.permission,
+			arg.attributes && arg.attributes.permissions,
+			typeof arg.get === 'function' ? arg.get('permissions') : null,
+		]
+		for (const candidate of permissionCandidates) {
+			const numeric = Number(candidate)
+			if (Number.isFinite(numeric)) {
+				return (numeric & requiredPermission) === requiredPermission
+			}
+		}
+		return null
+	}
+
+	const canCreateFromMenuContext = (...args) => {
+		for (const arg of args) {
+			const resolved = extractCreateCapabilityFromMenuContext(arg)
+			if (resolved !== null) {
+				return resolved
+			}
+		}
+		return true
+	}
+
+	const publicPadMenuEnabled = (...args) => canCreateFromMenuContext(...args)
+	const publicPadMenuHandler = () => {
+		void promptAndCreatePublicPad()
+	}
+
+	const buildPublicPadMenuEntry = () => ({
+		id: PUBLIC_PAD_MENU_ENTRY_ID,
+		displayName: t(APP_ID, 'Public pad'),
+		...(supportsInlineNewFileMenuSvg()
+			? { iconSvgInline: PUBLIC_PAD_MENU_ICON_SVG }
+			: { iconClass: PUBLIC_PAD_MENU_ICON_CLASS }),
+		order: PAD_MENU_ORDER,
+		enabled: publicPadMenuEnabled,
+		handler: publicPadMenuHandler,
+	})
+
+	const buildLegacyPublicPadMenuEntry = () => ({
+		id: PUBLIC_PAD_MENU_ENTRY_ID,
+		displayName: t(APP_ID, 'Public pad'),
+		templateName: t(APP_ID, 'Public pad'),
+		iconClass: PUBLIC_PAD_MENU_ICON_CLASS,
+		...(supportsInlineNewFileMenuSvg() ? { iconSvgInline: PUBLIC_PAD_MENU_ICON_SVG } : {}),
+		fileType: 'file',
+		order: PAD_MENU_ORDER,
+		actionHandler: publicPadMenuHandler,
+	})
 
 	const apiResolvePadByFileId = async (fileId) => {
 		const cacheKey = String(fileId)
@@ -1541,7 +1644,6 @@
 			}
 			if (typeof root.addNewFileMenuEntry === 'function') {
 				return {
-					type: 'add',
 					register: root.addNewFileMenuEntry.bind(root),
 					unregister: (typeof root.removeNewFileMenuEntry === 'function') ? root.removeNewFileMenuEntry.bind(root) : null,
 				}
@@ -1555,7 +1657,6 @@
 				}
 				if (menu && typeof menu.registerEntry === 'function') {
 					return {
-						type: 'registry',
 						register: menu.registerEntry.bind(menu),
 						unregister: (typeof menu.unregisterEntry === 'function') ? menu.unregisterEntry.bind(menu) : null,
 					}
@@ -1566,7 +1667,6 @@
 		const globalMenu = window._nc_newfilemenu
 		if (globalMenu && typeof globalMenu === 'object' && typeof globalMenu.registerEntry === 'function') {
 			return {
-				type: 'global-registry',
 				register: globalMenu.registerEntry.bind(globalMenu),
 				unregister: (typeof globalMenu.unregisterEntry === 'function') ? globalMenu.unregisterEntry.bind(globalMenu) : null,
 			}
@@ -1579,21 +1679,8 @@
 		if (!api) {
 			return false
 		}
-		const isDuplicateError = (error) => {
-			const message = (error && error.message) ? String(error.message) : ''
-			return message.toLowerCase().includes('duplicate')
-		}
 
-		const entry = {
-			id: PUBLIC_PAD_MENU_ENTRY_ID,
-			displayName: t(APP_ID, 'Public pad'),
-			iconSvgInline: PUBLIC_PAD_MENU_ICON_SVG,
-			order: PAD_MENU_ORDER,
-			enabled: () => true,
-			handler: () => {
-				void promptAndCreatePublicPad()
-			},
-		}
+		const entry = buildPublicPadMenuEntry()
 		try {
 			api.register(entry)
 			publicPadMenuApiRegistered = true
@@ -1611,21 +1698,7 @@
 		if (publicPadMenuLegacyApiRegistered) {
 			return true
 		}
-		const legacyEntry = {
-			id: PUBLIC_PAD_MENU_ENTRY_ID,
-			displayName: t(APP_ID, 'Public pad'),
-			templateName: t(APP_ID, 'Public pad'),
-			iconClass: PUBLIC_PAD_MENU_ICON_CLASS,
-			fileType: 'file',
-			order: PAD_MENU_ORDER,
-			actionHandler() {
-				void promptAndCreatePublicPad()
-			},
-		}
-		const isDuplicateError = (error) => {
-			const message = (error && error.message) ? String(error.message) : ''
-			return message.toLowerCase().includes('duplicate')
-		}
+		const legacyEntry = buildLegacyPublicPadMenuEntry()
 		const tryDirectLegacyMenu = () => {
 			const candidates = [
 				window.OCA && window.OCA.Files && window.OCA.Files.NewFileMenu,
@@ -1647,16 +1720,7 @@
 				}
 				if (typeof menu.registerEntry === 'function') {
 					try {
-						menu.registerEntry({
-							id: PUBLIC_PAD_MENU_ENTRY_ID,
-							displayName: t(APP_ID, 'Public pad'),
-							iconSvgInline: PUBLIC_PAD_MENU_ICON_SVG,
-							order: PAD_MENU_ORDER,
-							enabled: () => true,
-							handler: () => {
-								void promptAndCreatePublicPad()
-							},
-						})
+						menu.registerEntry(buildPublicPadMenuEntry())
 						return true
 					} catch (error) {
 						if (isDuplicateError(error)) {
@@ -1892,7 +1956,6 @@
 		evaluateCurrentRoute()
 		registerOpenAction()
 		registerPadClickInterceptor()
-		ensurePublicPadMenuRegistration()
 		installSidebarSyncObserver()
 		scheduleSidebarSyncPanelRefresh(200)
 	}
