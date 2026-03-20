@@ -10,7 +10,11 @@ Status date: 2026-03-11
 
 ### Important (Non-Blocking)
 
-- None currently.
+1. **Disallow `.pad` copy more explicitly**
+   - preferred technical path: block copy server-side via `BeforeNodeCopiedEvent`
+   - this is more robust than trying to hide `Copy` only in the Files UI
+   - expected follow-up: evaluate whether a clearer user-facing error/notification can be shown when copy is rejected
+   - avoid brittle DOM patching of the three-dots menu unless no stable alternative exists
 
 ## Nice-to-Have (Post-Release)
 

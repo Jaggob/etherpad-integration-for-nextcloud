@@ -1,12 +1,12 @@
 # Etherpad Integration for Nextcloud
 
-SPDX-License-Identifier: AGPL-3.0-or-later
-
-Etherpad plugin for Nextcloud (`etherpad_nextcloud`), focused on secure `.pad` files, native Nextcloud viewer flow, and robust trash/restore lifecycle handling.
+This plugin lets you surface pads from an Etherpad instance inside Nextcloud and organize them there like other files.
 
 ## Core Features
 
-- `.pad` files open directly in the Nextcloud viewer
+- Each Etherpad pad is represented by a `.pad` file inside Nextcloud
+- `.pad` files live in normal Nextcloud folders and integrate with sharing, trash, restore, and file organization
+- Opening a `.pad` file in Nextcloud opens the linked Etherpad pad inside the native Nextcloud file viewer in an iframe
 - Protected and public pad modes
 - Public folder/file share support for `.pad`
 - Periodic sync from Etherpad into `.pad` snapshots
@@ -138,6 +138,12 @@ For deployment, copy the app to `apps/etherpad_nextcloud` and exclude developmen
 
 - Verify Etherpad API key and Etherpad auth mode
 - Run admin `Health check` in `Settings -> Administration -> Pads`
+
+### Protected pads fail because of cookies / iframe auth
+
+- Nextcloud and Etherpad must run on the same registrable domain so browser session cookies work inside the iframe
+- Example: `cloud.example.org` + `pad.example.org`
+- Setups on unrelated domains will usually fail for protected pads in the embedded viewer
 
 ## Documentation
 
