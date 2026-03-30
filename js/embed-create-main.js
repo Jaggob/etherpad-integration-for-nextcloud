@@ -11,10 +11,11 @@
 	}
 
 	const parentFolderId = Number(root.getAttribute('data-parent-folder-id') || '')
-	const name = String(root.getAttribute('data-name') || '').trim()
-	const accessMode = String(root.getAttribute('data-access-mode') || '').trim()
 	const createByParentUrl = String(root.getAttribute('data-create-by-parent-url') || '').trim()
 	const templateRequestToken = String(root.getAttribute('data-request-token') || '').trim()
+	const missingNameMessage = String(root.getAttribute('data-l10n-missing-name') || 'Pad name is required.')
+	const invalidAccessModeMessage = String(root.getAttribute('data-l10n-invalid-access-mode') || 'Invalid access mode.')
+	const incompleteConfigMessage = String(root.getAttribute('data-l10n-incomplete-config') || 'Embed configuration is incomplete.')
 	const loadingNode = root.querySelector('[data-epnc-embed-create-loading]')
 	const errorNode = root.querySelector('[data-epnc-embed-create-error]')
 	const errorMessageNode = root.querySelector('[data-epnc-embed-create-error-message]')
@@ -63,9 +64,17 @@
 		}
 	}
 
+	const readLauncherParams = () => {
+		const params = new URL(window.location.href).searchParams
+		return {
+			name: String(params.get('name') || '').trim(),
+			accessMode: String(params.get('accessMode') || 'protected').trim(),
+		}
+	}
+
 	const run = async () => {
-		if (!Number.isFinite(parentFolderId) || parentFolderId <= 0 || name === '' || createByParentUrl === '') {
-			showError('Embed configuration is incomplete.')
+		if (!Number.isFinite(parentFolderId) || parentFolderId <= 0 || createByParentUrl === '') {
+			showError(incompleteConfigMessage)
 			return
 		}
 		if (ocRequestToken() === '') {
@@ -73,12 +82,20 @@
 			return
 		}
 
+		const { name, accessMode } = readLauncherParams()
+		if (name === '') {
+			showError(missingNameMessage)
+			return
+		}
+		if (accessMode !== 'protected' && accessMode !== 'public') {
+			showError(invalidAccessModeMessage)
+			return
+		}
+
 		const body = new URLSearchParams()
 		body.set('parentFolderId', String(parentFolderId))
 		body.set('name', name)
-		if (accessMode !== '') {
-			body.set('accessMode', accessMode)
-		}
+		body.set('accessMode', accessMode)
 
 		try {
 			const data = await fetchJson(createByParentUrl, {

@@ -94,16 +94,6 @@ class EmbedController extends Controller {
 			return $this->errorResponse('Invalid parent folder ID.', 'Unable to create pad');
 		}
 
-		$name = trim($this->readQueryStringParam('name'));
-		$accessMode = trim($this->readQueryStringParam('accessMode', 'protected'));
-		$trimmedName = trim($name);
-		if ($trimmedName === '') {
-			return $this->errorResponse('Pad name is required.', 'Unable to create pad');
-		}
-		if (!in_array($accessMode, ['protected', 'public'], true)) {
-			return $this->errorResponse('Invalid access mode.', 'Unable to create pad');
-		}
-
 		try {
 			$parentFolder = $this->resolveUserFolderNodeById($user->getUID(), $id);
 		} catch (NotFoundException) {
@@ -116,12 +106,13 @@ class EmbedController extends Controller {
 
 		return $this->buildEmbedTemplateResponse('embed-create', [
 			'parent_folder_id' => $id,
-			'name' => $trimmedName,
-			'access_mode' => $accessMode,
 			'create_by_parent_url' => $this->urlGenerator->linkToRoute($this->appName . '.pad.createByParent'),
 			'l10n' => [
 				'loading' => $this->l10n->t('Creating pad...'),
 				'error_title' => $this->l10n->t('Unable to create pad'),
+				'missing_name' => $this->l10n->t('Pad name is required.'),
+				'invalid_access_mode' => $this->l10n->t('Invalid access mode.'),
+				'incomplete_config' => $this->l10n->t('Embed configuration is incomplete.'),
 			],
 		]);
 	}
@@ -131,34 +122,6 @@ class EmbedController extends Controller {
 			'error' => $error,
 			'title' => $title,
 		]);
-	}
-
-	private function readQueryStringParam(string $name, string $default = ''): string {
-		foreach ($this->getCandidateQueryStringsForEmbedRequest() as $queryString) {
-			$queryParams = self::parseQueryString($queryString);
-			if (array_key_exists($name, $queryParams)) {
-				return (string)$queryParams[$name];
-			}
-		}
-
-		return (string)$this->request->getParam($name, $default);
-	}
-
-	/** @return list<string> */
-	private function getCandidateQueryStringsForEmbedRequest(): array {
-		$requestUri = (string)$this->request->getRequestUri();
-		$fromUri = (string)(parse_url($requestUri, PHP_URL_QUERY) ?? '');
-		$server = property_exists($this->request, 'server') ? $this->request->server : null;
-		$fromServer = is_array($server) ? (string)($server['QUERY_STRING'] ?? '') : '';
-
-		return array_values(array_filter([$fromUri, $fromServer], static fn (string $value): bool => $value !== ''));
-	}
-
-	/** @return array<string,mixed> */
-	private static function parseQueryString(string $queryString): array {
-		$params = [];
-		parse_str($queryString, $params);
-		return $params;
 	}
 
 	/** @param array<string,mixed> $data */
