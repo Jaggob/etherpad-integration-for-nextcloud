@@ -25,6 +25,7 @@
 	let syncUrl = ''
 	let syncIntervalMs = 120000
 	let syncInFlight = false
+	let syncPromise = null
 	let syncTimerId = null
 	let visibilityHandler = null
 	let pageHideHandler = null
@@ -75,13 +76,27 @@
 		}
 	}
 
+	const postHostMessage = (source, origin, type, payload = {}) => {
+		if (!source || typeof source.postMessage !== 'function' || !isAllowedMessageOrigin(origin)) {
+			return
+		}
+		source.postMessage(Object.assign({
+			type,
+			fileId,
+		}, payload), origin)
+	}
+
 	const runSync = async (force, keepalive) => {
-		if (!syncUrl) return
-		if (syncInFlight && !force) return
+		if (!syncUrl) {
+			return { status: 'disabled' }
+		}
+		if (syncPromise) {
+			return syncPromise
+		}
 		syncInFlight = true
-		try {
+		syncPromise = (async () => {
 			const url = force ? (syncUrl + (syncUrl.includes('?') ? '&' : '?') + 'force=1') : syncUrl
-			await fetch(url, {
+			const response = await fetch(url, {
 				method: 'POST',
 				credentials: 'same-origin',
 				headers: {
@@ -90,8 +105,17 @@
 				},
 				keepalive: Boolean(keepalive),
 			})
+			const data = await response.json().catch(() => ({}))
+			if (!response.ok) {
+				throw new Error((data && data.message) || 'Sync request failed.')
+			}
+			return data
+		})()
+		try {
+			return await syncPromise
 		} finally {
 			syncInFlight = false
+			syncPromise = null
 		}
 	}
 
@@ -141,7 +165,8 @@
 			return
 		}
 		messageHandler = (event) => {
-			if (!isAllowedMessageOrigin(String(event.origin || ''))) {
+			const origin = String(event.origin || '')
+			if (!isAllowedMessageOrigin(origin)) {
 				return
 			}
 			const payload = event.data
@@ -155,9 +180,31 @@
 				startSyncLoop()
 				return
 			}
-			if (type === 'epnc:host-hidden' || type === 'epnc:host-before-close' || type === 'epnc:host-sync-now') {
-				void runSync(true, type !== 'epnc:host-sync-now')
-				if (type !== 'epnc:host-sync-now') {
+			if (type === 'epnc:host-hidden') {
+				void runSync(true, true)
+				stopSyncLoop()
+				return
+			}
+			if (type === 'epnc:host-before-close' || type === 'epnc:host-sync-now') {
+				const keepalive = type !== 'epnc:host-sync-now'
+				const reason = type === 'epnc:host-before-close' ? 'before-close' : 'sync-now'
+				postHostMessage(event.source, origin, 'epnc:sync-flush-started', {
+					reason,
+				})
+				void runSync(true, keepalive)
+					.then((result) => {
+						postHostMessage(event.source, origin, 'epnc:sync-flush-finished', {
+							reason,
+							result: result && typeof result === 'object' ? result : {},
+						})
+					})
+					.catch((error) => {
+						postHostMessage(event.source, origin, 'epnc:sync-flush-failed', {
+							reason,
+							message: error instanceof Error ? error.message : 'Sync failed.',
+						})
+					})
+				if (keepalive) {
 					stopSyncLoop()
 				}
 			}

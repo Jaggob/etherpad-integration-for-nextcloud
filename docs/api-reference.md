@@ -24,6 +24,20 @@ Base: `/apps/etherpad_nextcloud`
     - renders a blank embed page that internally calls `open-by-id`
     - if open fails with `Missing YAML frontmatter`, the embed page retries once after `initialize-by-id/{fileId}`
     - sets route-specific `frame-ancestors` from admin-configured trusted embed origins
+  - Host message contract:
+    - accepted incoming messages from trusted origins:
+      - `epnc:host-visible`
+      - `epnc:host-hidden`
+      - `epnc:host-before-close`
+      - `epnc:host-sync-now`
+    - emitted replies to the sending host origin:
+      - `epnc:sync-flush-started`
+      - `epnc:sync-flush-finished`
+      - `epnc:sync-flush-failed`
+    - intended use:
+      - host sends `epnc:host-before-close`
+      - waits briefly for `epnc:sync-flush-finished` or `epnc:sync-flush-failed`
+      - only then unmounts the iframe
 
 - `GET /embed/create-by-parent/{parentFolderId}`
   - Controller: `EmbedController::createByParent`

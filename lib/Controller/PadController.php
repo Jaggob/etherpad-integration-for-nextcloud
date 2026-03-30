@@ -35,6 +35,8 @@ use OCP\Lock\LockedException;
 use Psr\Log\LoggerInterface;
 
 class PadController extends Controller {
+	private const SYNC_LOCK_RETRY_DELAYS_US = [150000, 300000, 600000];
+
 	public function __construct(
 		string $appName,
 		IRequest $request,
@@ -714,6 +716,7 @@ class PadController extends Controller {
 			$accessMode = (string)$meta['access_mode'];
 			$padUrl = isset($meta['pad_url']) ? trim((string)$meta['pad_url']) : '';
 			$isExternal = $this->padFileService->isExternalFrontmatter($meta, $padId);
+			$lockRetries = 0;
 			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
 
 			if ($isExternal) {
@@ -737,7 +740,7 @@ class PadController extends Controller {
 				$previousRev = $this->padFileService->getSnapshotRevision((string)$currentContent);
 				$nextRev = max(0, $previousRev + 1);
 				$updatedContent = $this->padFileService->withExportSnapshot((string)$currentContent, $text, '', $nextRev, false);
-				$node->putContent($updatedContent);
+				$this->putContentWithSyncLockRetry($node, $updatedContent, $lockRetries);
 
 				return new DataResponse([
 					'status' => 'updated',
@@ -745,6 +748,7 @@ class PadController extends Controller {
 					'pad_id' => $padId,
 					'external' => true,
 					'snapshot_rev' => $nextRev,
+					'lock_retries' => $lockRetries,
 				]);
 			}
 
@@ -763,13 +767,14 @@ class PadController extends Controller {
 			$text = $this->etherpadClient->getText($padId);
 			$html = $this->etherpadClient->getHTML($padId);
 			$updatedContent = $this->padFileService->withExportSnapshot((string)$currentContent, $text, $html, $currentRev);
-			$node->putContent($updatedContent);
+			$this->putContentWithSyncLockRetry($node, $updatedContent, $lockRetries);
 
 			return new DataResponse([
 				'status' => 'updated',
 				'file_id' => $fileId,
 				'pad_id' => $padId,
 				'snapshot_rev' => $currentRev,
+				'lock_retries' => $lockRetries,
 			]);
 		} catch (LockedException $e) {
 			$this->logger->warning('Pad sync deferred because .pad file is locked', [
@@ -780,6 +785,7 @@ class PadController extends Controller {
 				'accessMode' => $accessMode,
 				'external' => $isExternal,
 				'force' => $force,
+				'lockRetryAttempts' => $lockRetries ?? 0,
 				'exception' => $e,
 			]);
 			return new DataResponse([
@@ -787,6 +793,7 @@ class PadController extends Controller {
 				'file_id' => $fileId,
 				'pad_id' => $padId,
 				'external' => $isExternal,
+				'lock_retries' => $lockRetries ?? 0,
 				'retryable' => true,
 			]);
 		} catch (BindingException $e) {
@@ -802,6 +809,21 @@ class PadController extends Controller {
 				'exception' => $e,
 			]);
 			return new DataResponse(['message' => 'Pad sync failed.'], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	private function putContentWithSyncLockRetry(File $node, string $content, int &$lockRetries): void {
+		while (true) {
+			try {
+				$node->putContent($content);
+				return;
+			} catch (LockedException $e) {
+				if ($lockRetries >= count(self::SYNC_LOCK_RETRY_DELAYS_US)) {
+					throw $e;
+				}
+				\usleep(self::SYNC_LOCK_RETRY_DELAYS_US[$lockRetries]);
+				$lockRetries++;
+			}
 		}
 	}
 
