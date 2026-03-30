@@ -69,6 +69,7 @@ class EmbedController extends Controller {
 				['fileId' => '__FILE_ID__']
 			),
 			'requesttoken' => Util::callRegister(),
+			'trusted_embed_origins' => $this->appConfigService->getTrustedEmbedOrigins(),
 			'l10n' => [
 				'loading' => $this->l10n->t('Loading pad...'),
 				'error_title' => $this->l10n->t('Unable to open pad'),

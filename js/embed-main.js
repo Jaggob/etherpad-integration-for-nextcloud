@@ -14,10 +14,21 @@
 	const openByIdUrl = String(root.getAttribute('data-open-by-id-url') || '').trim()
 	const initializeByIdUrlTemplate = String(root.getAttribute('data-initialize-by-id-url-template') || '').trim()
 	const templateRequestToken = String(root.getAttribute('data-request-token') || '').trim()
+	const trustedOrigins = String(root.getAttribute('data-trusted-origins') || '')
+		.split(/\s+/)
+		.map((value) => value.trim())
+		.filter(Boolean)
 	const loadingNode = root.querySelector('[data-epnc-embed-loading]')
 	const errorNode = root.querySelector('[data-epnc-embed-error]')
 	const errorMessageNode = root.querySelector('[data-epnc-embed-error-message]')
 	const iframe = root.querySelector('[data-epnc-embed-iframe]')
+	let syncUrl = ''
+	let syncIntervalMs = 120000
+	let syncInFlight = false
+	let syncTimerId = null
+	let visibilityHandler = null
+	let pageHideHandler = null
+	let messageHandler = null
 
 	const ocRequestToken = () => {
 		if (templateRequestToken !== '') {
@@ -55,6 +66,103 @@
 		}
 		iframe.src = url
 		iframe.hidden = false
+	}
+
+	const stopSyncLoop = () => {
+		if (syncTimerId !== null) {
+			window.clearInterval(syncTimerId)
+			syncTimerId = null
+		}
+	}
+
+	const runSync = async (force, keepalive) => {
+		if (!syncUrl) return
+		if (syncInFlight && !force) return
+		syncInFlight = true
+		try {
+			const url = force ? (syncUrl + (syncUrl.includes('?') ? '&' : '?') + 'force=1') : syncUrl
+			await fetch(url, {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: {
+					Accept: 'application/json',
+					requesttoken: ocRequestToken(),
+				},
+				keepalive: Boolean(keepalive),
+			})
+		} finally {
+			syncInFlight = false
+		}
+	}
+
+	const startSyncLoop = () => {
+		if (!syncUrl || syncTimerId !== null) {
+			return
+		}
+		syncTimerId = window.setInterval(() => {
+			if (document.visibilityState === 'visible') {
+				void runSync(false, false)
+			}
+		}, syncIntervalMs)
+	}
+
+	const installSyncLifecycleHandlers = () => {
+		if (visibilityHandler || pageHideHandler) {
+			return
+		}
+		visibilityHandler = () => {
+			if (document.visibilityState === 'hidden') {
+				void runSync(true, true)
+				stopSyncLoop()
+				return
+			}
+			startSyncLoop()
+		}
+		pageHideHandler = () => {
+			void runSync(true, true)
+			stopSyncLoop()
+		}
+		document.addEventListener('visibilitychange', visibilityHandler)
+		window.addEventListener('pagehide', pageHideHandler)
+	}
+
+	const isAllowedMessageOrigin = (origin) => {
+		if (!origin || origin === 'null') {
+			return false
+		}
+		if (origin === window.location.origin) {
+			return true
+		}
+		return trustedOrigins.includes(origin)
+	}
+
+	const installHostMessageHandler = () => {
+		if (messageHandler) {
+			return
+		}
+		messageHandler = (event) => {
+			if (!isAllowedMessageOrigin(String(event.origin || ''))) {
+				return
+			}
+			const payload = event.data
+			const type = typeof payload === 'string'
+				? payload
+				: (payload && typeof payload === 'object' && typeof payload.type === 'string' ? payload.type : '')
+			if (!type) {
+				return
+			}
+			if (type === 'epnc:host-visible') {
+				startSyncLoop()
+				return
+			}
+			if (type === 'epnc:host-hidden' || type === 'epnc:host-before-close' || type === 'epnc:host-sync-now') {
+				void runSync(true, type !== 'epnc:host-sync-now')
+				if (type !== 'epnc:host-sync-now') {
+					stopSyncLoop()
+				}
+			}
+		}
+		window.addEventListener('message', messageHandler)
 	}
 
 	const fetchJson = async (url, init = {}) => {
@@ -136,6 +244,13 @@
 				await initializePad()
 				data = await openPad()
 			}
+			syncUrl = typeof data.sync_url === 'string' ? data.sync_url.trim() : ''
+			const intervalSeconds = Number(data.sync_interval_seconds)
+			syncIntervalMs = Number.isFinite(intervalSeconds) && intervalSeconds > 0 ? intervalSeconds * 1000 : 120000
+			syncInFlight = false
+			installSyncLifecycleHandlers()
+			installHostMessageHandler()
+			startSyncLoop()
 			showIframe(data.url)
 		} catch (error) {
 			showError(error instanceof Error ? error.message : 'Pad open failed.')

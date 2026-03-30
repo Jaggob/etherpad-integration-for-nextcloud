@@ -273,6 +273,12 @@ Base: `/apps/etherpad_nextcloud`
   - uses same-origin `POST /api/v1/pads/open-by-id`.
   - if open fails with missing frontmatter, calls `POST /api/v1/pads/initialize-by-id/{fileId}` and retries once.
   - sets the returned `response.url` directly on the internal iframe.
+  - uses the returned `sync_url` / `sync_interval_seconds` to trigger the same snapshot sync contract as the native viewer.
+  - listens for trusted parent-frame `postMessage` events:
+    - `epnc:host-visible`
+    - `epnc:host-hidden`
+    - `epnc:host-before-close`
+    - `epnc:host-sync-now`
 - `js/embed-create-main.js`
   - powers the minimal `/embed/create-by-parent/{parentFolderId}` page.
   - uses same-origin `POST /api/v1/pads/create-by-parent`.
