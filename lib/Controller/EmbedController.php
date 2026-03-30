@@ -70,6 +70,7 @@ class EmbedController extends Controller {
 				$this->appName . '.pad.initializeById',
 				['fileId' => '__FILE_ID__']
 			),
+			'requesttoken' => Util::callRegister(),
 			'l10n' => [
 				'loading' => $this->l10n->t('Loading pad...'),
 				'error_title' => $this->l10n->t('Unable to open pad'),
