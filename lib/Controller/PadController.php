@@ -31,6 +31,7 @@ use OCP\Files\NotFoundException;
 use OCP\IRequest;
 use OCP\IURLGenerator;
 use OCP\IUserSession;
+use OCP\Lock\LockedException;
 use Psr\Log\LoggerInterface;
 
 class PadController extends Controller {
@@ -691,6 +692,10 @@ class PadController extends Controller {
 		$forceParam = (string)$this->request->getParam('force', '0');
 		$force = in_array(strtolower($forceParam), ['1', 'true', 'yes'], true);
 		$uid = $user->getUID();
+		$absolutePath = '';
+		$padId = '';
+		$accessMode = '';
+		$isExternal = false;
 		try {
 			$node = $this->resolveUserPadNodeById($uid, $fileId);
 			$absolutePath = $this->toUserAbsolutePath($uid, $node);
@@ -700,9 +705,9 @@ class PadController extends Controller {
 		if (!str_ends_with(strtolower($node->getName()), '.pad')) {
 			return new DataResponse(['message' => 'Selected file is not a .pad file.'], Http::STATUS_BAD_REQUEST);
 		}
-		$currentContent = (string)$node->getContent();
 
 		try {
+			$currentContent = (string)$node->getContent();
 			$parsed = $this->padFileService->parsePadFile((string)$currentContent);
 			$meta = $parsed['frontmatter'];
 			$padId = (string)$meta['pad_id'];
@@ -765,6 +770,24 @@ class PadController extends Controller {
 				'file_id' => $fileId,
 				'pad_id' => $padId,
 				'snapshot_rev' => $currentRev,
+			]);
+		} catch (LockedException $e) {
+			$this->logger->warning('Pad sync deferred because .pad file is locked', [
+				'app' => 'etherpad_nextcloud',
+				'fileId' => $fileId,
+				'path' => $absolutePath,
+				'padId' => $padId,
+				'accessMode' => $accessMode,
+				'external' => $isExternal,
+				'force' => $force,
+				'exception' => $e,
+			]);
+			return new DataResponse([
+				'status' => 'locked',
+				'file_id' => $fileId,
+				'pad_id' => $padId,
+				'external' => $isExternal,
+				'retryable' => true,
 			]);
 		} catch (BindingException $e) {
 			return new DataResponse(['message' => $this->toUserFacingBindingErrorMessage($e)], Http::STATUS_BAD_REQUEST);
