@@ -1,22 +1,8 @@
 # ToDo
 
-Status date: 2026-03-11
+Status date: 2026-03-23
 
 ## Open Items
-
-### Release-Critical (First Release)
-
-- None currently.
-
-### Important (Non-Blocking)
-
-1. **Disallow `.pad` copy more explicitly**
-   - preferred technical path: block copy server-side via `BeforeNodeCopiedEvent`
-   - this is more robust than trying to hide `Copy` only in the Files UI
-   - expected follow-up: evaluate whether a clearer user-facing error/notification can be shown when copy is rejected
-   - avoid brittle DOM patching of the three-dots menu unless no stable alternative exists
-
-## Nice-to-Have (Post-Release)
 
 1. **Legacy import tool**
    - dry-run report
@@ -38,6 +24,15 @@ Status date: 2026-03-11
    - explicit `Rename pad` / `Move pad` actions in sidebar
    - decide if/when Etherpad `movePad` should be used for internal pads
    - keep binding consistency strict
+
+5. **Disallow `.pad` copy more explicitly**
+   - preferred technical path: block copy server-side via `BeforeNodeCopiedEvent`
+   - this is more robust than trying to hide `Copy` only in the Files UI
+   - expected follow-up: evaluate whether a clearer user-facing error/notification can be shown when copy is rejected
+   - avoid brittle DOM patching of the three-dots menu unless no stable alternative exists
+
+6. **error messages**
+   - better messages e.g. for health check errors
 
 ## Recently Completed (Summary)
 
