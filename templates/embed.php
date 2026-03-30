@@ -9,6 +9,7 @@
 	data-file-id="<?php p((string)$_['file_id']); ?>"
 	data-open-by-id-url="<?php p((string)$_['open_by_id_url']); ?>"
 	data-initialize-by-id-url-template="<?php p((string)$_['initialize_by_id_url_template']); ?>"
+	data-request-token="<?php p((string)($_['requesttoken'] ?? '')); ?>"
 	data-l10n-loading="<?php p((string)$_['l10n']['loading']); ?>"
 	data-l10n-error-title="<?php p((string)$_['l10n']['error_title']); ?>">
 	<div class="epnc-embed__loading" data-epnc-embed-loading>

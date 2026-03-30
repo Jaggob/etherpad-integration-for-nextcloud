@@ -13,12 +13,18 @@
 	const fileId = Number(root.getAttribute('data-file-id') || '')
 	const openByIdUrl = String(root.getAttribute('data-open-by-id-url') || '').trim()
 	const initializeByIdUrlTemplate = String(root.getAttribute('data-initialize-by-id-url-template') || '').trim()
+	const templateRequestToken = String(root.getAttribute('data-request-token') || '').trim()
 	const loadingNode = root.querySelector('[data-epnc-embed-loading]')
 	const errorNode = root.querySelector('[data-epnc-embed-error]')
 	const errorMessageNode = root.querySelector('[data-epnc-embed-error-message]')
 	const iframe = root.querySelector('[data-epnc-embed-iframe]')
 
-	const ocRequestToken = () => String((window.OC && window.OC.requestToken) || '')
+	const ocRequestToken = () => {
+		if (templateRequestToken !== '') {
+			return templateRequestToken
+		}
+		return String((window.OC && window.OC.requestToken) || '')
+	}
 
 	const showError = (message) => {
 		if (loadingNode instanceof HTMLElement) {
@@ -113,6 +119,10 @@
 	const run = async () => {
 		if (!Number.isFinite(fileId) || fileId <= 0 || openByIdUrl === '' || initializeByIdUrlTemplate === '') {
 			showError('Embed configuration is incomplete.')
+			return
+		}
+		if (ocRequestToken() === '') {
+			showError('CSRF request token is missing.')
 			return
 		}
 		try {
