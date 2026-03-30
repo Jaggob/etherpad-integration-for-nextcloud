@@ -34,6 +34,41 @@ class PadControllerTest extends TestCase {
 		$this->assertSame('Authentication required.', $response->getData()['message']);
 	}
 
+	public function testCreateByParentReturnsUnauthorizedWhenNoUserSession(): void {
+		$userSession = $this->createMock(IUserSession::class);
+		$userSession->method('getUser')->willReturn(null);
+
+		$controller = $this->buildController($this->createMock(IRequest::class), $userSession);
+		$response = $controller->createByParent(123, 'Test');
+
+		$this->assertSame(Http::STATUS_UNAUTHORIZED, $response->getStatus());
+		$this->assertSame('Authentication required.', $response->getData()['message']);
+	}
+
+	public function testCreateByParentRejectsInvalidParentFolderId(): void {
+		$user = $this->createMock(IUser::class);
+		$userSession = $this->createMock(IUserSession::class);
+		$userSession->method('getUser')->willReturn($user);
+
+		$controller = $this->buildController($this->createMock(IRequest::class), $userSession);
+		$response = $controller->createByParent(0, 'Test');
+
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame('Invalid parentFolderId.', $response->getData()['message']);
+	}
+
+	public function testCreateByParentRejectsInvalidAccessMode(): void {
+		$user = $this->createMock(IUser::class);
+		$userSession = $this->createMock(IUserSession::class);
+		$userSession->method('getUser')->willReturn($user);
+
+		$controller = $this->buildController($this->createMock(IRequest::class), $userSession);
+		$response = $controller->createByParent(12, 'Test', 'invalid');
+
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame('Invalid accessMode. Use public or protected.', $response->getData()['message']);
+	}
+
 	public function testOpenByIdRejectsInvalidFileId(): void {
 		$user = $this->createMock(IUser::class);
 		$userSession = $this->createMock(IUserSession::class);

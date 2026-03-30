@@ -25,6 +25,7 @@ use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\Files\File;
+use OCP\Files\Folder;
 use OCP\Files\IRootFolder;
 use OCP\Files\NotFoundException;
 use OCP\IRequest;
@@ -112,6 +113,94 @@ class PadController extends Controller {
 			$this->logger->error('Pad creation failed', [
 				'app' => 'etherpad_nextcloud',
 				'file' => $path,
+				'accessMode' => $accessMode,
+				'padId' => $padId,
+				'exception' => $e,
+			]);
+
+			$this->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
+			return new DataResponse(['message' => 'Pad creation failed.'], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Create a new Etherpad-backed .pad file and binding inside an existing parent folder.
+	 */
+	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
+	public function createByParent(int $parentFolderId, string $name, string $accessMode = BindingService::ACCESS_PROTECTED): DataResponse {
+		$user = $this->userSession->getUser();
+		if ($user === null) {
+			return new DataResponse(['message' => 'Authentication required.'], Http::STATUS_UNAUTHORIZED);
+		}
+		if ($parentFolderId <= 0) {
+			return new DataResponse(['message' => 'Invalid parentFolderId.'], Http::STATUS_BAD_REQUEST);
+		}
+		if (!in_array($accessMode, [BindingService::ACCESS_PUBLIC, BindingService::ACCESS_PROTECTED], true)) {
+			return new DataResponse(['message' => 'Invalid accessMode. Use public or protected.'], Http::STATUS_BAD_REQUEST);
+		}
+
+		try {
+			$fileName = $this->normalizeCreateFileName($name);
+		} catch (\Throwable) {
+			return new DataResponse(['message' => 'Invalid pad name.'], Http::STATUS_BAD_REQUEST);
+		}
+
+		$uid = $user->getUID();
+		try {
+			$parentFolder = $this->resolveUserFolderNodeById($uid, $parentFolderId);
+		} catch (NotFoundException) {
+			return new DataResponse(['message' => 'Cannot resolve selected parent folder.'], Http::STATUS_NOT_FOUND);
+		}
+
+		if (!$parentFolder->isCreatable()) {
+			return new DataResponse(['message' => 'Selected parent folder is not writable.'], Http::STATUS_FORBIDDEN);
+		}
+
+		$padId = '';
+		$fileCreated = false;
+		$path = '';
+
+		try {
+			$fileNode = $this->createUserFileInFolder($parentFolder, $fileName);
+			$fileCreated = true;
+			$path = $this->toUserAbsolutePath($uid, $fileNode);
+			$fileId = (int)$fileNode->getId();
+			if ($fileId <= 0) {
+				throw new \RuntimeException('Could not resolve new file ID.');
+			}
+
+			$padId = $this->padBootstrapService->provisionPadId($accessMode);
+			$content = $this->padFileService->buildInitialDocument(
+				$fileId,
+				$padId,
+				$accessMode,
+				'',
+				$this->etherpadClient->buildPadUrl($padId)
+			);
+			$fileNode->putContent($content);
+			$this->bindingService->createBinding($fileId, $padId, $accessMode);
+
+			return new DataResponse([
+				'file' => $path,
+				'file_id' => $fileId,
+				'parent_folder_id' => $parentFolderId,
+				'pad_id' => $padId,
+				'access_mode' => $accessMode,
+				'pad_url' => $this->etherpadClient->buildPadUrl($padId),
+				'viewer_url' => $this->buildFilesViewerUrl($fileId, $path),
+				'embed_url' => $this->buildEmbedUrl($fileId),
+			]);
+		} catch (\Throwable $e) {
+			if ($this->isCreateConflict($e)) {
+				$this->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
+				return new DataResponse(['message' => '.pad file already exists.'], Http::STATUS_CONFLICT);
+			}
+
+			$this->logger->error('Pad creation by parent failed', [
+				'app' => 'etherpad_nextcloud',
+				'parentFolderId' => $parentFolderId,
+				'padName' => $name,
+				'path' => $path,
 				'accessMode' => $accessMode,
 				'padId' => $padId,
 				'exception' => $e,
@@ -757,6 +846,21 @@ class PadController extends Controller {
 		return $path;
 	}
 
+	private function normalizeCreateFileName(string $name): string {
+		$fileName = trim($name);
+		$fileName = preg_replace('/\s+\.pad$/i', '.pad', $fileName) ?? $fileName;
+		if ($fileName === '' || $fileName === '.' || $fileName === '..') {
+			throw new \InvalidArgumentException('Invalid file name.');
+		}
+		if (str_contains($fileName, '/') || str_contains($fileName, '\\')) {
+			throw new \InvalidArgumentException('Invalid file name.');
+		}
+		if (!str_ends_with(strtolower($fileName), '.pad')) {
+			$fileName .= '.pad';
+		}
+		return $fileName;
+	}
+
 	private function rollbackFailedCreate(string $uid, string $path, string $padId, bool $fileCreated): void {
 		try {
 			if ($fileCreated || $this->userNodeExists($uid, $path)) {
@@ -957,6 +1061,13 @@ class PadController extends Controller {
 			throw new \RuntimeException('Target parent folder does not exist.');
 		}
 
+		return $this->createUserFileInFolder($parent, $fileName);
+	}
+
+	/**
+	 * @throws \RuntimeException
+	 */
+	private function createUserFileInFolder(Folder $parent, string $fileName): File {
 		try {
 			$node = $parent->newFile($fileName);
 		} catch (\Throwable $e) {
@@ -969,6 +1080,26 @@ class PadController extends Controller {
 			throw new \RuntimeException('Could not create .pad file.');
 		}
 		return $node;
+	}
+
+	/**
+	 * @throws NotFoundException
+	 */
+	private function resolveUserFolderNodeById(string $uid, int $folderId): Folder {
+		$nodes = $this->rootFolder->getById($folderId);
+		$prefix = '/' . $uid . '/files/';
+		foreach ($nodes as $node) {
+			if (!$node instanceof Folder) {
+				continue;
+			}
+			$nodePath = (string)$node->getPath();
+			if (!str_starts_with($nodePath, $prefix)) {
+				continue;
+			}
+			return $node;
+		}
+
+		throw new NotFoundException('Cannot resolve selected parent folder by ID.');
 	}
 
 	private function isCreateConflict(\Throwable $e): bool {
@@ -984,6 +1115,10 @@ class PadController extends Controller {
 		return $base . '/' . rawurlencode((string)$fileId)
 			. '?dir=' . rawurlencode($dir)
 			. '&editing=false&openfile=true';
+	}
+
+	private function buildEmbedUrl(int $fileId): string {
+		return $this->urlGenerator->linkToRoute('etherpad_nextcloud.embed.showById', ['fileId' => $fileId]);
 	}
 
 }
