@@ -23,6 +23,9 @@ use OCP\IUserSession;
 use OCP\Util;
 
 class EmbedController extends Controller {
+	/** @var array{requesttoken:string,trusted_embed_origins:list<string>}|null */
+	private ?array $embedBaseData = null;
+
 	public function __construct(
 		string $appName,
 		IRequest $request,
@@ -61,22 +64,18 @@ class EmbedController extends Controller {
 			return $this->errorResponse('Selected file is not a .pad file.');
 		}
 
-		$response = new TemplateResponse($this->appName, 'embed', [
+		return $this->buildEmbedTemplateResponse('embed', [
 			'file_id' => $id,
 			'open_by_id_url' => $this->urlGenerator->linkToRoute($this->appName . '.pad.openById'),
 			'initialize_by_id_url_template' => $this->urlGenerator->linkToRoute(
 				$this->appName . '.pad.initializeById',
 				['fileId' => '__FILE_ID__']
 			),
-			'requesttoken' => Util::callRegister(),
-			'trusted_embed_origins' => $this->appConfigService->getTrustedEmbedOrigins(),
 			'l10n' => [
 				'loading' => $this->l10n->t('Loading pad...'),
 				'error_title' => $this->l10n->t('Unable to open pad'),
 			],
-		], 'blank');
-
-		return $this->applyEmbedPolicy($response);
+		]);
 	}
 
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
@@ -115,30 +114,27 @@ class EmbedController extends Controller {
 			return $this->errorResponse('Selected parent folder is not writable.', 'Unable to create pad');
 		}
 
-		$response = new TemplateResponse($this->appName, 'embed-create', [
+		return $this->buildEmbedTemplateResponse('embed-create', [
 			'parent_folder_id' => $id,
 			'name' => $trimmedName,
 			'access_mode' => $accessMode,
 			'create_by_parent_url' => $this->urlGenerator->linkToRoute($this->appName . '.pad.createByParent'),
-			'requesttoken' => Util::callRegister(),
 			'l10n' => [
 				'loading' => $this->l10n->t('Creating pad...'),
 				'error_title' => $this->l10n->t('Unable to create pad'),
 			],
-		], 'blank');
-
-		return $this->applyEmbedPolicy($response);
+		]);
 	}
 
 	private function errorResponse(string $error, string $title = 'Unable to open pad'): TemplateResponse {
-		return $this->applyEmbedPolicy(new TemplateResponse($this->appName, 'noviewer', [
+		return $this->buildEmbedTemplateResponse('noviewer', [
 			'error' => $error,
 			'title' => $title,
-		], 'blank'));
+		]);
 	}
 
 	private function readQueryStringParam(string $name, string $default = ''): string {
-		foreach ($this->getCandidateQueryStrings() as $queryString) {
+		foreach ($this->getCandidateQueryStringsForEmbedRequest() as $queryString) {
 			$queryParams = self::parseQueryString($queryString);
 			if (array_key_exists($name, $queryParams)) {
 				return (string)$queryParams[$name];
@@ -149,7 +145,7 @@ class EmbedController extends Controller {
 	}
 
 	/** @return list<string> */
-	private function getCandidateQueryStrings(): array {
+	private function getCandidateQueryStringsForEmbedRequest(): array {
 		$requestUri = (string)$this->request->getRequestUri();
 		$fromUri = (string)(parse_url($requestUri, PHP_URL_QUERY) ?? '');
 		$server = property_exists($this->request, 'server') ? $this->request->server : null;
@@ -163,6 +159,32 @@ class EmbedController extends Controller {
 		$params = [];
 		parse_str($queryString, $params);
 		return $params;
+	}
+
+	/** @param array<string,mixed> $data */
+	private function buildEmbedTemplateResponse(string $template, array $data): TemplateResponse {
+		$response = new TemplateResponse(
+			$this->appName,
+			$template,
+			array_merge($this->getEmbedBaseData(), $data),
+			'blank'
+		);
+
+		return $this->applyEmbedPolicy($response);
+	}
+
+	/** @return array{requesttoken:string,trusted_embed_origins:list<string>} */
+	private function getEmbedBaseData(): array {
+		if ($this->embedBaseData !== null) {
+			return $this->embedBaseData;
+		}
+
+		$this->embedBaseData = [
+			'requesttoken' => Util::callRegister(),
+			'trusted_embed_origins' => $this->appConfigService->getTrustedEmbedOrigins(),
+		];
+
+		return $this->embedBaseData;
 	}
 
 	private function applyEmbedPolicy(TemplateResponse $response): TemplateResponse {
