@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace OCA\EtherpadNextcloud\Settings;
 
 use OCA\EtherpadNextcloud\AppInfo\Application;
+use OCA\EtherpadNextcloud\Service\AppConfigService;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IConfig;
 use OCP\IL10N;
@@ -21,6 +22,7 @@ class AdminSettings implements ISettings {
 		private IConfig $config,
 		private IURLGenerator $urlGenerator,
 		private IL10N $l10n,
+		private AppConfigService $appConfigService,
 	) {
 	}
 
@@ -47,6 +49,7 @@ class AdminSettings implements ISettings {
 			'delete_on_trash' => (string)$this->config->getAppValue(Application::APP_ID, 'delete_on_trash', 'yes') === 'yes',
 			'allow_external_pads' => (string)$this->config->getAppValue(Application::APP_ID, 'allow_external_pads', 'yes') === 'yes',
 			'external_pad_allowlist' => (string)$this->config->getAppValue(Application::APP_ID, 'external_pad_allowlist', ''),
+			'trusted_embed_origins' => $this->appConfigService->getTrustedEmbedOriginsRaw(),
 			'has_api_key' => (string)$this->config->getAppValue(Application::APP_ID, 'etherpad_api_key', '') !== '',
 			'save_settings_url' => $this->urlGenerator->linkToRoute('etherpad_nextcloud.admin.saveSettings'),
 			'health_check_url' => $this->urlGenerator->linkToRoute('etherpad_nextcloud.admin.healthCheck'),
@@ -67,6 +70,8 @@ class AdminSettings implements ISettings {
 				'allow_external_pads' => $this->l10n->t('Allow linking external public pads'),
 				'external_allowlist' => $this->l10n->t('External host allowlist (optional)'),
 				'external_allowlist_hint' => $this->l10n->t('Leave empty to allow all public hosts. HTTPS is always required.'),
+				'trusted_embed_origins' => $this->l10n->t('Trusted embed origins (optional)'),
+				'trusted_embed_origins_hint' => $this->l10n->t('Absolute https origins allowed to embed the /embed/by-id route. Leave empty to disable external embedding.'),
 				'save_button' => $this->l10n->t('Save settings'),
 				'health_button' => $this->l10n->t('Health check'),
 				'consistency_button' => $this->l10n->t('Consistency check'),

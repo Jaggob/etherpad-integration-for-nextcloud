@@ -8,7 +8,9 @@ declare(strict_types=1);
 
 namespace OCA\EtherpadNextcloud\Controller;
 
+use OCA\EtherpadNextcloud\Service\AppConfigService;
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http\ContentSecurityPolicy;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\Files\File;
 use OCP\Files\IRootFolder;
@@ -27,6 +29,7 @@ class EmbedController extends Controller {
 		private IRootFolder $rootFolder,
 		private IURLGenerator $urlGenerator,
 		private IL10N $l10n,
+		private AppConfigService $appConfigService,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -60,7 +63,7 @@ class EmbedController extends Controller {
 		Util::addScript($this->appName, 'embed-main');
 		Util::addStyle($this->appName, 'embed');
 
-		return new TemplateResponse($this->appName, 'embed', [
+		$response = new TemplateResponse($this->appName, 'embed', [
 			'file_id' => $id,
 			'open_by_id_url' => $this->urlGenerator->linkToRoute($this->appName . '.pad.openById'),
 			'initialize_by_id_url_template' => $this->urlGenerator->linkToRoute(
@@ -72,6 +75,14 @@ class EmbedController extends Controller {
 				'error_title' => $this->l10n->t('Unable to open pad'),
 			],
 		], 'blank');
+
+		$policy = new ContentSecurityPolicy();
+		foreach ($this->appConfigService->getTrustedEmbedOrigins() as $origin) {
+			$policy->addAllowedFrameAncestorDomain($origin);
+		}
+		$response->setContentSecurityPolicy($policy);
+
+		return $response;
 	}
 
 	private function errorResponse(string $error): TemplateResponse {
