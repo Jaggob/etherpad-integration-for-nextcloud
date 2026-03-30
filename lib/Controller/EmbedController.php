@@ -94,8 +94,8 @@ class EmbedController extends Controller {
 			return $this->errorResponse('Invalid parent folder ID.', 'Unable to create pad');
 		}
 
-		$name = trim((string)$this->request->getParam('name', ''));
-		$accessMode = trim((string)$this->request->getParam('accessMode', 'protected'));
+		$name = trim($this->readQueryStringParam('name'));
+		$accessMode = trim($this->readQueryStringParam('accessMode', 'protected'));
 		$trimmedName = trim($name);
 		if ($trimmedName === '') {
 			return $this->errorResponse('Pad name is required.', 'Unable to create pad');
@@ -134,6 +134,30 @@ class EmbedController extends Controller {
 			'error' => $error,
 			'title' => $title,
 		], 'blank'));
+	}
+
+	private function readQueryStringParam(string $name, string $default = ''): string {
+		$requestUri = (string)$this->request->getRequestUri();
+		$requestUriQuery = (string)(parse_url($requestUri, PHP_URL_QUERY) ?? '');
+		if ($requestUriQuery !== '') {
+			$queryParams = [];
+			parse_str($requestUriQuery, $queryParams);
+			if (array_key_exists($name, $queryParams)) {
+				return (string)$queryParams[$name];
+			}
+		}
+
+		$server = $this->request->server;
+		$queryString = is_array($server) ? (string)($server['QUERY_STRING'] ?? '') : '';
+		if ($queryString !== '') {
+			$queryParams = [];
+			parse_str($queryString, $queryParams);
+			if (array_key_exists($name, $queryParams)) {
+				return (string)$queryParams[$name];
+			}
+		}
+
+		return (string)$this->request->getParam($name, $default);
 	}
 
 	private function applyEmbedPolicy(TemplateResponse $response): TemplateResponse {
