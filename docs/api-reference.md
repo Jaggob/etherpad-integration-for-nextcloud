@@ -25,6 +25,19 @@ Base: `/apps/etherpad_nextcloud`
     - if open fails with `Missing YAML frontmatter`, the embed page retries once after `initialize-by-id/{fileId}`
     - sets route-specific `frame-ancestors` from admin-configured trusted embed origins
 
+- `GET /embed/create-by-parent/{parentFolderId}`
+  - Controller: `EmbedController::createByParent`
+  - Query:
+    - `name` (required)
+    - `accessMode` (`public|protected`, optional, default `protected`)
+  - Purpose: minimal authenticated create launcher page for trusted same-site / trusted-origin integrations.
+  - Behavior:
+    - requires a logged-in Nextcloud user
+    - validates that `parentFolderId` resolves to an accessible writable folder in the user's file tree
+    - renders a blank page that internally calls `POST /api/v1/pads/create-by-parent` same-origin with CSRF token
+    - on success redirects itself to the returned `embed_url`
+    - sets route-specific `frame-ancestors` from admin-configured trusted embed origins
+
 - `GET /public/{token}`
   - Controller: `PublicViewerController::showPad`
   - Query (folder share): `file=/subfolder/file.pad`
@@ -56,6 +69,9 @@ Base: `/apps/etherpad_nextcloud`
     - `pad_url`
     - `viewer_url`
     - `embed_url`
+  - Intended use:
+    - trusted same-origin launcher pages inside Nextcloud
+    - not direct server-side cross-app mutation without a real Nextcloud user session
 
 - `POST /api/v1/pads/from-url`
   - Controller: `PadController::createFromUrl`
@@ -257,6 +273,10 @@ Base: `/apps/etherpad_nextcloud`
   - uses same-origin `POST /api/v1/pads/open-by-id`.
   - if open fails with missing frontmatter, calls `POST /api/v1/pads/initialize-by-id/{fileId}` and retries once.
   - sets the returned `response.url` directly on the internal iframe.
+- `js/embed-create-main.js`
+  - powers the minimal `/embed/create-by-parent/{parentFolderId}` page.
+  - uses same-origin `POST /api/v1/pads/create-by-parent`.
+  - redirects to returned `embed_url` after successful pad creation.
 
 ## URL Control in Files App
 

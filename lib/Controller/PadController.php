@@ -104,6 +104,16 @@ class PadController extends Controller {
 				'pad_url' => $this->etherpadClient->buildPadUrl($padId),
 				'viewer_url' => $this->buildFilesViewerUrl($fileId, $path),
 			]);
+		} catch (BindingException $e) {
+			$this->logger->warning('Pad create hit existing binding', [
+				'app' => 'etherpad_nextcloud',
+				'file' => $path,
+				'accessMode' => $accessMode,
+				'padId' => $padId,
+				'exception' => $e,
+			]);
+			$this->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
+			return new DataResponse(['message' => '.pad file already exists.'], Http::STATUS_CONFLICT);
 		} catch (\Throwable $e) {
 			if ($this->isCreateConflict($e)) {
 				$this->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
@@ -190,6 +200,18 @@ class PadController extends Controller {
 				'viewer_url' => $this->buildFilesViewerUrl($fileId, $path),
 				'embed_url' => $this->buildEmbedUrl($fileId),
 			]);
+		} catch (BindingException $e) {
+			$this->logger->warning('Pad creation by parent hit existing binding', [
+				'app' => 'etherpad_nextcloud',
+				'parentFolderId' => $parentFolderId,
+				'padName' => $name,
+				'path' => $path,
+				'accessMode' => $accessMode,
+				'padId' => $padId,
+				'exception' => $e,
+			]);
+			$this->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
+			return new DataResponse(['message' => '.pad file already exists.'], Http::STATUS_CONFLICT);
 		} catch (\Throwable $e) {
 			if ($this->isCreateConflict($e)) {
 				$this->rollbackFailedCreate($uid, $path, $padId, $fileCreated);

@@ -13,6 +13,7 @@ use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\ContentSecurityPolicy;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\Files\File;
+use OCP\Files\Folder;
 use OCP\Files\IRootFolder;
 use OCP\Files\NotFoundException;
 use OCP\IL10N;
@@ -74,6 +75,63 @@ class EmbedController extends Controller {
 			],
 		], 'blank');
 
+		return $this->applyEmbedPolicy($response);
+	}
+
+	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
+	#[\OCP\AppFramework\Http\Attribute\NoCSRFRequired]
+	public function createByParent(mixed $parentFolderId, string $name = '', string $accessMode = 'protected'): TemplateResponse {
+		$user = $this->userSession->getUser();
+		if ($user === null) {
+			return $this->errorResponse('Authentication required.');
+		}
+		if (!is_numeric($parentFolderId)) {
+			return $this->errorResponse('Invalid parent folder ID.');
+		}
+
+		$id = (int)$parentFolderId;
+		if ($id <= 0) {
+			return $this->errorResponse('Invalid parent folder ID.');
+		}
+
+		$trimmedName = trim($name);
+		if ($trimmedName === '') {
+			return $this->errorResponse('Pad name is required.');
+		}
+		if (!in_array($accessMode, ['protected', 'public'], true)) {
+			return $this->errorResponse('Invalid access mode.');
+		}
+
+		try {
+			$parentFolder = $this->resolveUserFolderNodeById($user->getUID(), $id);
+		} catch (NotFoundException) {
+			return $this->errorResponse('Cannot resolve selected parent folder.');
+		}
+
+		if (!$parentFolder->isCreatable()) {
+			return $this->errorResponse('Selected parent folder is not writable.');
+		}
+
+		$response = new TemplateResponse($this->appName, 'embed-create', [
+			'parent_folder_id' => $id,
+			'name' => $trimmedName,
+			'access_mode' => $accessMode,
+			'create_by_parent_url' => $this->urlGenerator->linkToRoute($this->appName . '.pad.createByParent'),
+			'requesttoken' => Util::callRegister(),
+			'l10n' => [
+				'loading' => $this->l10n->t('Creating pad...'),
+				'error_title' => $this->l10n->t('Unable to create pad'),
+			],
+		], 'blank');
+
+		return $this->applyEmbedPolicy($response);
+	}
+
+	private function errorResponse(string $error): TemplateResponse {
+		return new TemplateResponse($this->appName, 'noviewer', ['error' => $error], 'blank');
+	}
+
+	private function applyEmbedPolicy(TemplateResponse $response): TemplateResponse {
 		$policy = new ContentSecurityPolicy();
 		foreach ($this->appConfigService->getTrustedEmbedOrigins() as $origin) {
 			$policy->addAllowedFrameAncestorDomain($origin);
@@ -81,10 +139,6 @@ class EmbedController extends Controller {
 		$response->setContentSecurityPolicy($policy);
 
 		return $response;
-	}
-
-	private function errorResponse(string $error): TemplateResponse {
-		return new TemplateResponse($this->appName, 'noviewer', ['error' => $error], 'blank');
 	}
 
 	/**
@@ -102,5 +156,23 @@ class EmbedController extends Controller {
 			}
 		}
 		throw new NotFoundException('File not found by ID.');
+	}
+
+	/**
+	 * @throws NotFoundException
+	 */
+	private function resolveUserFolderNodeById(string $uid, int $folderId): Folder {
+		$nodes = $this->rootFolder->getById($folderId);
+		$prefix = '/' . $uid . '/files/';
+		foreach ($nodes as $node) {
+			if (!$node instanceof Folder) {
+				continue;
+			}
+			if (str_starts_with((string)$node->getPath(), $prefix)) {
+				return $node;
+			}
+		}
+
+		throw new NotFoundException('Folder not found by ID.');
 	}
 }
