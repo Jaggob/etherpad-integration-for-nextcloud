@@ -15,6 +15,16 @@ Base: `/apps/etherpad_nextcloud`
   - Controller: `ViewerController::showPadById`
   - Purpose: compatibility entry route via file ID; redirects to native Files viewer URL.
 
+- `GET /embed/by-id/{fileId}`
+  - Controller: `EmbedController::showById`
+  - Purpose: minimal authenticated embed page for trusted same-site / trusted-origin integrations.
+  - Behavior:
+    - requires a logged-in Nextcloud user
+    - validates that `fileId` resolves to an accessible `.pad` file in the user's file tree
+    - renders a blank embed page that internally calls `open-by-id`
+    - if open fails with `Missing YAML frontmatter`, the embed page retries once after `initialize-by-id/{fileId}`
+    - sets route-specific `frame-ancestors` from admin-configured trusted embed origins
+
 - `GET /public/{token}`
   - Controller: `PublicViewerController::showPad`
   - Query (folder share): `file=/subfolder/file.pad`
@@ -29,6 +39,23 @@ Base: `/apps/etherpad_nextcloud`
     - `file` (required)
     - `accessMode` (`public|protected`, optional, default `protected`)
   - Result: creates pad, file, and binding.
+
+- `POST /api/v1/pads/create-by-parent`
+  - Controller: `PadController::createByParent`
+  - Params:
+    - `parentFolderId` (required, Nextcloud folder/file ID of the writable target folder)
+    - `name` (required, filename base; `.pad` suffix is appended if missing)
+    - `accessMode` (`public|protected`, optional, default `protected`)
+  - Purpose: creates a managed `.pad` file inside an existing parent folder without requiring the client to construct a full path string.
+  - Result includes:
+    - `file`
+    - `file_id`
+    - `parent_folder_id`
+    - `pad_id`
+    - `access_mode`
+    - `pad_url`
+    - `viewer_url`
+    - `embed_url`
 
 - `POST /api/v1/pads/from-url`
   - Controller: `PadController::createFromUrl`
@@ -66,6 +93,23 @@ Base: `/apps/etherpad_nextcloud`
 - `POST /api/v1/pads/initialize-by-id/{fileId}`
   - Controller: `PadController::initializeById`
   - Purpose: explicit frontmatter initialization by stable Nextcloud `fileId`.
+
+- `GET /api/v1/pads/meta-by-id/{fileId}`
+  - Controller: `PadController::metaById`
+  - Purpose: read-only metadata endpoint for external UIs that need stable file context without triggering open/session bootstrap.
+  - Result includes:
+    - `is_pad`
+    - `is_pad_mime`
+    - `file_id`
+    - `name`
+    - `path`
+    - `access_mode`
+    - `is_external`
+    - `pad_id`
+    - `pad_url`
+    - `public_open_url`
+    - `viewer_url`
+    - `embed_url`
 
 - `GET /api/v1/pads/resolve`
   - Controller: `PadController::resolveById`
@@ -174,6 +218,7 @@ Base: `/apps/etherpad_nextcloud`
 ## Important Response Fields
 
 - `viewer_url`: URL for viewer redirect.
+- `embed_url`: URL for the minimal authenticated embed page (`/embed/by-id/{fileId}`).
 - `pad_id`: Etherpad pad ID.
 - `pad_url`: preferred target URL for public/external pads.
 - `access_mode`: `public` or `protected`.
@@ -207,6 +252,11 @@ Base: `/apps/etherpad_nextcloud`
   - if open fails with missing frontmatter, calls `POST /api/v1/pads/initialize*` and retries open once.
   - uses `POST /api/v1/pads/sync/{fileId}` periodically and on unload.
   - sync status UI is exposed in Files sidebar panel via `js/files-main.js`.
+- `js/embed-main.js`
+  - powers the minimal `/embed/by-id/{fileId}` page.
+  - uses same-origin `POST /api/v1/pads/open-by-id`.
+  - if open fails with missing frontmatter, calls `POST /api/v1/pads/initialize-by-id/{fileId}` and retries once.
+  - sets the returned `response.url` directly on the internal iframe.
 
 ## URL Control in Files App
 
@@ -269,4 +319,7 @@ Registered in `lib/AppInfo/Application.php`.
 - `sync_interval_seconds` (default `120`, clamp `5..3600`)
 - `allow_external_pads` (`yes|no`, default `yes`)
 - `external_pad_allowlist` (newline-separated host list, optional)
+- `trusted_embed_origins` (newline-separated absolute `https://origin` list, optional)
+  - used only for the route-specific `frame-ancestors` policy on `/embed/by-id/{fileId}`
+  - when empty, no external embedding origin is added beyond `'self'`
 - `test_fault` (debug-only E2E fault injection; empty by default)
