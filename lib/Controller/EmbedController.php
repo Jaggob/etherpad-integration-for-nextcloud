@@ -80,36 +80,38 @@ class EmbedController extends Controller {
 
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	#[\OCP\AppFramework\Http\Attribute\NoCSRFRequired]
-	public function createByParent(mixed $parentFolderId, string $name = '', string $accessMode = 'protected'): TemplateResponse {
+	public function createByParent(mixed $parentFolderId): TemplateResponse {
 		$user = $this->userSession->getUser();
 		if ($user === null) {
-			return $this->errorResponse('Authentication required.');
+			return $this->errorResponse('Authentication required.', 'Unable to create pad');
 		}
 		if (!is_numeric($parentFolderId)) {
-			return $this->errorResponse('Invalid parent folder ID.');
+			return $this->errorResponse('Invalid parent folder ID.', 'Unable to create pad');
 		}
 
 		$id = (int)$parentFolderId;
 		if ($id <= 0) {
-			return $this->errorResponse('Invalid parent folder ID.');
+			return $this->errorResponse('Invalid parent folder ID.', 'Unable to create pad');
 		}
 
+		$name = trim((string)$this->request->getParam('name', ''));
+		$accessMode = trim((string)$this->request->getParam('accessMode', 'protected'));
 		$trimmedName = trim($name);
 		if ($trimmedName === '') {
-			return $this->errorResponse('Pad name is required.');
+			return $this->errorResponse('Pad name is required.', 'Unable to create pad');
 		}
 		if (!in_array($accessMode, ['protected', 'public'], true)) {
-			return $this->errorResponse('Invalid access mode.');
+			return $this->errorResponse('Invalid access mode.', 'Unable to create pad');
 		}
 
 		try {
 			$parentFolder = $this->resolveUserFolderNodeById($user->getUID(), $id);
 		} catch (NotFoundException) {
-			return $this->errorResponse('Cannot resolve selected parent folder.');
+			return $this->errorResponse('Cannot resolve selected parent folder.', 'Unable to create pad');
 		}
 
 		if (!$parentFolder->isCreatable()) {
-			return $this->errorResponse('Selected parent folder is not writable.');
+			return $this->errorResponse('Selected parent folder is not writable.', 'Unable to create pad');
 		}
 
 		$response = new TemplateResponse($this->appName, 'embed-create', [
@@ -127,8 +129,11 @@ class EmbedController extends Controller {
 		return $this->applyEmbedPolicy($response);
 	}
 
-	private function errorResponse(string $error): TemplateResponse {
-		return new TemplateResponse($this->appName, 'noviewer', ['error' => $error], 'blank');
+	private function errorResponse(string $error, string $title = 'Unable to open pad'): TemplateResponse {
+		return $this->applyEmbedPolicy(new TemplateResponse($this->appName, 'noviewer', [
+			'error' => $error,
+			'title' => $title,
+		], 'blank'));
 	}
 
 	private function applyEmbedPolicy(TemplateResponse $response): TemplateResponse {
