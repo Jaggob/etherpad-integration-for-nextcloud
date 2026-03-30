@@ -4,6 +4,8 @@
  * Copyright (c) 2026 Jacob Bühler
  */
 ?>
+<link rel="stylesheet" href="<?php p(link_to('etherpad_nextcloud', 'css/embed.css')); ?>">
+<script nonce="<?php p((string)$_['cspNonce']); ?>" defer src="<?php p(link_to('etherpad_nextcloud', 'js/embed-main.js')); ?>"></script>
 <div id="etherpad-nextcloud-embed"
 	class="epnc-embed"
 	data-file-id="<?php p((string)$_['file_id']); ?>"

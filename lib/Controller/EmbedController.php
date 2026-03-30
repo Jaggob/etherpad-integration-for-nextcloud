@@ -60,9 +60,6 @@ class EmbedController extends Controller {
 			return $this->errorResponse('Selected file is not a .pad file.');
 		}
 
-		Util::addScript($this->appName, 'embed-main');
-		Util::addStyle($this->appName, 'embed');
-
 		$response = new TemplateResponse($this->appName, 'embed', [
 			'file_id' => $id,
 			'open_by_id_url' => $this->urlGenerator->linkToRoute($this->appName . '.pad.openById'),
