@@ -12,6 +12,7 @@ use OCA\EtherpadNextcloud\Service\LifecycleService;
 use OCA\EtherpadNextcloud\Service\PadBootstrapService;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadSessionService;
+use OCA\EtherpadNextcloud\Service\UserNodeResolver;
 use OCA\EtherpadNextcloud\Util\PathNormalizer;
 use OCP\AppFramework\Http;
 use OCP\Files\File;
@@ -217,6 +218,7 @@ class PadControllerTest extends TestCase {
 		?BindingService $bindingService = null,
 		?EtherpadClient $etherpadClient = null,
 	): PadController {
+		$resolvedRootFolder = $rootFolder ?? $this->createMock(IRootFolder::class);
 		return new PadController(
 			'etherpad_nextcloud',
 			$request,
@@ -231,7 +233,8 @@ class PadControllerTest extends TestCase {
 			$this->createMock(PadBootstrapService::class),
 			$this->createMock(AppConfigService::class),
 			$this->createMock(LifecycleService::class),
-			$rootFolder ?? $this->createMock(IRootFolder::class),
+			$resolvedRootFolder,
+			new UserNodeResolver($resolvedRootFolder),
 		);
 	}
 

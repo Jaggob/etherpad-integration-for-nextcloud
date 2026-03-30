@@ -9,12 +9,10 @@ declare(strict_types=1);
 namespace OCA\EtherpadNextcloud\Controller;
 
 use OCA\EtherpadNextcloud\Service\AppConfigService;
+use OCA\EtherpadNextcloud\Service\UserNodeResolver;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\ContentSecurityPolicy;
 use OCP\AppFramework\Http\TemplateResponse;
-use OCP\Files\File;
-use OCP\Files\Folder;
-use OCP\Files\IRootFolder;
 use OCP\Files\NotFoundException;
 use OCP\IL10N;
 use OCP\IRequest;
@@ -29,10 +27,10 @@ class EmbedController extends Controller {
 		string $appName,
 		IRequest $request,
 		private IUserSession $userSession,
-		private IRootFolder $rootFolder,
 		private IURLGenerator $urlGenerator,
 		private IL10N $l10n,
 		private AppConfigService $appConfigService,
+		private UserNodeResolver $userNodeResolver,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -54,7 +52,7 @@ class EmbedController extends Controller {
 		}
 
 		try {
-			$fileNode = $this->resolveUserFileNodeById($user->getUID(), $id);
+			$fileNode = $this->userNodeResolver->resolveUserFileNodeById($user->getUID(), $id);
 		} catch (NotFoundException) {
 			return $this->errorResponse('Cannot open selected .pad file.');
 		}
@@ -95,7 +93,7 @@ class EmbedController extends Controller {
 		}
 
 		try {
-			$parentFolder = $this->resolveUserFolderNodeById($user->getUID(), $id);
+			$parentFolder = $this->userNodeResolver->resolveUserFolderNodeById($user->getUID(), $id);
 		} catch (NotFoundException) {
 			return $this->errorResponse('Cannot resolve selected parent folder.', $createErrorTitle);
 		}
@@ -158,40 +156,5 @@ class EmbedController extends Controller {
 		$response->setContentSecurityPolicy($policy);
 
 		return $response;
-	}
-
-	/**
-	 * @throws NotFoundException
-	 */
-	private function resolveUserFileNodeById(string $uid, int $fileId): File {
-		$nodes = $this->rootFolder->getById($fileId);
-		$prefix = '/' . $uid . '/files/';
-		foreach ($nodes as $node) {
-			if (!$node instanceof File) {
-				continue;
-			}
-			if (str_starts_with((string)$node->getPath(), $prefix)) {
-				return $node;
-			}
-		}
-		throw new NotFoundException('File not found by ID.');
-	}
-
-	/**
-	 * @throws NotFoundException
-	 */
-	private function resolveUserFolderNodeById(string $uid, int $folderId): Folder {
-		$nodes = $this->rootFolder->getById($folderId);
-		$prefix = '/' . $uid . '/files/';
-		foreach ($nodes as $node) {
-			if (!$node instanceof Folder) {
-				continue;
-			}
-			if (str_starts_with((string)$node->getPath(), $prefix)) {
-				return $node;
-			}
-		}
-
-		throw new NotFoundException('Folder not found by ID.');
 	}
 }

@@ -20,6 +20,7 @@ use OCA\EtherpadNextcloud\Service\EtherpadClient;
 use OCA\EtherpadNextcloud\Service\LifecycleService;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadSessionService;
+use OCA\EtherpadNextcloud\Service\UserNodeResolver;
 use OCA\EtherpadNextcloud\Util\PathNormalizer;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
@@ -52,6 +53,7 @@ class PadController extends Controller {
 		private AppConfigService $appConfigService,
 		private LifecycleService $lifecycleService,
 		private IRootFolder $rootFolder,
+		private UserNodeResolver $userNodeResolver,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -160,7 +162,7 @@ class PadController extends Controller {
 
 		$uid = $user->getUID();
 		try {
-			$parentFolder = $this->resolveUserFolderNodeById($uid, $parentFolderId);
+			$parentFolder = $this->userNodeResolver->resolveUserFolderNodeById($uid, $parentFolderId);
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot resolve selected parent folder.'], Http::STATUS_NOT_FOUND);
 		}
@@ -176,7 +178,7 @@ class PadController extends Controller {
 		try {
 			$fileNode = $this->createUserFileInFolder($parentFolder, $fileName);
 			$fileCreated = true;
-			$path = $this->toUserAbsolutePath($uid, $fileNode);
+			$path = $this->userNodeResolver->toUserAbsolutePath($uid, $fileNode);
 			$fileId = (int)$fileNode->getId();
 			if ($fileId <= 0) {
 				throw new \RuntimeException('Could not resolve new file ID.');
@@ -345,7 +347,7 @@ class PadController extends Controller {
 		$uid = $user->getUID();
 		try {
 			$node = $this->resolveUserPadNode($uid, $path);
-			$absolutePath = $this->toUserAbsolutePath($uid, $node);
+			$absolutePath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot open selected .pad file.'], Http::STATUS_NOT_FOUND);
 		}
@@ -368,7 +370,7 @@ class PadController extends Controller {
 		$uid = $user->getUID();
 		try {
 			$node = $this->resolveUserPadNodeById($uid, $fileId);
-			$absolutePath = $this->toUserAbsolutePath($uid, $node);
+			$absolutePath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot open selected .pad file.'], Http::STATUS_NOT_FOUND);
 		}
@@ -465,7 +467,7 @@ class PadController extends Controller {
 		$uid = $user->getUID();
 		try {
 			$node = $this->resolveUserPadNodeById($uid, $fileId);
-			$absolutePath = $this->toUserAbsolutePath($uid, $node);
+			$absolutePath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot open selected .pad file.'], Http::STATUS_NOT_FOUND);
 		}
@@ -503,7 +505,7 @@ class PadController extends Controller {
 		$uid = $user->getUID();
 		try {
 			$node = $this->resolveUserPadNodeById($uid, $fileId);
-			$absolutePath = $this->toUserAbsolutePath($uid, $node);
+			$absolutePath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot resolve selected .pad file.'], Http::STATUS_NOT_FOUND);
 		}
@@ -602,7 +604,7 @@ class PadController extends Controller {
 		if ($resolvedFileId > 0) {
 			try {
 				$node = $this->resolveUserPadNodeById($uid, $resolvedFileId);
-				$normalizedPath = $this->toUserAbsolutePath($uid, $node);
+				$normalizedPath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
 				$mime = (string)$node->getMimeType();
 			} catch (NotFoundException) {
 				return new DataResponse(['is_pad' => false, 'file_id' => $resolvedFileId]);
@@ -626,7 +628,7 @@ class PadController extends Controller {
 			if ($resolvedFileId <= 0) {
 				return new DataResponse(['is_pad' => false, 'path' => $requestedPath]);
 			}
-			$normalizedPath = $this->toUserAbsolutePath($uid, $node);
+			$normalizedPath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
 			$mime = (string)$node->getMimeType();
 		}
 
@@ -700,7 +702,7 @@ class PadController extends Controller {
 		$isExternal = false;
 		try {
 			$node = $this->resolveUserPadNodeById($uid, $fileId);
-			$absolutePath = $this->toUserAbsolutePath($uid, $node);
+			$absolutePath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot resolve file path for file ID.'], Http::STATUS_NOT_FOUND);
 		}
@@ -960,7 +962,7 @@ class PadController extends Controller {
 	/** @return array{status:string,file:string,file_id:int,pad_id:string,access_mode:string} */
 	private function initializePadFrontmatter(string $uid, File $file, string $content): array {
 		$fileId = (int)$file->getId();
-		$path = $this->toUserAbsolutePath($uid, $file);
+		$path = $this->userNodeResolver->toUserAbsolutePath($uid, $file);
 		try {
 			$parsed = $this->padFileService->parsePadFile($content);
 			$meta = $parsed['frontmatter'];
@@ -1136,32 +1138,14 @@ class PadController extends Controller {
 	 * @throws NotFoundException
 	 */
 	private function resolveUserPadNodeById(string $uid, int $fileId): File {
-		$nodes = $this->rootFolder->getById($fileId);
-		$prefix = '/' . $uid . '/files/';
-		foreach ($nodes as $node) {
-			if (!$node instanceof File) {
-				continue;
-			}
-			$nodePath = (string)$node->getPath();
-			if (!str_starts_with($nodePath, $prefix)) {
-				continue;
-			}
-			return $node;
-		}
-
-		throw new NotFoundException('Cannot resolve selected .pad file by ID.');
+		return $this->userNodeResolver->resolveUserFileNodeById($uid, $fileId);
 	}
 
 	/**
 	 * @throws NotFoundException
 	 */
 	private function toUserAbsolutePath(string $uid, File $node): string {
-		$nodePath = (string)$node->getPath();
-		$prefix = '/' . $uid . '/files/';
-		if (!str_starts_with($nodePath, $prefix)) {
-			throw new NotFoundException('Cannot map file to user file tree.');
-		}
-		return '/' . ltrim(substr($nodePath, strlen($prefix)), '/');
+		return $this->userNodeResolver->toUserAbsolutePath($uid, $node);
 	}
 
 	private function userNodeExists(string $uid, string $absolutePath): bool {
@@ -1233,26 +1217,6 @@ class PadController extends Controller {
 			throw new \RuntimeException('Could not create .pad file.');
 		}
 		return $node;
-	}
-
-	/**
-	 * @throws NotFoundException
-	 */
-	private function resolveUserFolderNodeById(string $uid, int $folderId): Folder {
-		$nodes = $this->rootFolder->getById($folderId);
-		$prefix = '/' . $uid . '/files/';
-		foreach ($nodes as $node) {
-			if (!$node instanceof Folder) {
-				continue;
-			}
-			$nodePath = (string)$node->getPath();
-			if (!str_starts_with($nodePath, $prefix)) {
-				continue;
-			}
-			return $node;
-		}
-
-		throw new NotFoundException('Cannot resolve selected parent folder by ID.');
 	}
 
 	private function isCreateConflict(\Throwable $e): bool {

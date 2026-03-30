@@ -10,12 +10,12 @@ declare(strict_types=1);
 
 namespace OCA\EtherpadNextcloud\Controller;
 
+use OCA\EtherpadNextcloud\Service\UserNodeResolver;
 use OCA\EtherpadNextcloud\Util\PathNormalizer;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\Files\File;
-use OCP\Files\IRootFolder;
 use OCP\Files\NotFoundException;
 use OCP\IRequest;
 use OCP\IURLGenerator;
@@ -28,7 +28,7 @@ class ViewerController extends Controller {
 		private IURLGenerator $urlGenerator,
 		private IUserSession $userSession,
 		private PathNormalizer $pathNormalizer,
-		private IRootFolder $rootFolder,
+		private UserNodeResolver $userNodeResolver,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -76,8 +76,8 @@ class ViewerController extends Controller {
 		}
 
 		try {
-			$fileNode = $this->resolveUserFileNodeById($user->getUID(), $id);
-			$path = $this->toUserAbsolutePath($user->getUID(), $fileNode);
+			$fileNode = $this->userNodeResolver->resolveUserFileNodeById($user->getUID(), $id);
+			$path = $this->userNodeResolver->toUserAbsolutePath($user->getUID(), $fileNode);
 		} catch (NotFoundException) {
 			return $this->errorResponse('Cannot resolve file path for file ID.');
 		}
@@ -116,33 +116,4 @@ class ViewerController extends Controller {
 		return $node;
 	}
 
-	/**
-	 * @throws NotFoundException
-	 */
-	private function resolveUserFileNodeById(string $uid, int $fileId): File {
-		$nodes = $this->rootFolder->getById($fileId);
-		$prefix = '/' . $uid . '/files/';
-		foreach ($nodes as $node) {
-			if (!$node instanceof File) {
-				continue;
-			}
-			if (str_starts_with((string)$node->getPath(), $prefix)) {
-				return $node;
-			}
-		}
-		throw new NotFoundException('File not found by ID.');
-	}
-
-	/**
-	 * @throws NotFoundException
-	 */
-	private function toUserAbsolutePath(string $uid, File $node): string {
-		$nodePath = (string)$node->getPath();
-		$prefix = '/' . $uid . '/files/';
-		if (!str_starts_with($nodePath, $prefix)) {
-			throw new NotFoundException('Cannot map file to user file tree.');
-		}
-		return '/' . ltrim(substr($nodePath, strlen($prefix)), '/');
-	}
 }
-
