@@ -295,10 +295,10 @@
 			const intervalSeconds = Number(data.sync_interval_seconds)
 			syncIntervalMs = Number.isFinite(intervalSeconds) && intervalSeconds > 0 ? intervalSeconds * 1000 : 120000
 			syncInFlight = false
+			showIframe(data.url)
 			installSyncLifecycleHandlers()
 			installHostMessageHandler()
 			startSyncLoop()
-			showIframe(data.url)
 		} catch (error) {
 			showError(error instanceof Error ? error.message : 'Pad open failed.')
 		}
