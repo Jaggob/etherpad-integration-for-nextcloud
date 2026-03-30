@@ -5,6 +5,7 @@ declare(strict_types=1);
 return ['routes' => [
 	['name' => 'viewer#showPad', 'url' => '/', 'verb' => 'GET'],
 	['name' => 'viewer#showPadById', 'url' => '/by-id/{fileId}', 'verb' => 'GET'],
+	['name' => 'embed#showById', 'url' => '/embed/by-id/{fileId}', 'verb' => 'GET'],
 	['name' => 'publicViewer#showPad', 'url' => '/public/{token}', 'verb' => 'GET'],
 	['name' => 'publicViewer#openPadData', 'url' => '/api/v1/public/open/{token}', 'verb' => 'GET'],
 	['name' => 'pad#create', 'url' => '/api/v1/pads', 'verb' => 'POST'],
