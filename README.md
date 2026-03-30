@@ -19,7 +19,8 @@ This plugin lets you surface pads from an Etherpad instance inside Nextcloud and
 - Etherpad reachable from Nextcloud server
 - Etherpad API key
 - HTTPS for production deployments
-- For protected pads: run Nextcloud and Etherpad on the same registrable domain (same-site), for example `cloud.example.org` + `pad.example.org`, so session cookies work reliably in iframe viewer flows.
+- For protected pads in the embedded viewer: Nextcloud and Etherpad must allow iframe embedding and send compatible cookies.
+- Recommended: run Nextcloud and Etherpad on the same registrable domain, for example `cloud.example.org` + `pad.example.org`.
 
 ## Etherpad Compatibility
 
@@ -72,6 +73,21 @@ and configure:
 - Copy content to `.pad` file interval
 - Delete-on-trash policy
 - External public pad policy
+
+### 5) Check iframe and cookie setup for protected pads
+
+If protected pads should open inside the Nextcloud viewer iframe:
+
+- Etherpad responses must allow embedding from your Nextcloud origin.
+- Reverse proxies must not enforce a conflicting `X-Frame-Options` policy.
+- A `Content-Security-Policy: frame-ancestors ...` header on the Etherpad side is the most reliable modern setup.
+- If Nextcloud and Etherpad are on the same registrable domain, Etherpad's default `SameSite: Lax` session cookie usually works.
+- If they are on different registrable domains, set Etherpad `cookie.sameSite` to `"None"` and keep HTTPS + `trustProxy: true`.
+
+Example:
+
+- `cloud.example.org` + `pad.example.org` -> usually works with default `SameSite: "Lax"`
+- `cloud.example.org` + `pad.otherdomain.example` -> usually requires `SameSite: "None"` and HTTPS
 
 ## Upgrade
 
@@ -141,9 +157,17 @@ For deployment, copy the app to `apps/etherpad_nextcloud` and exclude developmen
 
 ### Protected pads fail because of cookies / iframe auth
 
-- Nextcloud and Etherpad must run on the same registrable domain so browser session cookies work inside the iframe
-- Example: `cloud.example.org` + `pad.example.org`
-- Setups on unrelated domains will usually fail for protected pads in the embedded viewer
+- Check Etherpad cookie settings:
+  - same registrable domain: default `SameSite: "Lax"` is usually enough
+  - different registrable domains: use `cookie.sameSite: "None"` and `trustProxy: true`
+- HTTPS is required when using `SameSite=None`
+- Some hosting domains that look related are still treated as cross-site by browsers
+
+### Etherpad is blocked inside the Nextcloud viewer iframe
+
+- Check response headers on the Etherpad side and in the reverse proxy
+- Remove or relax conflicting `X-Frame-Options` rules
+- Prefer a `Content-Security-Policy: frame-ancestors 'self' https://your-nextcloud.example` header that explicitly allows your Nextcloud origin
 
 ## Documentation
 
