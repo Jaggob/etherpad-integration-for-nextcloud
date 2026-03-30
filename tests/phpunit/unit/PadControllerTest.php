@@ -81,6 +81,18 @@ class PadControllerTest extends TestCase {
 		$this->assertSame('Invalid file ID.', $response->getData()['message']);
 	}
 
+	public function testMetaByIdRejectsInvalidFileId(): void {
+		$user = $this->createMock(IUser::class);
+		$userSession = $this->createMock(IUserSession::class);
+		$userSession->method('getUser')->willReturn($user);
+
+		$controller = $this->buildController($this->createMock(IRequest::class), $userSession);
+		$response = $controller->metaById(0);
+
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame('Invalid file ID.', $response->getData()['message']);
+	}
+
 	public function testSyncByIdRejectsInvalidFileId(): void {
 		$user = $this->createMock(IUser::class);
 		$userSession = $this->createMock(IUserSession::class);
