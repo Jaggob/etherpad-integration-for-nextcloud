@@ -813,18 +813,17 @@ class PadController extends Controller {
 	}
 
 	private function putContentWithSyncLockRetry(File $node, string $content, int &$lockRetries): void {
-		while (true) {
+		foreach (self::SYNC_LOCK_RETRY_DELAYS_US as $delay) {
 			try {
 				$node->putContent($content);
 				return;
-			} catch (LockedException $e) {
-				if ($lockRetries >= count(self::SYNC_LOCK_RETRY_DELAYS_US)) {
-					throw $e;
-				}
-				\usleep(self::SYNC_LOCK_RETRY_DELAYS_US[$lockRetries]);
+			} catch (LockedException) {
+				\usleep($delay);
 				$lockRetries++;
 			}
 		}
+
+		$node->putContent($content);
 	}
 
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
