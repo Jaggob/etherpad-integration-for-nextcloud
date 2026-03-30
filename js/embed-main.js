@@ -24,8 +24,10 @@
 	const iframe = root.querySelector('[data-epnc-embed-iframe]')
 	let syncUrl = ''
 	let syncIntervalMs = 120000
-	let syncInFlight = false
 	let syncPromise = null
+	let activeSyncForce = false
+	let pendingForcedSync = false
+	let pendingForcedKeepalive = false
 	let syncTimerId = null
 	let visibilityHandler = null
 	let pageHideHandler = null
@@ -76,8 +78,13 @@
 		}
 	}
 
+	const fireAndForgetSync = (force, keepalive) => {
+		void runSync(force, keepalive).catch(() => {})
+	}
+
 	const postHostMessage = (source, origin, type, payload = {}) => {
-		if (!source || typeof source.postMessage !== 'function' || !isAllowedMessageOrigin(origin)) {
+		// Replies are only sent from the already origin-validated message handler.
+		if (!source || typeof source.postMessage !== 'function') {
 			return
 		}
 		source.postMessage(Object.assign({
@@ -91,10 +98,15 @@
 			return { status: 'disabled' }
 		}
 		if (syncPromise) {
+			if (force && !activeSyncForce) {
+				pendingForcedSync = true
+				pendingForcedKeepalive = pendingForcedKeepalive || Boolean(keepalive)
+				return syncPromise.then(() => runSync(true, pendingForcedKeepalive))
+			}
 			return syncPromise
 		}
-		syncInFlight = true
-		syncPromise = (async () => {
+		activeSyncForce = Boolean(force)
+		const currentPromise = (async () => {
 			const url = force ? (syncUrl + (syncUrl.includes('?') ? '&' : '?') + 'force=1') : syncUrl
 			const response = await fetch(url, {
 				method: 'POST',
@@ -111,12 +123,30 @@
 			}
 			return data
 		})()
+		syncPromise = currentPromise
+		let result
+		let syncError = null
 		try {
-			return await syncPromise
+			result = await currentPromise
+		} catch (error) {
+			syncError = error
 		} finally {
-			syncInFlight = false
-			syncPromise = null
+			if (syncPromise === currentPromise) {
+				syncPromise = null
+			}
+			activeSyncForce = false
 		}
+		const rerunForcedSync = pendingForcedSync
+		const rerunKeepalive = pendingForcedKeepalive
+		pendingForcedSync = false
+		pendingForcedKeepalive = false
+		if (rerunForcedSync) {
+			return runSync(true, rerunKeepalive)
+		}
+		if (syncError instanceof Error) {
+			throw syncError
+		}
+		return result
 	}
 
 	const startSyncLoop = () => {
@@ -125,7 +155,7 @@
 		}
 		syncTimerId = window.setInterval(() => {
 			if (document.visibilityState === 'visible') {
-				void runSync(false, false)
+				fireAndForgetSync(false, false)
 			}
 		}, syncIntervalMs)
 	}
@@ -136,14 +166,14 @@
 		}
 		visibilityHandler = () => {
 			if (document.visibilityState === 'hidden') {
-				void runSync(true, true)
+				fireAndForgetSync(true, true)
 				stopSyncLoop()
 				return
 			}
 			startSyncLoop()
 		}
 		pageHideHandler = () => {
-			void runSync(true, true)
+			fireAndForgetSync(true, true)
 			stopSyncLoop()
 		}
 		document.addEventListener('visibilitychange', visibilityHandler)
@@ -181,7 +211,7 @@
 				return
 			}
 			if (type === 'epnc:host-hidden') {
-				void runSync(true, true)
+				fireAndForgetSync(true, true)
 				stopSyncLoop()
 				return
 			}
@@ -294,7 +324,6 @@
 			syncUrl = typeof data.sync_url === 'string' ? data.sync_url.trim() : ''
 			const intervalSeconds = Number(data.sync_interval_seconds)
 			syncIntervalMs = Number.isFinite(intervalSeconds) && intervalSeconds > 0 ? intervalSeconds * 1000 : 120000
-			syncInFlight = false
 			showIframe(data.url)
 			installSyncLifecycleHandlers()
 			installHostMessageHandler()

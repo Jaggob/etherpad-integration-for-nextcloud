@@ -138,27 +138,31 @@ class EmbedController extends Controller {
 	}
 
 	private function readQueryStringParam(string $name, string $default = ''): string {
-		$requestUri = (string)$this->request->getRequestUri();
-		$requestUriQuery = (string)(parse_url($requestUri, PHP_URL_QUERY) ?? '');
-		if ($requestUriQuery !== '') {
-			$queryParams = [];
-			parse_str($requestUriQuery, $queryParams);
-			if (array_key_exists($name, $queryParams)) {
-				return (string)$queryParams[$name];
-			}
-		}
-
-		$server = $this->request->server;
-		$queryString = is_array($server) ? (string)($server['QUERY_STRING'] ?? '') : '';
-		if ($queryString !== '') {
-			$queryParams = [];
-			parse_str($queryString, $queryParams);
+		foreach ($this->getCandidateQueryStrings() as $queryString) {
+			$queryParams = self::parseQueryString($queryString);
 			if (array_key_exists($name, $queryParams)) {
 				return (string)$queryParams[$name];
 			}
 		}
 
 		return (string)$this->request->getParam($name, $default);
+	}
+
+	/** @return list<string> */
+	private function getCandidateQueryStrings(): array {
+		$requestUri = (string)$this->request->getRequestUri();
+		$fromUri = (string)(parse_url($requestUri, PHP_URL_QUERY) ?? '');
+		$server = property_exists($this->request, 'server') ? $this->request->server : null;
+		$fromServer = is_array($server) ? (string)($server['QUERY_STRING'] ?? '') : '';
+
+		return array_values(array_filter([$fromUri, $fromServer], static fn (string $value): bool => $value !== ''));
+	}
+
+	/** @return array<string,mixed> */
+	private static function parseQueryString(string $queryString): array {
+		$params = [];
+		parse_str($queryString, $params);
+		return $params;
 	}
 
 	private function applyEmbedPolicy(TemplateResponse $response): TemplateResponse {

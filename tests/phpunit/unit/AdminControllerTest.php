@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\EtherpadNextcloud\Tests\Unit;
 
 use OCA\EtherpadNextcloud\Controller\AdminController;
+use OCA\EtherpadNextcloud\Service\AppConfigService;
 use OCA\EtherpadNextcloud\Service\ConsistencyCheckService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
 use OCA\EtherpadNextcloud\Service\PendingDeleteRetryService;
@@ -33,6 +34,7 @@ class AdminControllerTest extends TestCase {
 			$userSession,
 			$this->createMock(IGroupManager::class),
 			$this->buildL10n(),
+			$this->createMock(AppConfigService::class),
 			$this->createMock(EtherpadClient::class),
 			$this->createMock(PendingDeleteRetryService::class),
 			$this->createMock(ConsistencyCheckService::class),
@@ -64,6 +66,7 @@ class AdminControllerTest extends TestCase {
 			$userSession,
 			$groupManager,
 			$this->buildL10n(),
+			$this->createMock(AppConfigService::class),
 			$this->createMock(EtherpadClient::class),
 			$this->createMock(PendingDeleteRetryService::class),
 			$this->createMock(ConsistencyCheckService::class),
@@ -129,6 +132,7 @@ class AdminControllerTest extends TestCase {
 			$userSession,
 			$groupManager,
 			$this->buildL10n(),
+			$this->createMock(AppConfigService::class),
 			$etherpad,
 			$pendingDeleteRetry,
 			$this->createMock(ConsistencyCheckService::class),

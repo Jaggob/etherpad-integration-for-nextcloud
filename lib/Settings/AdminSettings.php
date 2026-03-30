@@ -71,7 +71,7 @@ class AdminSettings implements ISettings {
 				'external_allowlist' => $this->l10n->t('External host allowlist (optional)'),
 				'external_allowlist_hint' => $this->l10n->t('Leave empty to allow all public hosts. HTTPS is always required.'),
 				'trusted_embed_origins' => $this->l10n->t('Trusted embed origins (optional)'),
-				'trusted_embed_origins_hint' => $this->l10n->t('Absolute https origins allowed to embed the /embed/by-id route. Leave empty to disable external embedding.'),
+				'trusted_embed_origins_hint' => $this->l10n->t('Absolute https origins allowed to embed the /embed/by-id and /embed/create-by-parent routes. Leave empty to disable external embedding.'),
 				'save_button' => $this->l10n->t('Save settings'),
 				'health_button' => $this->l10n->t('Health check'),
 				'consistency_button' => $this->l10n->t('Consistency check'),

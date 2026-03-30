@@ -360,6 +360,8 @@ Registered in `lib/AppInfo/Application.php`.
 - `allow_external_pads` (`yes|no`, default `yes`)
 - `external_pad_allowlist` (newline-separated host list, optional)
 - `trusted_embed_origins` (newline-separated absolute `https://origin` list, optional)
-  - used only for the route-specific `frame-ancestors` policy on `/embed/by-id/{fileId}`
+  - used for the route-specific `frame-ancestors` policy on:
+    - `/embed/by-id/{fileId}`
+    - `/embed/create-by-parent/{parentFolderId}`
   - when empty, no external embedding origin is added beyond `'self'`
 - `test_fault` (debug-only E2E fault injection; empty by default)

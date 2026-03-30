@@ -42,7 +42,8 @@ class PadSessionService {
 		}
 
 		$authorId = $this->etherpadClient->createAuthorIfNotExistsFor('nc:' . $uid, $effectiveDisplayName);
-		$this->rememberAuthorState($uid, $authorId, $effectiveDisplayName);
+		$this->rememberAuthorId($uid, $authorId);
+		$this->syncAuthorDisplayNameIfNeeded($uid, $authorId, $effectiveDisplayName);
 		$sessionId = $this->etherpadClient->createSession($groupId, $authorId, $validUntil);
 		return [
 			'url' => $this->etherpadClient->buildPadUrl($padId),
@@ -161,12 +162,11 @@ class PadSessionService {
 		));
 	}
 
-	private function rememberAuthorState(string $uid, string $authorId, string $displayName): void {
+	private function rememberAuthorId(string $uid, string $authorId): void {
 		if (!$this->shouldPersistAuthorState($uid)) {
 			return;
 		}
 		$this->config->setUserValue($uid, 'etherpad_nextcloud', self::USER_CONFIG_AUTHOR_ID_KEY, trim($authorId));
-		$this->rememberAuthorName($uid, $displayName);
 	}
 
 	private function rememberAuthorName(string $uid, string $displayName): void {

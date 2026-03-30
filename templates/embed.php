@@ -22,5 +22,5 @@
 		<h2 class="epnc-embed__error-title"><?php p((string)$_['l10n']['error_title']); ?></h2>
 		<p class="epnc-embed__error-message" data-epnc-embed-error-message></p>
 	</div>
-	<iframe class="epnc-embed__iframe" data-epnc-embed-iframe hidden></iframe>
+	<iframe class="epnc-embed__iframe" data-epnc-embed-iframe title="Etherpad" hidden></iframe>
 </div>
