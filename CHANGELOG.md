@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+- Trusted embed integration for same-site / trusted-origin hosts:
+  - minimal authenticated embed page via `/embed/by-id/{fileId}`
+  - trusted `frame-ancestors` / embed-origin allowlist
+  - same-origin open flow with CSRF bootstrap inside blank template
+- Trusted embedded create flow:
+  - minimal launcher page via `/embed/create-by-parent/{parentFolderId}`
+  - same-origin pad creation with redirect into embed viewer
+- External integration APIs:
+  - `POST /api/v1/pads/create-by-parent`
+  - `GET /api/v1/pads/meta-by-id/{fileId}`
+- Embedded sync improvements:
+  - host message hooks for visible/hidden/before-close/sync-now
+  - close-flush ack protocol (`epnc:sync-flush-started|finished|failed`)
+  - short lock retries for `.pad` snapshot writes before returning `status=locked`
+- Protected pad open performance:
+  - earlier iframe start in embed flow
+  - Etherpad author caching per Nextcloud user
+  - author name sync only on actual display-name changes
+
 ## 1.0.0 - 2026-03-11
 
 - First stable release of **Etherpad Integration for Nextcloud**.
