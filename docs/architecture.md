@@ -122,11 +122,10 @@ Primary flow (minimal blank create launcher page):
 2. `EmbedController::createByParent` validates:
    - logged-in Nextcloud user
    - writable target folder by stable `parentFolderId`
-   - valid `name`
-   - valid `accessMode`
 3. `templates/embed-create.php` loads `js/embed-create-main.js` explicitly in blank layout.
-4. `js/embed-create-main.js` calls `POST /api/v1/pads/create-by-parent` same-origin with CSRF token from the template.
-5. On success the launcher redirects itself to the returned `embed_url`, after which the normal embed-open flow takes over.
+4. `js/embed-create-main.js` reads `name` and `accessMode` from the launcher URL, validates them client-side, and calls `POST /api/v1/pads/create-by-parent` same-origin with CSRF token from the template.
+5. `PadController::createByParent` performs server-side validation of `name`, `accessMode`, and the writable target folder before creating the `.pad` file and binding.
+6. On success the launcher redirects itself to the returned `embed_url`, after which the normal embed-open flow takes over.
 
 ### 3) Open (public share)
 

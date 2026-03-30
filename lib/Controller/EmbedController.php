@@ -20,7 +20,6 @@ use OCP\IL10N;
 use OCP\IRequest;
 use OCP\IURLGenerator;
 use OCP\IUserSession;
-use OCP\Util;
 
 class EmbedController extends Controller {
 	/** @var array{requesttoken:string,trusted_embed_origins:list<string>}|null */
@@ -81,27 +80,28 @@ class EmbedController extends Controller {
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	#[\OCP\AppFramework\Http\Attribute\NoCSRFRequired]
 	public function createByParent(mixed $parentFolderId): TemplateResponse {
+		$createErrorTitle = $this->l10n->t('Unable to create pad');
 		$user = $this->userSession->getUser();
 		if ($user === null) {
-			return $this->errorResponse('Authentication required.', 'Unable to create pad');
+			return $this->errorResponse('Authentication required.', $createErrorTitle);
 		}
 		if (!is_numeric($parentFolderId)) {
-			return $this->errorResponse('Invalid parent folder ID.', 'Unable to create pad');
+			return $this->errorResponse('Invalid parent folder ID.', $createErrorTitle);
 		}
 
 		$id = (int)$parentFolderId;
 		if ($id <= 0) {
-			return $this->errorResponse('Invalid parent folder ID.', 'Unable to create pad');
+			return $this->errorResponse('Invalid parent folder ID.', $createErrorTitle);
 		}
 
 		try {
 			$parentFolder = $this->resolveUserFolderNodeById($user->getUID(), $id);
 		} catch (NotFoundException) {
-			return $this->errorResponse('Cannot resolve selected parent folder.', 'Unable to create pad');
+			return $this->errorResponse('Cannot resolve selected parent folder.', $createErrorTitle);
 		}
 
 		if (!$parentFolder->isCreatable()) {
-			return $this->errorResponse('Selected parent folder is not writable.', 'Unable to create pad');
+			return $this->errorResponse('Selected parent folder is not writable.', $createErrorTitle);
 		}
 
 		return $this->buildEmbedTemplateResponse('embed-create', [
@@ -117,10 +117,10 @@ class EmbedController extends Controller {
 		]);
 	}
 
-	private function errorResponse(string $error, string $title = 'Unable to open pad'): TemplateResponse {
+	private function errorResponse(string $error, ?string $title = null): TemplateResponse {
 		return $this->buildEmbedTemplateResponse('noviewer', [
 			'error' => $error,
-			'title' => $title,
+			'title' => $title ?? $this->l10n->t('Unable to open pad'),
 		]);
 	}
 
@@ -143,7 +143,7 @@ class EmbedController extends Controller {
 		}
 
 		$this->embedBaseData = [
-			'requesttoken' => Util::callRegister(),
+			'requesttoken' => \OC::$server->getCsrfTokenManager()->getToken()->getEncryptedValue(),
 			'trusted_embed_origins' => $this->appConfigService->getTrustedEmbedOrigins(),
 		];
 
