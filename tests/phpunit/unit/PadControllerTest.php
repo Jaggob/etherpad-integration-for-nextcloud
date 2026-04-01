@@ -210,6 +210,102 @@ class PadControllerTest extends TestCase {
 		$this->assertSame(3, $response->getData()['lock_retries']);
 	}
 
+	public function testSyncByIdForcedProtectedSyncDoesNotRewriteWhenRevisionIsUnchanged(): void {
+		$user = $this->createConfiguredMock(IUser::class, ['getUID' => 'alice']);
+		$userSession = $this->createConfiguredMock(IUserSession::class, ['getUser' => $user]);
+		$request = $this->createConfiguredMock(IRequest::class, ['getParam' => '1']);
+		$file = $this->buildPadFileNode();
+		$file->expects($this->never())->method('putContent');
+
+		$rootFolder = $this->createMock(IRootFolder::class);
+		$rootFolder->method('getById')->with(138)->willReturn([$file]);
+
+		$padFileService = $this->createMock(PadFileService::class);
+		$padFileService->method('parsePadFile')->willReturn([
+			'frontmatter' => [
+				'pad_id' => 'g.ABCDEFGHIJKLMNOP$pad-1',
+				'access_mode' => BindingService::ACCESS_PROTECTED,
+			],
+		]);
+		$padFileService->method('isExternalFrontmatter')->willReturn(false);
+		$padFileService->method('getSnapshotRevision')->willReturn(5);
+
+		$bindingService = $this->createMock(BindingService::class);
+		$bindingService->method('assertConsistentMapping');
+
+		$etherpadClient = $this->createMock(EtherpadClient::class);
+		$etherpadClient->expects($this->once())
+			->method('getRevisionsCount')
+			->with('g.ABCDEFGHIJKLMNOP$pad-1')
+			->willReturn(5);
+		$etherpadClient->expects($this->never())->method('getText');
+		$etherpadClient->expects($this->never())->method('getHTML');
+
+		$controller = $this->buildController(
+			$request,
+			$userSession,
+			rootFolder: $rootFolder,
+			padFileService: $padFileService,
+			bindingService: $bindingService,
+			etherpadClient: $etherpadClient,
+		);
+		$response = $controller->syncById(138);
+
+		$this->assertSame('unchanged', $response->getData()['status']);
+		$this->assertSame(5, $response->getData()['snapshot_rev']);
+		$this->assertSame(5, $response->getData()['current_rev']);
+	}
+
+	public function testSyncByIdForcedExternalSyncDoesNotRewriteWhenTextIsUnchanged(): void {
+		$user = $this->createConfiguredMock(IUser::class, ['getUID' => 'alice']);
+		$userSession = $this->createConfiguredMock(IUserSession::class, ['getUser' => $user]);
+		$request = $this->createConfiguredMock(IRequest::class, ['getParam' => '1']);
+		$file = $this->buildPadFileNode();
+		$file->expects($this->never())->method('putContent');
+
+		$rootFolder = $this->createMock(IRootFolder::class);
+		$rootFolder->method('getById')->with(138)->willReturn([$file]);
+
+		$padFileService = $this->createMock(PadFileService::class);
+		$padFileService->method('parsePadFile')->willReturn([
+			'frontmatter' => [
+				'pad_id' => 'ext.remote-pad',
+				'access_mode' => BindingService::ACCESS_PUBLIC,
+				'pad_url' => 'https://pad.example.test/p/public-pad',
+				'remote_pad_id' => 'public-pad',
+				'pad_origin' => 'https://pad.example.test',
+			],
+		]);
+		$padFileService->method('isExternalFrontmatter')->willReturn(true);
+		$padFileService->method('getTextSnapshotForRestore')->willReturn('same text');
+
+		$bindingService = $this->createMock(BindingService::class);
+		$bindingService->method('assertConsistentMapping');
+
+		$etherpadClient = $this->createMock(EtherpadClient::class);
+		$etherpadClient->expects($this->once())
+			->method('normalizeAndValidateExternalPublicPadUrl')
+			->with('https://pad.example.test/p/public-pad')
+			->willReturn(['pad_url' => 'https://pad.example.test/p/public-pad']);
+		$etherpadClient->expects($this->once())
+			->method('getPublicTextFromPadUrl')
+			->with('https://pad.example.test/p/public-pad')
+			->willReturn('same text');
+
+		$controller = $this->buildController(
+			$request,
+			$userSession,
+			rootFolder: $rootFolder,
+			padFileService: $padFileService,
+			bindingService: $bindingService,
+			etherpadClient: $etherpadClient,
+		);
+		$response = $controller->syncById(138);
+
+		$this->assertSame('unchanged', $response->getData()['status']);
+		$this->assertTrue($response->getData()['external']);
+	}
+
 	private function buildController(
 		IRequest $request,
 		IUserSession $userSession,

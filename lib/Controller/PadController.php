@@ -730,7 +730,7 @@ class PadController extends Controller {
 				$text = $this->etherpadClient->getPublicTextFromPadUrl($normalized['pad_url']);
 
 				$existingText = $this->padFileService->getTextSnapshotForRestore((string)$currentContent);
-				if (!$force && $existingText === $text) {
+				if ($existingText === $text) {
 					return new DataResponse([
 						'status' => 'unchanged',
 						'file_id' => $fileId,
@@ -756,7 +756,7 @@ class PadController extends Controller {
 
 			$currentRev = $this->etherpadClient->getRevisionsCount($padId);
 			$snapshotRev = $this->padFileService->getSnapshotRevision((string)$currentContent);
-			if (!$force && $snapshotRev >= $currentRev) {
+			if ($snapshotRev >= $currentRev) {
 				return new DataResponse([
 					'status' => 'unchanged',
 					'file_id' => $fileId,
