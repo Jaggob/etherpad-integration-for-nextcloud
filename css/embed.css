@@ -2,6 +2,19 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  * Copyright (c) 2026 Jacob Bühler
  */
+:root {
+	color-scheme: light dark;
+	--epnc-embed-background: transparent;
+	--epnc-embed-text: var(--color-main-text, #222222);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--epnc-embed-background: transparent;
+		--epnc-embed-text: var(--color-main-text, #ebebeb);
+	}
+}
+
 html,
 body,
 #content,
@@ -10,12 +23,13 @@ body,
 	height: 100%;
 	min-height: 100vh;
 	margin: 0;
+	background: var(--epnc-embed-background);
+	color: var(--epnc-embed-text);
 }
 
 .epnc-embed {
 	display: flex;
 	flex-direction: column;
-	background: var(--color-main-background, #fff);
 }
 
 .epnc-embed__loading,
@@ -39,5 +53,5 @@ body,
 	height: 100%;
 	min-height: 100vh;
 	border: 0;
-	background: #fff;
+	background: var(--epnc-embed-background);
 }

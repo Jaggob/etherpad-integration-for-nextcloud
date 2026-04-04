@@ -4,6 +4,7 @@
  */
 (function () {
 	const REQUEST_TIMEOUT_MS = 10000
+	const IFRAME_REVEAL_DELAY_MS = 100
 
 	const root = document.getElementById('etherpad-nextcloud-embed')
 	if (!(root instanceof HTMLElement)) {
@@ -61,14 +62,21 @@
 			showError('Embed iframe is not available.')
 			return
 		}
-		if (loadingNode instanceof HTMLElement) {
-			loadingNode.hidden = true
-		}
 		if (errorNode instanceof HTMLElement) {
 			errorNode.hidden = true
 		}
+		iframe.hidden = true
+		const revealIframe = () => {
+			iframe.removeEventListener('load', revealIframe)
+			window.setTimeout(() => {
+				if (loadingNode instanceof HTMLElement) {
+					loadingNode.hidden = true
+				}
+				iframe.hidden = false
+			}, IFRAME_REVEAL_DELAY_MS)
+		}
+		iframe.addEventListener('load', revealIframe, { once: true })
 		iframe.src = url
-		iframe.hidden = false
 	}
 
 	const stopSyncLoop = () => {

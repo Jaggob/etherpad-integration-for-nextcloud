@@ -84,6 +84,112 @@ class PadControllerTest extends TestCase {
 		$this->assertSame('Invalid file ID.', $response->getData()['message']);
 	}
 
+	public function testOpenByIdRetriesLockedReadAndEventuallySucceeds(): void {
+		$user = $this->createConfiguredMock(IUser::class, [
+			'getUID' => 'alice',
+			'getDisplayName' => 'Alice',
+		]);
+		$userSession = $this->createConfiguredMock(IUserSession::class, ['getUser' => $user]);
+		$file = $this->buildPadFileNode();
+		$file->expects($this->exactly(3))
+			->method('getContent')
+			->willReturnCallback(static function (): string {
+				static $call = 0;
+				$call++;
+				if ($call < 3) {
+					throw new LockedException('locked');
+				}
+				return 'frontmatter';
+			});
+
+		$rootFolder = $this->createMock(IRootFolder::class);
+		$rootFolder->method('getById')->with(138)->willReturn([$file]);
+
+		$padFileService = $this->createMock(PadFileService::class);
+		$padFileService->expects($this->once())
+			->method('parsePadFile')
+			->with('frontmatter')
+			->willReturn([
+				'frontmatter' => [
+					'pad_id' => 'g.ABCDEFGHIJKLMNOP$pad-1',
+					'access_mode' => BindingService::ACCESS_PUBLIC,
+				],
+			]);
+		$padFileService->method('isExternalFrontmatter')->willReturn(false);
+
+		$bindingService = $this->createMock(BindingService::class);
+		$bindingService->expects($this->once())
+			->method('assertConsistentMapping')
+			->with(138, 'g.ABCDEFGHIJKLMNOP$pad-1', BindingService::ACCESS_PUBLIC);
+
+		$etherpadClient = $this->createMock(EtherpadClient::class);
+		$etherpadClient->expects($this->once())
+			->method('buildPadUrl')
+			->with('g.ABCDEFGHIJKLMNOP$pad-1')
+			->willReturn('https://pad.example.test/p/g.ABCDEFGHIJKLMNOP$pad-1');
+
+		$appConfigService = $this->createMock(AppConfigService::class);
+		$appConfigService->expects($this->once())
+			->method('getSyncIntervalSeconds')
+			->willReturn(30);
+
+		$urlGenerator = $this->createMock(IURLGenerator::class);
+		$urlGenerator->method('linkToRoute')
+			->willReturnMap([
+				['etherpad_nextcloud.pad.syncById', ['fileId' => 138], '/sync/138'],
+				['etherpad_nextcloud.pad.syncStatusById', ['fileId' => 138], '/sync-status/138'],
+			]);
+
+		$controller = new PadController(
+			'etherpad_nextcloud',
+			$this->createMock(IRequest::class),
+			$urlGenerator,
+			$userSession,
+			$this->createMock(LoggerInterface::class),
+			new PathNormalizer(),
+			$padFileService,
+			$bindingService,
+			$etherpadClient,
+			$this->createMock(PadSessionService::class),
+			$this->createMock(PadBootstrapService::class),
+			$appConfigService,
+			$this->createMock(LifecycleService::class),
+			$rootFolder,
+			new UserNodeResolver($rootFolder),
+		);
+
+		$response = $controller->openById(138);
+
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$this->assertSame('https://pad.example.test/p/g.ABCDEFGHIJKLMNOP$pad-1', $response->getData()['url']);
+	}
+
+	public function testOpenByIdReturnsRetryableErrorWhenReadRemainsLocked(): void {
+		$user = $this->createConfiguredMock(IUser::class, [
+			'getUID' => 'alice',
+			'getDisplayName' => 'Alice',
+		]);
+		$userSession = $this->createConfiguredMock(IUserSession::class, ['getUser' => $user]);
+		$file = $this->buildPadFileNode();
+		$file->expects($this->exactly(4))
+			->method('getContent')
+			->willThrowException(new LockedException('still locked'));
+
+		$rootFolder = $this->createMock(IRootFolder::class);
+		$rootFolder->method('getById')->with(138)->willReturn([$file]);
+
+		$controller = $this->buildController(
+			$this->createMock(IRequest::class),
+			$userSession,
+			rootFolder: $rootFolder,
+		);
+		$response = $controller->openById(138);
+
+		$this->assertSame(Http::STATUS_SERVICE_UNAVAILABLE, $response->getStatus());
+		$this->assertSame('Pad file is temporarily locked. Please retry.', $response->getData()['message']);
+		$this->assertTrue($response->getData()['retryable']);
+	}
+
 	public function testMetaByIdRejectsInvalidFileId(): void {
 		$user = $this->createMock(IUser::class);
 		$userSession = $this->createMock(IUserSession::class);

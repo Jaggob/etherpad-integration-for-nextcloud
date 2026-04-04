@@ -36,6 +36,7 @@ use OCP\Lock\LockedException;
 use Psr\Log\LoggerInterface;
 
 class PadController extends Controller {
+	private const OPEN_LOCK_RETRY_DELAYS_US = [100000, 200000, 400000];
 	private const SYNC_LOCK_RETRY_DELAYS_US = [150000, 300000, 600000];
 
 	public function __construct(
@@ -379,13 +380,13 @@ class PadController extends Controller {
 	}
 
 	private function openPadInternal(string $uid, string $displayName, File $node, string $absolutePath): DataResponse {
-		$content = (string)$node->getContent();
-		$fileId = (int)$node->getId();
-		if ($fileId <= 0) {
-			return new DataResponse(['message' => 'Could not resolve file ID.'], Http::STATUS_INTERNAL_SERVER_ERROR);
-		}
-
 		try {
+			$content = $this->readContentWithOpenLockRetry($node);
+			$fileId = (int)$node->getId();
+			if ($fileId <= 0) {
+				return new DataResponse(['message' => 'Could not resolve file ID.'], Http::STATUS_INTERNAL_SERVER_ERROR);
+			}
+
 			$parsed = $this->padFileService->parsePadFile((string)$content);
 			$meta = $parsed['frontmatter'];
 			$padId = (string)$meta['pad_id'];
@@ -403,6 +404,17 @@ class PadController extends Controller {
 				$padUrl,
 				$isExternal
 			);
+		} catch (LockedException $e) {
+			$this->logger->warning('Pad open deferred because .pad file is locked', [
+				'app' => 'etherpad_nextcloud',
+				'fileId' => (int)$node->getId(),
+				'path' => $absolutePath,
+				'exception' => $e,
+			]);
+			return new DataResponse([
+				'message' => 'Pad file is temporarily locked. Please retry.',
+				'retryable' => true,
+			], Http::STATUS_SERVICE_UNAVAILABLE);
 		} catch (BindingException $e) {
 			return new DataResponse(['message' => $this->toUserFacingBindingErrorMessage($e)], Http::STATUS_BAD_REQUEST);
 		} catch (PadFileFormatException|EtherpadClientException $e) {
@@ -826,6 +838,18 @@ class PadController extends Controller {
 		}
 
 		$node->putContent($content);
+	}
+
+	private function readContentWithOpenLockRetry(File $node): string {
+		foreach (self::OPEN_LOCK_RETRY_DELAYS_US as $delay) {
+			try {
+				return (string)$node->getContent();
+			} catch (LockedException) {
+				\usleep($delay);
+			}
+		}
+
+		return (string)$node->getContent();
 	}
 
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
