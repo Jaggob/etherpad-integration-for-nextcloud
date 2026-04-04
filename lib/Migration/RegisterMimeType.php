@@ -97,12 +97,7 @@ class RegisterMimeType implements IRepairStep {
 			@unlink($coreIcon);
 		}
 
-		if (@symlink($appIcon, $coreIcon)) {
-			$output->info('Synchronized core filetype icon via symlink for MIME alias etherpad-nextcloud-pad.');
-			return;
-		}
-
-		if (@file_put_contents($coreIcon, $iconContents) !== false) {
+		if (@file_put_contents($coreIcon, $iconContents, LOCK_EX) !== false) {
 			$output->info('Synchronized core filetype icon via file copy for MIME alias etherpad-nextcloud-pad.');
 			return;
 		}
