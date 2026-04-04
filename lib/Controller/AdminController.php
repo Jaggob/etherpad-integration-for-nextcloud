@@ -11,6 +11,7 @@ namespace OCA\EtherpadNextcloud\Controller;
 use OCA\EtherpadNextcloud\AppInfo\Application;
 use OCA\EtherpadNextcloud\Exception\AdminValidationException;
 use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
+use OCA\EtherpadNextcloud\Service\AppConfigService;
 use OCA\EtherpadNextcloud\Service\ConsistencyCheckService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
 use OCA\EtherpadNextcloud\Service\LifecycleService;
@@ -33,6 +34,7 @@ class AdminController extends Controller {
 		private IUserSession $userSession,
 		private IGroupManager $groupManager,
 		private IL10N $l10n,
+		private AppConfigService $appConfigService,
 		private EtherpadClient $etherpadClient,
 		private PendingDeleteRetryService $pendingDeleteRetryService,
 		private ConsistencyCheckService $consistencyCheckService,
@@ -69,6 +71,7 @@ class AdminController extends Controller {
 				$validated['allow_external_pads'] ? 'yes' : 'no',
 			);
 			$this->config->setAppValue(Application::APP_ID, 'external_pad_allowlist', $validated['external_pad_allowlist']);
+			$this->config->setAppValue(Application::APP_ID, 'trusted_embed_origins', $validated['trusted_embed_origins']);
 
 			return new DataResponse([
 				'ok' => true,
@@ -290,7 +293,8 @@ class AdminController extends Controller {
 	 *   sync_interval_seconds: int,
 	 *   delete_on_trash: bool,
 	 *   allow_external_pads: bool,
-	 *   external_pad_allowlist: string
+	 *   external_pad_allowlist: string,
+	 *   trusted_embed_origins: string
 	 * }
 	 */
 	private function validateSettingsPayload(array $payload, bool $forHealthCheck): array {
@@ -306,6 +310,9 @@ class AdminController extends Controller {
 				?? ((string)$this->config->getAppValue(Application::APP_ID, 'allow_external_pads', 'yes') === 'yes')
 		);
 		$externalAllowlist = $this->normalizeAllowlist((string)($payload['external_pad_allowlist'] ?? ''));
+		$trustedEmbedOrigins = $this->appConfigService->normalizeTrustedEmbedOrigins(
+			(string)($payload['trusted_embed_origins'] ?? $this->appConfigService->getTrustedEmbedOriginsRaw())
+		);
 
 		$rawApiKey = trim((string)($payload['etherpad_api_key'] ?? ''));
 		$storedApiKey = trim((string)$this->config->getAppValue(Application::APP_ID, 'etherpad_api_key', ''));
@@ -330,6 +337,7 @@ class AdminController extends Controller {
 			'delete_on_trash' => $deleteOnTrash,
 			'allow_external_pads' => $allowExternalPads,
 			'external_pad_allowlist' => $externalAllowlist,
+			'trusted_embed_origins' => $trustedEmbedOrigins,
 		];
 	}
 

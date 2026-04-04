@@ -169,6 +169,12 @@ For deployment, copy the app to `apps/etherpad_nextcloud` and exclude developmen
 - Remove or relax conflicting `X-Frame-Options` rules
 - Prefer a `Content-Security-Policy: frame-ancestors 'self' https://your-nextcloud.example` header that explicitly allows your Nextcloud origin
 
+### iPhone / iOS Safari zooms when focusing the embedded editor
+
+- Usually caused by small editor/form font sizes inside Etherpad, not by the outer Nextcloud shell
+- For the default `colibris` skin, adjust `src/static/skins/colibris/pad.css`, for example in the mobile `@media (max-width: 768px)` section, and raise the effective pad/editor font size from `15px` to `16px`
+- Test in a private Safari tab or after clearing website data because Etherpad CSS is cached aggressively
+
 ## Documentation
 
 - Architecture: [docs/architecture.md](docs/architecture.md)

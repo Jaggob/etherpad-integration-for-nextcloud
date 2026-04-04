@@ -12,6 +12,9 @@ use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
 use OCP\IConfig;
 
 class PadSessionService {
+	private const USER_CONFIG_AUTHOR_ID_KEY = 'etherpad_author_id';
+	private const USER_CONFIG_AUTHOR_NAME_KEY = 'etherpad_author_display_name';
+
 	public function __construct(
 		private EtherpadClient $etherpadClient,
 		private IConfig $config,
@@ -22,9 +25,25 @@ class PadSessionService {
 	public function createProtectedOpenContext(string $uid, string $displayName, string $padId, int $ttlSeconds = 3600): array {
 		$groupId = $this->extractGroupId($padId);
 		$effectiveDisplayName = trim($displayName) !== '' ? $displayName : $uid;
-		$authorId = $this->etherpadClient->createAuthorIfNotExistsFor('nc:' . $uid, $effectiveDisplayName);
 		$safeTtlSeconds = max(60, $ttlSeconds);
 		$validUntil = time() + $safeTtlSeconds;
+		$authorId = $this->resolveCachedAuthorId($uid);
+		if ($authorId !== '') {
+			$this->syncAuthorDisplayNameIfNeeded($uid, $authorId, $effectiveDisplayName);
+			try {
+				$sessionId = $this->etherpadClient->createSession($groupId, $authorId, $validUntil);
+				return [
+					'url' => $this->etherpadClient->buildPadUrl($padId),
+					'cookie' => $this->buildEtherpadSessionCookie($sessionId, $validUntil),
+				];
+			} catch (EtherpadClientException) {
+				$this->clearCachedAuthorState($uid);
+			}
+		}
+
+		$authorId = $this->etherpadClient->createAuthorIfNotExistsFor('nc:' . $uid, $effectiveDisplayName);
+		$this->rememberAuthorId($uid, $authorId);
+		$this->syncAuthorDisplayNameIfNeeded($uid, $authorId, $effectiveDisplayName);
 		$sessionId = $this->etherpadClient->createSession($groupId, $authorId, $validUntil);
 		return [
 			'url' => $this->etherpadClient->buildPadUrl($padId),
@@ -105,5 +124,72 @@ class PadSessionService {
 
 		array_shift($labels);
 		return '.' . implode('.', $labels);
+	}
+
+	private function syncAuthorDisplayNameIfNeeded(string $uid, string $authorId, string $displayName): void {
+		$trimmedName = trim($displayName);
+		if ($trimmedName === '') {
+			return;
+		}
+
+		$lastSyncedName = trim((string)$this->config->getUserValue(
+			$uid,
+			'etherpad_nextcloud',
+			self::USER_CONFIG_AUTHOR_NAME_KEY,
+			''
+		));
+		if ($lastSyncedName === $trimmedName) {
+			return;
+		}
+
+		try {
+			$this->etherpadClient->setAuthorName($authorId, $trimmedName);
+			$this->rememberAuthorName($uid, $trimmedName);
+		} catch (\Throwable) {
+			// Do not fail pad open if author renaming is unavailable.
+		}
+	}
+
+	private function resolveCachedAuthorId(string $uid): string {
+		if (!$this->shouldPersistAuthorState($uid)) {
+			return '';
+		}
+		return trim((string)$this->config->getUserValue(
+			$uid,
+			'etherpad_nextcloud',
+			self::USER_CONFIG_AUTHOR_ID_KEY,
+			''
+		));
+	}
+
+	private function rememberAuthorId(string $uid, string $authorId): void {
+		if (!$this->shouldPersistAuthorState($uid)) {
+			return;
+		}
+		$this->config->setUserValue($uid, 'etherpad_nextcloud', self::USER_CONFIG_AUTHOR_ID_KEY, trim($authorId));
+	}
+
+	private function rememberAuthorName(string $uid, string $displayName): void {
+		if (!$this->shouldPersistAuthorState($uid)) {
+			return;
+		}
+		$this->config->setUserValue(
+			$uid,
+			'etherpad_nextcloud',
+			self::USER_CONFIG_AUTHOR_NAME_KEY,
+			trim($displayName)
+		);
+	}
+
+	private function clearCachedAuthorState(string $uid): void {
+		if (!$this->shouldPersistAuthorState($uid)) {
+			return;
+		}
+		$this->config->deleteUserValue($uid, 'etherpad_nextcloud', self::USER_CONFIG_AUTHOR_ID_KEY);
+		$this->config->deleteUserValue($uid, 'etherpad_nextcloud', self::USER_CONFIG_AUTHOR_NAME_KEY);
+	}
+
+	private function shouldPersistAuthorState(string $uid): bool {
+		return $uid !== '' && !str_starts_with($uid, 'public-share:');
 	}
 }
