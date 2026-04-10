@@ -739,6 +739,9 @@ class PadController extends Controller {
 				}
 				$normalized = $this->etherpadClient->normalizeAndValidateExternalPublicPadUrl($padUrl);
 
+				// External sync already performs a live upstream text fetch on every call.
+				// force=1 therefore does not unlock a cheaper fast path here; it only marks
+				// the caller intent while preserving the "no blind rewrite" invariant.
 				$text = $this->etherpadClient->getPublicTextFromPadUrl($normalized['pad_url']);
 
 				$existingText = $this->padFileService->getTextSnapshotForRestore((string)$currentContent);
@@ -784,6 +787,9 @@ class PadController extends Controller {
 			$text = $this->etherpadClient->getText($padId);
 			$html = $this->etherpadClient->getHTML($padId);
 			if ($force && $snapshotRev >= $currentRev) {
+				// force=1 still matters for internal pads: it bypasses the cheap revision
+				// short-circuit and performs a live content re-check before deciding that
+				// the local snapshot is unchanged.
 				$existingText = $this->padFileService->getTextSnapshotForRestore((string)$currentContent);
 				$existingHtml = $this->padFileService->getHtmlSnapshotForRestore((string)$currentContent);
 				if ($existingText === $text && $existingHtml === $html) {
