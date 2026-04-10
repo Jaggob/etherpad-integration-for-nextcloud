@@ -165,7 +165,8 @@ Primary flow (native viewer when available):
    - flush on `pagehide`
    - extra flush triggers via trusted host messages
 3. `PadController::syncById` fetches revision state from Etherpad.
-4. `.pad` snapshot is updated only for newer revision (or `force=1`).
+4. `.pad` snapshot is updated only when the upstream snapshot actually differs.
+   - `force=1` requests an immediate upstream re-check, but unchanged snapshots are still not rewritten.
 5. External pads are synced as text only (no HTML import).
 6. Write-lock handling:
    - short bounded retry around `.pad` snapshot writes (`150ms`, `300ms`, `600ms`)

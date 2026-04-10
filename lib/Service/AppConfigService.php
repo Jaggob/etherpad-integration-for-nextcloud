@@ -103,7 +103,11 @@ class AppConfigService {
 				continue;
 			}
 
-			$origin = $scheme . '://' . strtolower((string)$parts['host']);
+			$host = strtolower((string)$parts['host']);
+			if (str_contains($host, ':') && !str_starts_with($host, '[')) {
+				$host = '[' . $host . ']';
+			}
+			$origin = $scheme . '://' . $host;
 			if (isset($parts['port'])) {
 				$port = (int)$parts['port'];
 				if ($port < 1 || $port > 65535) {

@@ -748,6 +748,7 @@ class PadController extends Controller {
 						'file_id' => $fileId,
 						'pad_id' => $padId,
 						'external' => true,
+						'forced' => $force,
 					]);
 				}
 
@@ -761,6 +762,7 @@ class PadController extends Controller {
 					'file_id' => $fileId,
 					'pad_id' => $padId,
 					'external' => true,
+					'forced' => $force,
 					'snapshot_rev' => $nextRev,
 					'lock_retries' => $lockRetries,
 				]);
@@ -768,11 +770,12 @@ class PadController extends Controller {
 
 			$currentRev = $this->etherpadClient->getRevisionsCount($padId);
 			$snapshotRev = $this->padFileService->getSnapshotRevision((string)$currentContent);
-			if ($snapshotRev >= $currentRev) {
+			if (!$force && $snapshotRev >= $currentRev) {
 				return new DataResponse([
 					'status' => 'unchanged',
 					'file_id' => $fileId,
 					'pad_id' => $padId,
+					'forced' => false,
 					'snapshot_rev' => $snapshotRev,
 					'current_rev' => $currentRev,
 				]);
@@ -780,6 +783,20 @@ class PadController extends Controller {
 
 			$text = $this->etherpadClient->getText($padId);
 			$html = $this->etherpadClient->getHTML($padId);
+			if ($force && $snapshotRev >= $currentRev) {
+				$existingText = $this->padFileService->getTextSnapshotForRestore((string)$currentContent);
+				$existingHtml = $this->padFileService->getHtmlSnapshotForRestore((string)$currentContent);
+				if ($existingText === $text && $existingHtml === $html) {
+					return new DataResponse([
+						'status' => 'unchanged',
+						'file_id' => $fileId,
+						'pad_id' => $padId,
+						'forced' => true,
+						'snapshot_rev' => $snapshotRev,
+						'current_rev' => $currentRev,
+					]);
+				}
+			}
 			$updatedContent = $this->padFileService->withExportSnapshot((string)$currentContent, $text, $html, $currentRev);
 			$this->putContentWithSyncLockRetry($node, $updatedContent, $lockRetries);
 
@@ -787,6 +804,7 @@ class PadController extends Controller {
 				'status' => 'updated',
 				'file_id' => $fileId,
 				'pad_id' => $padId,
+				'forced' => $force,
 				'snapshot_rev' => $currentRev,
 				'lock_retries' => $lockRetries,
 			]);
@@ -807,6 +825,7 @@ class PadController extends Controller {
 				'file_id' => $fileId,
 				'pad_id' => $padId,
 				'external' => $isExternal,
+				'forced' => $force,
 				'lock_retries' => $lockRetries ?? 0,
 				'retryable' => true,
 			]);

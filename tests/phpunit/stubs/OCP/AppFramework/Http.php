@@ -13,6 +13,7 @@ if (!class_exists(Http::class)) {
 		public const STATUS_NOT_FOUND = 404;
 		public const STATUS_CONFLICT = 409;
 		public const STATUS_INTERNAL_SERVER_ERROR = 500;
+		public const STATUS_SERVICE_UNAVAILABLE = 503;
 		public const STATUS_BAD_GATEWAY = 502;
 	}
 }

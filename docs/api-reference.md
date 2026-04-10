@@ -152,6 +152,7 @@ Base: `/apps/etherpad_nextcloud`
   - Controller: `PadController::syncById`
   - Optional query: `force=1`
   - Result: snapshot sync Etherpad -> `.pad` (`updated` or `unchanged`).
+  - `force=1` requests an immediate upstream re-check, but unchanged snapshots are still not rewritten.
   - External pads:
     - Sync uses public text export only (`/export/txt`) based on `pad_url`.
     - HTML is not imported for external pads.

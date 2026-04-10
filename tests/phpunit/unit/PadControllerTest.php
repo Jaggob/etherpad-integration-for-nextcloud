@@ -335,6 +335,8 @@ class PadControllerTest extends TestCase {
 		]);
 		$padFileService->method('isExternalFrontmatter')->willReturn(false);
 		$padFileService->method('getSnapshotRevision')->willReturn(5);
+		$padFileService->method('getTextSnapshotForRestore')->with('frontmatter')->willReturn('hello');
+		$padFileService->method('getHtmlSnapshotForRestore')->with('frontmatter')->willReturn('<p>hello</p>');
 
 		$bindingService = $this->createMock(BindingService::class);
 		$bindingService->method('assertConsistentMapping');
@@ -344,8 +346,8 @@ class PadControllerTest extends TestCase {
 			->method('getRevisionsCount')
 			->with('g.ABCDEFGHIJKLMNOP$pad-1')
 			->willReturn(5);
-		$etherpadClient->expects($this->never())->method('getText');
-		$etherpadClient->expects($this->never())->method('getHTML');
+		$etherpadClient->expects($this->once())->method('getText')->with('g.ABCDEFGHIJKLMNOP$pad-1')->willReturn('hello');
+		$etherpadClient->expects($this->once())->method('getHTML')->with('g.ABCDEFGHIJKLMNOP$pad-1')->willReturn('<p>hello</p>');
 
 		$controller = $this->buildController(
 			$request,
@@ -358,6 +360,7 @@ class PadControllerTest extends TestCase {
 		$response = $controller->syncById(138);
 
 		$this->assertSame('unchanged', $response->getData()['status']);
+		$this->assertTrue($response->getData()['forced']);
 		$this->assertSame(5, $response->getData()['snapshot_rev']);
 		$this->assertSame(5, $response->getData()['current_rev']);
 	}
@@ -410,6 +413,7 @@ class PadControllerTest extends TestCase {
 
 		$this->assertSame('unchanged', $response->getData()['status']);
 		$this->assertTrue($response->getData()['external']);
+		$this->assertTrue($response->getData()['forced']);
 	}
 
 	private function buildController(

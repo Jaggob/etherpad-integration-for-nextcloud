@@ -109,7 +109,7 @@
 			if (force && !activeSyncForce) {
 				pendingForcedSync = true
 				pendingForcedKeepalive = pendingForcedKeepalive || Boolean(keepalive)
-				return syncPromise.then(() => runSync(true, pendingForcedKeepalive))
+				return syncPromise.catch(() => undefined).then(() => runSync(true, pendingForcedKeepalive))
 			}
 			return syncPromise
 		}

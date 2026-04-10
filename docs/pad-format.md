@@ -114,7 +114,8 @@ Implementation: `lib/Service/PadFileService.php`
 
 ## Sync Semantics
 
-- Sync writes only when Etherpad revision is newer (`snapshot_rev < current_rev`), unless `force=1`.
+- Sync writes only when the upstream snapshot actually differs.
+- `force=1` requests an immediate upstream re-check, but unchanged snapshots are still not rewritten.
 - On successful sync:
   - `snapshot_rev` is updated
   - body is replaced:

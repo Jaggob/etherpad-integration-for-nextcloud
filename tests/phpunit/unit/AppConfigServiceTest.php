@@ -11,7 +11,7 @@ use OCP\IL10N;
 use PHPUnit\Framework\TestCase;
 
 class AppConfigServiceTest extends TestCase {
-	public function testNormalizeTrustedEmbedOriginsRejectsPortAboveTcpRange(): void {
+	public function testNormalizeTrustedEmbedOriginsRejectsInvalidTcpPortZero(): void {
 		$service = new AppConfigService(
 			$this->createMock(IConfig::class),
 			$this->buildL10n(),
@@ -20,7 +20,7 @@ class AppConfigServiceTest extends TestCase {
 		$this->expectException(AdminValidationException::class);
 		$this->expectExceptionMessage('Trusted embed origins must use a valid TCP port');
 
-		$service->normalizeTrustedEmbedOrigins('https://portal.example.test:70000');
+		$service->normalizeTrustedEmbedOrigins('https://portal.example.test:0');
 	}
 
 	public function testNormalizeTrustedEmbedOriginsAcceptsUpperTcpPortBoundary(): void {
@@ -32,6 +32,18 @@ class AppConfigServiceTest extends TestCase {
 		$this->assertSame(
 			'https://portal.example.test:65535',
 			$service->normalizeTrustedEmbedOrigins('https://portal.example.test:65535')
+		);
+	}
+
+	public function testNormalizeTrustedEmbedOriginsPreservesIpv6Brackets(): void {
+		$service = new AppConfigService(
+			$this->createMock(IConfig::class),
+			$this->buildL10n(),
+		);
+
+		$this->assertSame(
+			'https://[::1]:8443',
+			$service->normalizeTrustedEmbedOrigins('https://[::1]:8443')
 		);
 	}
 
