@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace OCA\EtherpadNextcloud\Controller;
 
+use OC\Security\CSRF\CsrfTokenManager;
 use OCA\EtherpadNextcloud\Service\AppConfigService;
 use OCA\EtherpadNextcloud\Service\UserNodeResolver;
 use OCP\AppFramework\Controller;
@@ -29,6 +30,7 @@ class EmbedController extends Controller {
 		private IUserSession $userSession,
 		private IURLGenerator $urlGenerator,
 		private IL10N $l10n,
+		private CsrfTokenManager $csrfTokenManager,
 		private AppConfigService $appConfigService,
 		private UserNodeResolver $userNodeResolver,
 	) {
@@ -141,7 +143,7 @@ class EmbedController extends Controller {
 		}
 
 		$this->embedBaseData = [
-			'requesttoken' => \OC::$server->getCsrfTokenManager()->getToken()->getEncryptedValue(),
+			'requesttoken' => $this->csrfTokenManager->getToken()->getEncryptedValue(),
 			'trusted_embed_origins' => $this->appConfigService->getTrustedEmbedOrigins(),
 		];
 

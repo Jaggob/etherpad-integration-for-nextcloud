@@ -104,8 +104,18 @@ class AppConfigService {
 			}
 
 			$origin = $scheme . '://' . strtolower((string)$parts['host']);
-			if (isset($parts['port']) && (int)$parts['port'] > 0) {
-				$origin .= ':' . (int)$parts['port'];
+			if (isset($parts['port'])) {
+				$port = (int)$parts['port'];
+				if ($port < 1 || $port > 65535) {
+					if ($throwOnInvalid) {
+						throw new AdminValidationException(
+							'trusted_embed_origins',
+							$this->l10n->t('Trusted embed origins must use a valid TCP port: {origin}', ['origin' => $token])
+						);
+					}
+					continue;
+				}
+				$origin .= ':' . $port;
 			}
 			$normalized[$origin] = true;
 		}
