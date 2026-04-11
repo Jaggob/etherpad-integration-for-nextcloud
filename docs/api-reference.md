@@ -22,6 +22,7 @@ Base: `/apps/etherpad_nextcloud`
     - requires a logged-in Nextcloud user
     - validates that `fileId` resolves to an accessible `.pad` file in the user's file tree
     - renders a blank embed page that internally calls `open-by-id`
+    - injects CSRF token manually into the blank template because this layout does not receive the normal `OC.requestToken` bootstrap
     - if open fails with `Missing YAML frontmatter`, the embed page retries once after `initialize-by-id/{fileId}`
     - sets route-specific `frame-ancestors` from admin-configured trusted embed origins
   - Host message contract:
@@ -49,6 +50,7 @@ Base: `/apps/etherpad_nextcloud`
     - requires a logged-in Nextcloud user
     - validates that `parentFolderId` resolves to an accessible writable folder in the user's file tree
     - renders a blank page that internally calls `POST /api/v1/pads/create-by-parent` same-origin with CSRF token
+    - injects CSRF token manually into the blank template because this layout does not receive the normal `OC.requestToken` bootstrap
     - on success redirects itself to the returned `embed_url`
     - sets route-specific `frame-ancestors` from admin-configured trusted embed origins
 

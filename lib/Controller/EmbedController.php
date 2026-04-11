@@ -143,6 +143,11 @@ class EmbedController extends Controller {
 		}
 
 		$this->embedBaseData = [
+			// Intentional use of the internal manager:
+			// blank embed templates do not get the normal Nextcloud layout bootstrap,
+			// so OC.requestToken is not auto-injected there. In this NC version there is
+			// no public OCP CSRF-token service for this use-case, so the encrypted token
+			// has to be passed manually into the blank template.
 			'requesttoken' => $this->csrfTokenManager->getToken()->getEncryptedValue(),
 			'trusted_embed_origins' => $this->appConfigService->getTrustedEmbedOrigins(),
 		];

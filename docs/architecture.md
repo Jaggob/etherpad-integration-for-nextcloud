@@ -93,6 +93,9 @@ Primary flow (minimal blank embed page):
    - accessible `.pad` file by stable `fileId`
 3. `templates/embed.php` loads `js/embed-main.js` explicitly because blank layouts do not rely on Nextcloud asset collector injection.
 4. `js/embed-main.js` calls `POST /api/v1/pads/open-by-id` same-origin with CSRF token baked into the template.
+   - because blank layout does not inject the normal `OC.requestToken` bootstrap
+   - and this Nextcloud version exposes no public `OCP\...` CSRF-token service for that template use-case
+   - `EmbedController` therefore passes the encrypted token manually from the internal CSRF token manager
 5. On `Missing YAML frontmatter`, the embed page retries once after `POST /api/v1/pads/initialize-by-id/{fileId}`.
 6. As soon as `open-by-id` returns `url`, the iframe `src` is set to the Etherpad target.
 7. Sync and host-message handlers are installed after iframe start so initial visual load is not delayed by background setup.
@@ -124,6 +127,7 @@ Primary flow (minimal blank create launcher page):
    - writable target folder by stable `parentFolderId`
 3. `templates/embed-create.php` loads `js/embed-create-main.js` explicitly in blank layout.
 4. `js/embed-create-main.js` reads `name` and `accessMode` from the launcher URL, validates them client-side, and calls `POST /api/v1/pads/create-by-parent` same-origin with CSRF token from the template.
+   - the token is injected manually for the same reason as embed-open: blank layout has no automatic `OC.requestToken` bootstrap
 5. `PadController::createByParent` performs server-side validation of `name`, `accessMode`, and the writable target folder before creating the `.pad` file and binding.
 6. On success the launcher redirects itself to the returned `embed_url`, after which the normal embed-open flow takes over.
 
