@@ -388,10 +388,10 @@ class PadController extends Controller {
 			}
 
 			$parsed = $this->padFileService->parsePadFile((string)$content);
-			$meta = $parsed['frontmatter'];
-			$padId = (string)$meta['pad_id'];
-			$accessMode = (string)$meta['access_mode'];
-			$padUrl = isset($meta['pad_url']) ? trim((string)$meta['pad_url']) : '';
+			$meta = $this->extractPadMetadata($parsed['frontmatter']);
+			$padId = $meta['pad_id'];
+			$accessMode = $meta['access_mode'];
+			$padUrl = $meta['pad_url'];
 			$isExternal = $this->padFileService->isExternalFrontmatter($meta, $padId);
 			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
 			return $this->buildOpenResponse(
@@ -557,10 +557,10 @@ class PadController extends Controller {
 		$padId = '';
 		try {
 			$parsed = $this->padFileService->parsePadFile((string)$node->getContent());
-			$meta = $parsed['frontmatter'];
-			$padId = (string)($meta['pad_id'] ?? '');
-			$accessMode = (string)($meta['access_mode'] ?? '');
-			$padUrl = isset($meta['pad_url']) ? trim((string)$meta['pad_url']) : '';
+			$meta = $this->extractPadMetadata($parsed['frontmatter']);
+			$padId = $meta['pad_id'];
+			$accessMode = $meta['access_mode'];
+			$padUrl = $meta['pad_url'];
 			$isExternal = $this->padFileService->isExternalFrontmatter($meta, $padId);
 
 			if ($accessMode === BindingService::ACCESS_PUBLIC) {
@@ -655,10 +655,10 @@ class PadController extends Controller {
 		$publicOpenUrl = '';
 		try {
 			$parsed = $this->padFileService->parsePadFile((string)$node->getContent());
-			$meta = $parsed['frontmatter'];
-			$padId = (string)($meta['pad_id'] ?? '');
-			$accessMode = (string)($meta['access_mode'] ?? '');
-			$padUrl = isset($meta['pad_url']) ? trim((string)$meta['pad_url']) : '';
+			$meta = $this->extractPadMetadata($parsed['frontmatter']);
+			$padId = $meta['pad_id'];
+			$accessMode = $meta['access_mode'];
+			$padUrl = $meta['pad_url'];
 			$isExternal = $this->padFileService->isExternalFrontmatter($meta, $padId);
 
 			if ($accessMode === BindingService::ACCESS_PUBLIC) {
@@ -725,10 +725,10 @@ class PadController extends Controller {
 		try {
 			$currentContent = (string)$node->getContent();
 			$parsed = $this->padFileService->parsePadFile((string)$currentContent);
-			$meta = $parsed['frontmatter'];
-			$padId = (string)$meta['pad_id'];
-			$accessMode = (string)$meta['access_mode'];
-			$padUrl = isset($meta['pad_url']) ? trim((string)$meta['pad_url']) : '';
+			$meta = $this->extractPadMetadata($parsed['frontmatter']);
+			$padId = $meta['pad_id'];
+			$accessMode = $meta['access_mode'];
+			$padUrl = $meta['pad_url'];
 			$isExternal = $this->padFileService->isExternalFrontmatter($meta, $padId);
 			$lockRetries = 0;
 			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
@@ -879,6 +879,18 @@ class PadController extends Controller {
 		return (string)$node->getContent();
 	}
 
+	/**
+	 * @param array<string,mixed> $meta
+	 * @return array{pad_id:string,access_mode:string,pad_url:string}
+	 */
+	private function extractPadMetadata(array $meta): array {
+		return [
+			'pad_id' => isset($meta['pad_id']) ? (string)$meta['pad_id'] : '',
+			'access_mode' => isset($meta['access_mode']) ? (string)$meta['access_mode'] : '',
+			'pad_url' => isset($meta['pad_url']) ? trim((string)$meta['pad_url']) : '',
+		];
+	}
+
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	#[\OCP\AppFramework\Http\Attribute\NoCSRFRequired]
 	public function syncStatusById(int $fileId): DataResponse {
@@ -899,9 +911,9 @@ class PadController extends Controller {
 
 		try {
 			$parsed = $this->padFileService->parsePadFile((string)$content);
-			$meta = $parsed['frontmatter'];
-			$padId = (string)$meta['pad_id'];
-			$accessMode = (string)$meta['access_mode'];
+			$meta = $this->extractPadMetadata($parsed['frontmatter']);
+			$padId = $meta['pad_id'];
+			$accessMode = $meta['access_mode'];
 			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
 
 			$isExternal = $this->padFileService->isExternalFrontmatter($meta, $padId);
