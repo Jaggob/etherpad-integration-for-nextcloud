@@ -556,7 +556,7 @@ class PadController extends Controller {
 		$padUrl = '';
 		$padId = '';
 		try {
-			$parsed = $this->padFileService->parsePadFile((string)$node->getContent());
+			$parsed = $this->padFileService->parsePadFile($this->readContentWithOpenLockRetry($node));
 			$meta = $this->extractPadMetadata($parsed['frontmatter']);
 			$padId = $meta['pad_id'];
 			$accessMode = $meta['access_mode'];
@@ -573,6 +573,11 @@ class PadController extends Controller {
 					$padUrl = $publicOpenUrl;
 				}
 			}
+		} catch (LockedException) {
+			return new DataResponse([
+				'message' => 'Pad file is temporarily locked. Please retry.',
+				'retryable' => true,
+			], Http::STATUS_SERVICE_UNAVAILABLE);
 		} catch (\Throwable $e) {
 			$this->logger->debug('Pad meta parse skipped', [
 				'app' => 'etherpad_nextcloud',

@@ -152,7 +152,7 @@ class EmbedController extends Controller {
 
 	private function applyEmbedPolicy(TemplateResponse $response): TemplateResponse {
 		$policy = new ContentSecurityPolicy();
-		foreach ($this->appConfigService->getTrustedEmbedOrigins() as $origin) {
+		foreach ($this->getEmbedBaseData()['trusted_embed_origins'] as $origin) {
 			$policy->addAllowedFrameAncestorDomain($origin);
 		}
 		$response->setContentSecurityPolicy($policy);

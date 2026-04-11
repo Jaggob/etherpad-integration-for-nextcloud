@@ -202,6 +202,29 @@ class PadControllerTest extends TestCase {
 		$this->assertSame('Invalid file ID.', $response->getData()['message']);
 	}
 
+	public function testMetaByIdReturnsRetryableErrorWhenReadRemainsLocked(): void {
+		$user = $this->createConfiguredMock(IUser::class, ['getUID' => 'alice']);
+		$userSession = $this->createConfiguredMock(IUserSession::class, ['getUser' => $user]);
+		$file = $this->buildPadFileNode();
+		$file->expects($this->exactly(4))
+			->method('getContent')
+			->willThrowException(new LockedException('still locked'));
+
+		$rootFolder = $this->createMock(IRootFolder::class);
+		$rootFolder->method('getById')->with(138)->willReturn([$file]);
+
+		$controller = $this->buildController(
+			$this->createMock(IRequest::class),
+			$userSession,
+			rootFolder: $rootFolder,
+		);
+		$response = $controller->metaById(138);
+
+		$this->assertSame(Http::STATUS_SERVICE_UNAVAILABLE, $response->getStatus());
+		$this->assertSame('Pad file is temporarily locked. Please retry.', $response->getData()['message']);
+		$this->assertTrue($response->getData()['retryable']);
+	}
+
 	public function testSyncByIdRejectsInvalidFileId(): void {
 		$user = $this->createMock(IUser::class);
 		$userSession = $this->createMock(IUserSession::class);
