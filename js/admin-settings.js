@@ -19,6 +19,7 @@
 		etherpad_api_key: form.querySelector('[name="etherpad_api_key"]'),
 		sync_interval_seconds: form.querySelector('[name="sync_interval_seconds"]'),
 		external_pad_allowlist: form.querySelector('[name="external_pad_allowlist"]'),
+		trusted_embed_origins: form.querySelector('[name="trusted_embed_origins"]'),
 	}
 
 	if (!root || !form || !statusNode || !healthButton) {
@@ -80,6 +81,7 @@
 			delete_on_trash: data.has('delete_on_trash'),
 			allow_external_pads: data.has('allow_external_pads'),
 			external_pad_allowlist: String(data.get('external_pad_allowlist') || ''),
+			trusted_embed_origins: String(data.get('trusted_embed_origins') || ''),
 		}
 	}
 

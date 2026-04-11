@@ -89,21 +89,14 @@ class EtherpadClient {
 			throw new EtherpadClientException('Etherpad did not return authorID.');
 		}
 
-		// Some Etherpad versions do not refresh the mapped author's display name
-		// on repeated createAuthorIfNotExistsFor calls. Keep it in sync explicitly.
-		$trimmedName = trim($name);
-		if ($trimmedName !== '') {
-			try {
-				$this->apiCall('setAuthorName', [
-					'authorID' => $authorId,
-					'name' => $trimmedName,
-				], 'POST');
-			} catch (\Throwable) {
-				// Do not fail pad open if author renaming is unavailable.
-			}
-		}
-
 		return $authorId;
+	}
+
+	public function setAuthorName(string $authorId, string $name): void {
+		$this->apiCall('setAuthorName', [
+			'authorID' => $authorId,
+			'name' => $name,
+		], 'POST');
 	}
 
 	public function createSession(string $groupId, string $authorId, int $validUntil): string {

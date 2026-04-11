@@ -37,6 +37,9 @@ Etherpad is the editing source of truth; the `.pad` file acts as binding storage
     - resolves `.pad` path/id to stable Nextcloud files viewer URL.
 - `lib/Controller/PublicViewerController.php`
   - Public-share API + compatibility redirect adapter (`/public/{token}` -> `/s/{token}` with file selection).
+- `lib/Controller/EmbedController.php`
+  - Minimal embed entrypoints for trusted same-site / trusted-origin integrations.
+  - Renders blank embed/open and embed/create pages with route-specific CSP `frame-ancestors`.
 - `lib/Controller/PadController.php`
   - API for create/open/resolve/sync/trash/restore.
   - For protected pad opens, attaches explicit Etherpad `Set-Cookie` session header via response header.
@@ -80,6 +83,54 @@ Primary flow (native viewer):
 4. For protected pads, response includes one Etherpad session `Set-Cookie` header.
 5. Legacy app routes (`/apps/etherpad_nextcloud`, `/by-id/{fileId}`) redirect into the same native files viewer URL.
 
+### 2b) Open (trusted embed integration)
+
+Primary flow (minimal blank embed page):
+
+1. External same-site / trusted-origin host loads `GET /apps/etherpad_nextcloud/embed/by-id/{fileId}` inside an iframe.
+2. `EmbedController::showById` validates:
+   - logged-in Nextcloud user
+   - accessible `.pad` file by stable `fileId`
+3. `templates/embed.php` loads `js/embed-main.js` explicitly because blank layouts do not rely on Nextcloud asset collector injection.
+4. `js/embed-main.js` calls `POST /api/v1/pads/open-by-id` same-origin with CSRF token baked into the template.
+   - because blank layout does not inject the normal `OC.requestToken` bootstrap
+   - and this Nextcloud version exposes no public `OCP\...` CSRF-token service for that template use-case
+   - `EmbedController` therefore passes the encrypted token manually from the internal CSRF token manager
+5. On `Missing YAML frontmatter`, the embed page retries once after `POST /api/v1/pads/initialize-by-id/{fileId}`.
+6. As soon as `open-by-id` returns `url`, the iframe `src` is set to the Etherpad target.
+7. Sync and host-message handlers are installed after iframe start so initial visual load is not delayed by background setup.
+
+Trusted host integration details:
+
+- Embed routes use route-specific `frame-ancestors` from admin setting `trusted_embed_origins`.
+- `js/embed-main.js` accepts host messages only from:
+  - `window.location.origin`
+  - configured trusted embed origins
+- Supported host messages:
+  - `epnc:host-visible`
+  - `epnc:host-hidden`
+  - `epnc:host-before-close`
+  - `epnc:host-sync-now`
+- Close handshake:
+  - host sends `epnc:host-before-close`
+  - embed replies with `epnc:sync-flush-started`
+  - then `epnc:sync-flush-finished` or `epnc:sync-flush-failed`
+  - host should wait briefly for that ack before unmounting the iframe
+
+### 2c) Create (trusted embed integration)
+
+Primary flow (minimal blank create launcher page):
+
+1. External same-site / trusted-origin host loads `GET /apps/etherpad_nextcloud/embed/create-by-parent/{parentFolderId}?name=...&accessMode=...`.
+2. `EmbedController::createByParent` validates:
+   - logged-in Nextcloud user
+   - writable target folder by stable `parentFolderId`
+3. `templates/embed-create.php` loads `js/embed-create-main.js` explicitly in blank layout.
+4. `js/embed-create-main.js` reads `name` and `accessMode` from the launcher URL, validates them client-side, and calls `POST /api/v1/pads/create-by-parent` same-origin with CSRF token from the template.
+   - the token is injected manually for the same reason as embed-open: blank layout has no automatic `OC.requestToken` bootstrap
+5. `PadController::createByParent` performs server-side validation of `name`, `accessMode`, and the writable target folder before creating the `.pad` file and binding.
+6. On success the launcher redirects itself to the returned `embed_url`, after which the normal embed-open flow takes over.
+
 ### 3) Open (public share)
 
 Primary flow (native viewer when available):
@@ -112,11 +163,19 @@ Primary flow (native viewer when available):
 ### 4) Sync
 
 1. Frontend (`js/viewer-main.js`) triggers periodic sync while a pad is open in native viewer.
-2. `PadController::syncById` fetches revision state from Etherpad.
-3. `.pad` snapshot is updated only for newer revision (or `force=1`).
-4. External pads are synced as text only (no HTML import).
-5. Final flush on `visibilitychange`/`pagehide`.
-6. Files sidebar panel uses revision-based status:
+2. Trusted embed flow (`js/embed-main.js`) runs the same snapshot sync contract:
+   - interval sync while visible
+   - flush on `visibilitychange`
+   - flush on `pagehide`
+   - extra flush triggers via trusted host messages
+3. `PadController::syncById` fetches revision state from Etherpad.
+4. `.pad` snapshot is updated only when the upstream snapshot actually differs.
+   - `force=1` requests an immediate upstream re-check, but unchanged snapshots are still not rewritten.
+5. External pads are synced as text only (no HTML import).
+6. Write-lock handling:
+   - short bounded retry around `.pad` snapshot writes (`150ms`, `300ms`, `600ms`)
+   - if still locked, API returns `status=locked` and `retryable=true`
+7. Files sidebar panel uses revision-based status:
    - `GET /api/v1/pads/sync-status/{fileId}` compares `snapshot_rev` with `current_rev`.
    - Sidebar shows `synced` vs `pending`.
    - Manual action `Pad in Datei speichern` calls `syncById` with `force=1`.
@@ -156,6 +215,15 @@ Primary flow (native viewer when available):
     - `open` (fallback)
   - Handles initialize-retry when frontmatter is missing.
   - Triggers periodic/unload-safe sync loop for authenticated native viewer sessions.
+- `js/embed-main.js`
+  - Powers the minimal `/embed/by-id/{fileId}` page for trusted host integrations.
+  - Same-origin open flow via `open-by-id` and optional `initialize-by-id` retry.
+  - Sets iframe `src` as early as possible, then starts sync/host handlers.
+  - Implements trusted host message contract and close-flush ack protocol.
+- `js/embed-create-main.js`
+  - Powers the minimal `/embed/create-by-parent/{parentFolderId}` launcher page.
+  - Same-origin create flow via `POST /api/v1/pads/create-by-parent`.
+  - Redirects to returned `embed_url` after successful creation.
 
 ## Event Integration
 

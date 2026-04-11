@@ -116,6 +116,17 @@
 		</p>
 		<p id="external-pad-allowlist-hint" class="settings-hint ep-field-hint"><?php p((string)$_['l10n']['external_allowlist_hint']); ?></p>
 
+		<p id="trusted-embed-origins-row">
+			<label for="trusted-embed-origins"><?php p((string)$_['l10n']['trusted_embed_origins']); ?></label>
+			<textarea
+				id="trusted-embed-origins"
+				name="trusted_embed_origins"
+				rows="4"
+				placeholder="https://portal.example.org&#10;https://app.example.org"><?php p((string)$_['trusted_embed_origins']); ?></textarea>
+			<span class="ep-field-error" data-field-error="trusted_embed_origins" aria-live="polite"></span>
+		</p>
+		<p id="trusted-embed-origins-hint" class="settings-hint ep-field-hint"><?php p((string)$_['l10n']['trusted_embed_origins_hint']); ?></p>
+
 		<div class="etherpad-nextcloud-admin-actions">
 			<button type="submit" class="primary"><?php p((string)$_['l10n']['save_button']); ?></button>
 			<button type="button" id="etherpad-nextcloud-health-check"><?php p((string)$_['l10n']['health_button']); ?></button>

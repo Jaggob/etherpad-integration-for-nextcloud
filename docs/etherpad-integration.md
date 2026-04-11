@@ -41,11 +41,48 @@ Important:
 
 Implemented in `lib/Service/PadSessionService.php`.
 
+Normal protected open flow:
+
 1. Extract group ID from pad ID.
-2. Resolve author via `createAuthorIfNotExistsFor`.
-3. Create session via `createSession`.
+2. Resolve Etherpad author context for the Nextcloud user.
+3. Create Etherpad session via `createSession`.
 4. Set `sessionID` cookie.
 5. Open regular pad URL.
+
+### Author Resolution Strategy
+
+For normal authenticated users, the plugin now caches Etherpad author state per Nextcloud user in server-side user config:
+
+- cached keys:
+  - `etherpad_author_id`
+  - `etherpad_author_display_name`
+- cache scope:
+  - per Nextcloud user
+  - not shared across users
+  - not persisted for public-share pseudo users (`public-share:*`)
+
+Open-path behavior:
+
+1. Try cached `authorId` for the current Nextcloud user.
+2. If the current display name differs from the cached synced name:
+   - call `setAuthorName`
+   - update cached name
+3. Try `createSession` with cached `authorId`.
+4. If session creation fails with an Etherpad API error:
+   - clear cached author state
+   - retry full author bootstrap through `createAuthorIfNotExistsFor`
+   - then create session again
+
+Why this exists:
+
+- Without caching, a normal protected open typically required:
+  - `createAuthorIfNotExistsFor`
+  - `setAuthorName`
+  - `createSession`
+- With cache hit and unchanged display name, the hot path is usually only:
+  - `createSession`
+
+This reduces Etherpad API round-trips on repeated opens without weakening access checks or moving trust to the client.
 
 Cookie details:
 
@@ -86,3 +123,6 @@ Regression safety check:
 - API errors are propagated as `EtherpadClientException`.
 - HTTP >= 400 and invalid JSON are treated as explicit failures.
 - Critical lifecycle flows log failures and abort in a controlled way (no silent best effort).
+- Protected open keeps author-cache fallback defensive:
+  - stale cached author IDs are cleared automatically when session creation fails
+  - author name sync failures do not block pad opening
