@@ -265,6 +265,7 @@ class PadControllerTest extends TestCase {
 		$response = $controller->syncById(138);
 
 		$this->assertSame('updated', $response->getData()['status']);
+		$this->assertFalse($response->getData()['external']);
 		$this->assertSame(2, $response->getData()['lock_retries']);
 		$this->assertSame(5, $response->getData()['snapshot_rev']);
 	}
@@ -360,6 +361,7 @@ class PadControllerTest extends TestCase {
 		$response = $controller->syncById(138);
 
 		$this->assertSame('unchanged', $response->getData()['status']);
+		$this->assertFalse($response->getData()['external']);
 		$this->assertTrue($response->getData()['forced']);
 		$this->assertSame(5, $response->getData()['snapshot_rev']);
 		$this->assertSame(5, $response->getData()['current_rev']);
