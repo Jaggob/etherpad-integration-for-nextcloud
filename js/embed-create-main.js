@@ -72,6 +72,14 @@
 		}
 	}
 
+	const normalizeEmbedRedirectUrl = (value) => {
+		const url = new URL(String(value || '').trim(), window.location.origin)
+		if (url.origin !== window.location.origin) {
+			throw new Error('Invalid embed URL origin.')
+		}
+		return url.pathname + url.search + url.hash
+	}
+
 	const run = async () => {
 		if (!Number.isFinite(parentFolderId) || parentFolderId <= 0 || createByParentUrl === '') {
 			showError(incompleteConfigMessage)
@@ -109,7 +117,7 @@
 			if (!data || typeof data.embed_url !== 'string' || data.embed_url.trim() === '') {
 				throw new Error('Pad creation API did not return a valid embed URL.')
 			}
-			window.location.replace(data.embed_url)
+			window.location.replace(normalizeEmbedRedirectUrl(data.embed_url))
 		} catch (error) {
 			showError(error instanceof Error ? error.message : 'Pad creation failed.')
 		}

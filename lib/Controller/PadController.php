@@ -874,6 +874,8 @@ class PadController extends Controller {
 			}
 		}
 
+		// Final uncaught attempt preserves the original LockedException for the caller
+		// once the bounded retry budget has been exhausted.
 		return (string)$node->getContent();
 	}
 

@@ -330,7 +330,7 @@
 				data = await openPad()
 			}
 			syncUrl = typeof data.sync_url === 'string' ? data.sync_url.trim() : ''
-			const intervalSeconds = Number(data.sync_interval_seconds)
+			const intervalSeconds = Number(data.sync_interval_seconds ?? 0)
 			syncIntervalMs = Number.isFinite(intervalSeconds) && intervalSeconds > 0 ? intervalSeconds * 1000 : 120000
 			showIframe(data.url)
 			installSyncLifecycleHandlers()

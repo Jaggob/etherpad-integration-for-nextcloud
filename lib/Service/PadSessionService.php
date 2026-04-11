@@ -71,6 +71,8 @@ class PadSessionService {
 			'path' => '/',
 			'domain' => $cookieDomain,
 			'secure' => true,
+			// Etherpad reads its session cookie client-side in the pad app, so this
+			// must remain script-readable for protected pad opens to work.
 			'http_only' => false,
 			'same_site' => 'None',
 		];
