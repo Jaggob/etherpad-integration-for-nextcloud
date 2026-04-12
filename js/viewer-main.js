@@ -14,6 +14,7 @@
 		return '/index.php' + path
 	}
 	const ocRequestToken = () => String((window.OC && window.OC.requestToken) || '')
+	const translate = (text) => (typeof window.t === 'function' ? window.t(APP_ID, text) : text)
 
 	const parsePublicShareTokenFromLocation = () => {
 		const match = (window.location.pathname || '').match(/(?:\/index\.php)?\/s\/([^/]+)(?:\/.*)?$/)
@@ -40,6 +41,7 @@
 				loadError: '',
 				externalOpenUrl: '',
 				externalOpenMessage: '',
+				externalSnapshotText: '',
 				resolveGeneration: 0,
 				syncUrl: '',
 				syncIntervalMs: 120000,
@@ -255,6 +257,7 @@
 				this.iframeSrc = ''
 				this.externalOpenUrl = ''
 				this.externalOpenMessage = ''
+				this.externalSnapshotText = ''
 				this.syncUrl = ''
 				this.syncInFlight = false
 				this.stopSyncLoop()
@@ -342,16 +345,9 @@
 
 					if (data && data.is_external === true && typeof data.url === 'string' && data.url.trim() !== '') {
 						const targetUrl = data.url.trim()
-						const params = new URLSearchParams(window.location.search || '')
-						const alreadyOpened = params.get('epExternalOpened') === '1'
-						const popup = alreadyOpened ? null : window.open(targetUrl, '_blank', 'noopener,noreferrer')
-						if (popup && typeof popup.focus === 'function') {
-							popup.focus()
-						}
 						this.externalOpenUrl = targetUrl
-						this.externalOpenMessage = alreadyOpened || popup
-							? 'This external pad was opened in a new tab.'
-							: 'Your browser blocked the automatic new tab. Open the external pad manually.'
+						this.externalOpenMessage = translate('This view shows the last synced snapshot stored in the .pad file. It is read-only here. To edit the pad, open the original pad in a new tab.')
+						this.externalSnapshotText = (data && typeof data.snapshot_text === 'string') ? data.snapshot_text : ''
 						this.markLoaded()
 						return
 					}
@@ -392,8 +388,11 @@
 			if (this.externalOpenUrl) {
 				return createElement('div', { class: 'epnc-native-status' }, [
 					createElement('div', { class: 'epnc-native-error-card' }, [
-						createElement('div', { class: 'epnc-native-error-title' }, 'External pad'),
+						createElement('div', { class: 'epnc-native-error-title' }, translate('Pad from another server')),
 						createElement('div', { class: 'epnc-native-error-message' }, this.externalOpenMessage),
+						createElement('pre', { class: 'epnc-native-preview' }, this.externalSnapshotText.trim() !== ''
+							? this.externalSnapshotText
+							: translate('No synced snapshot is stored in this .pad file yet.')),
 						createElement('a', {
 							class: 'button primary',
 							attrs: {
@@ -401,7 +400,7 @@
 								target: '_blank',
 								rel: 'noopener noreferrer',
 							},
-						}, 'Open external pad'),
+						}, translate('Open original pad in new tab')),
 					]),
 				])
 			}

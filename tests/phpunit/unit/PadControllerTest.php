@@ -231,6 +231,10 @@ class PadControllerTest extends TestCase {
 			->method('isExternalFrontmatter')
 			->with($frontmatter, 'ext.abc123')
 			->willReturn(true);
+		$padFileService->expects($this->once())
+			->method('getTextSnapshotForRestore')
+			->with('frontmatter')
+			->willReturn("External snapshot\nSecond line");
 
 		$bindingService = $this->createMock(BindingService::class);
 		$bindingService->expects($this->once())
@@ -281,6 +285,7 @@ class PadControllerTest extends TestCase {
 		$this->assertTrue($response->getData()['is_external']);
 		$this->assertSame('https://pad.portal.fzs.de/p/Test', $response->getData()['pad_url']);
 		$this->assertSame('https://pad.portal.fzs.de/p/Test', $response->getData()['original_pad_url']);
+		$this->assertSame("External snapshot\nSecond line", $response->getData()['snapshot_text']);
 	}
 
 	public function testMetaByIdRejectsInvalidFileId(): void {

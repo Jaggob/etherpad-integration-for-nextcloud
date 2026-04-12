@@ -394,6 +394,7 @@ class PadController extends Controller {
 			$accessMode = $meta['access_mode'];
 			$padUrl = $meta['pad_url'];
 			$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
+			$snapshotText = $isExternal ? $this->padFileService->getTextSnapshotForRestore((string)$content) : '';
 			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
 			return $this->buildOpenResponse(
 				$uid,
@@ -403,7 +404,8 @@ class PadController extends Controller {
 				$padId,
 				$accessMode,
 				$padUrl,
-				$isExternal
+				$isExternal,
+				$snapshotText
 			);
 		} catch (LockedException $e) {
 			$this->logger->warning('Pad open deferred because .pad file is locked', [
@@ -1132,7 +1134,8 @@ class PadController extends Controller {
 		string $padId,
 		string $accessMode,
 		string $padUrl = '',
-		bool $isExternal = false
+		bool $isExternal = false,
+		string $snapshotText = ''
 	): DataResponse {
 		if ($isExternal && $accessMode !== BindingService::ACCESS_PUBLIC) {
 			throw new EtherpadClientException('External pad metadata requires public access_mode.');
@@ -1169,6 +1172,7 @@ class PadController extends Controller {
 			'pad_url' => $effectivePadUrl,
 			'is_external' => $isExternal,
 			'original_pad_url' => $originalPadUrl,
+			'snapshot_text' => $isExternal ? $snapshotText : '',
 			'url' => $url,
 			'sync_url' => $this->urlGenerator->linkToRoute('etherpad_nextcloud.pad.syncById', ['fileId' => $fileId]),
 			'sync_status_url' => $this->urlGenerator->linkToRoute('etherpad_nextcloud.pad.syncStatusById', ['fileId' => $fileId]),

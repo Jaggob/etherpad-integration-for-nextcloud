@@ -23,9 +23,10 @@
 	const errorNode = root.querySelector('[data-epnc-embed-error]')
 	const errorMessageNode = root.querySelector('[data-epnc-embed-error-message]')
 	const iframe = root.querySelector('[data-epnc-embed-iframe]')
-	const externalOpenedText = String(root.getAttribute('data-l10n-external-opened') || 'This external pad was opened in a new tab.').trim()
-	const externalBlockedText = String(root.getAttribute('data-l10n-external-blocked') || 'Your browser blocked the automatic new tab. Open the external pad manually.').trim()
-	const externalLinkText = String(root.getAttribute('data-l10n-external-link') || 'Open external pad').trim()
+	const externalTitleText = String(root.getAttribute('data-l10n-external-title') || 'Pad from another server').trim()
+	const externalMessageText = String(root.getAttribute('data-l10n-external-message') || 'This view shows the last synced snapshot stored in the .pad file. It is read-only here. To edit the pad, open the original pad in a new tab.').trim()
+	const externalEmptyText = String(root.getAttribute('data-l10n-external-empty') || 'No synced snapshot is stored in this .pad file yet.').trim()
+	const externalLinkText = String(root.getAttribute('data-l10n-external-link') || 'Open original pad in new tab').trim()
 	let syncUrl = ''
 	let syncIntervalMs = 120000
 	let syncPromise = null
@@ -60,7 +61,7 @@
 		}
 	}
 
-	const showExternalPadNotice = (url, opened) => {
+	const showExternalPadPreview = (url, snapshotText) => {
 		if (errorNode instanceof HTMLElement) {
 			errorNode.hidden = true
 		}
@@ -74,9 +75,20 @@
 		loadingNode.hidden = false
 		loadingNode.textContent = ''
 
+		const card = document.createElement('div')
+		card.className = 'epnc-embed__external-card'
+
+		const title = document.createElement('h2')
+		title.className = 'epnc-embed__external-title'
+		title.textContent = externalTitleText
+
 		const message = document.createElement('p')
 		message.className = 'epnc-embed__external-message'
-		message.textContent = opened ? externalOpenedText : externalBlockedText
+		message.textContent = externalMessageText
+
+		const preview = document.createElement('pre')
+		preview.className = 'epnc-embed__external-preview'
+		preview.textContent = String(snapshotText || '').trim() !== '' ? String(snapshotText) : externalEmptyText
 
 		const link = document.createElement('a')
 		link.className = 'epnc-embed__external-link'
@@ -85,20 +97,11 @@
 		link.rel = 'noopener noreferrer'
 		link.textContent = externalLinkText
 
-		loadingNode.appendChild(message)
-		loadingNode.appendChild(link)
-	}
-
-	const tryOpenExternalPad = (url) => {
-		const targetUrl = String(url || '').trim()
-		if (targetUrl === '') {
-			return false
-		}
-		const popup = window.open(targetUrl, '_blank', 'noopener,noreferrer')
-		if (popup && typeof popup.focus === 'function') {
-			popup.focus()
-		}
-		return Boolean(popup)
+		card.appendChild(title)
+		card.appendChild(message)
+		card.appendChild(link)
+		card.appendChild(preview)
+		loadingNode.appendChild(card)
 	}
 
 	const showIframe = (url) => {
@@ -380,8 +383,7 @@
 			installHostMessageHandler()
 			startSyncLoop()
 			if (data.is_external === true) {
-				const opened = tryOpenExternalPad(data.url)
-				showExternalPadNotice(data.url, opened)
+				showExternalPadPreview(data.url, typeof data.snapshot_text === 'string' ? data.snapshot_text : '')
 				return
 			}
 			showIframe(data.url)
