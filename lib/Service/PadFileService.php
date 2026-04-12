@@ -130,6 +130,18 @@ class PadFileService {
 		return BindingService::ACCESS_PUBLIC;
 	}
 
+	/**
+	 * @param array<string,mixed> $frontmatter
+	 * @return array{pad_id:string,access_mode:string,pad_url:string}
+	 */
+	public function extractPadMetadata(array $frontmatter): array {
+		return [
+			'pad_id' => isset($frontmatter['pad_id']) ? (string)$frontmatter['pad_id'] : '',
+			'access_mode' => isset($frontmatter['access_mode']) ? (string)$frontmatter['access_mode'] : '',
+			'pad_url' => isset($frontmatter['pad_url']) ? trim((string)$frontmatter['pad_url']) : '',
+		];
+	}
+
 	/** @param array<string,mixed> $frontmatter */
 	public function isExternalFrontmatter(array $frontmatter, string $padId): bool {
 		$remotePadId = isset($frontmatter['remote_pad_id']) ? trim((string)$frontmatter['remote_pad_id']) : '';

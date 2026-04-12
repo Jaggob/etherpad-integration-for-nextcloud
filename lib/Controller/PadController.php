@@ -388,7 +388,7 @@ class PadController extends Controller {
 			}
 
 			$parsed = $this->padFileService->parsePadFile((string)$content);
-			$meta = $this->extractPadMetadata($parsed['frontmatter']);
+			$meta = $this->padFileService->extractPadMetadata($parsed['frontmatter']);
 			$padId = $meta['pad_id'];
 			$accessMode = $meta['access_mode'];
 			$padUrl = $meta['pad_url'];
@@ -557,11 +557,12 @@ class PadController extends Controller {
 		$padId = '';
 		try {
 			$parsed = $this->padFileService->parsePadFile($this->readContentWithOpenLockRetry($node));
-			$meta = $this->extractPadMetadata($parsed['frontmatter']);
+			$frontmatter = $parsed['frontmatter'];
+			$meta = $this->padFileService->extractPadMetadata($frontmatter);
 			$padId = $meta['pad_id'];
 			$accessMode = $meta['access_mode'];
 			$padUrl = $meta['pad_url'];
-			$isExternal = $this->padFileService->isExternalFrontmatter($meta, $padId);
+			$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
 
 			if ($accessMode === BindingService::ACCESS_PUBLIC) {
 				if ($isExternal && $padUrl !== '') {
@@ -659,12 +660,13 @@ class PadController extends Controller {
 		$isExternal = false;
 		$publicOpenUrl = '';
 		try {
-			$parsed = $this->padFileService->parsePadFile((string)$node->getContent());
-			$meta = $this->extractPadMetadata($parsed['frontmatter']);
-			$padId = $meta['pad_id'];
-			$accessMode = $meta['access_mode'];
-			$padUrl = $meta['pad_url'];
-			$isExternal = $this->padFileService->isExternalFrontmatter($meta, $padId);
+				$parsed = $this->padFileService->parsePadFile((string)$node->getContent());
+				$frontmatter = $parsed['frontmatter'];
+				$meta = $this->padFileService->extractPadMetadata($frontmatter);
+				$padId = $meta['pad_id'];
+				$accessMode = $meta['access_mode'];
+				$padUrl = $meta['pad_url'];
+				$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
 
 			if ($accessMode === BindingService::ACCESS_PUBLIC) {
 				if ($isExternal && $padUrl !== '') {
@@ -728,13 +730,14 @@ class PadController extends Controller {
 		}
 
 		try {
-			$currentContent = (string)$node->getContent();
-			$parsed = $this->padFileService->parsePadFile((string)$currentContent);
-			$meta = $this->extractPadMetadata($parsed['frontmatter']);
-			$padId = $meta['pad_id'];
-			$accessMode = $meta['access_mode'];
-			$padUrl = $meta['pad_url'];
-			$isExternal = $this->padFileService->isExternalFrontmatter($meta, $padId);
+				$currentContent = (string)$node->getContent();
+				$parsed = $this->padFileService->parsePadFile((string)$currentContent);
+				$frontmatter = $parsed['frontmatter'];
+				$meta = $this->padFileService->extractPadMetadata($frontmatter);
+				$padId = $meta['pad_id'];
+				$accessMode = $meta['access_mode'];
+				$padUrl = $meta['pad_url'];
+				$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
 			$lockRetries = 0;
 			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
 
@@ -887,18 +890,6 @@ class PadController extends Controller {
 		return (string)$node->getContent();
 	}
 
-	/**
-	 * @param array<string,mixed> $meta
-	 * @return array{pad_id:string,access_mode:string,pad_url:string}
-	 */
-	private function extractPadMetadata(array $meta): array {
-		return [
-			'pad_id' => isset($meta['pad_id']) ? (string)$meta['pad_id'] : '',
-			'access_mode' => isset($meta['access_mode']) ? (string)$meta['access_mode'] : '',
-			'pad_url' => isset($meta['pad_url']) ? trim((string)$meta['pad_url']) : '',
-		];
-	}
-
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	#[\OCP\AppFramework\Http\Attribute\NoCSRFRequired]
 	public function syncStatusById(int $fileId): DataResponse {
@@ -919,12 +910,13 @@ class PadController extends Controller {
 
 		try {
 			$parsed = $this->padFileService->parsePadFile((string)$content);
-			$meta = $this->extractPadMetadata($parsed['frontmatter']);
+			$frontmatter = $parsed['frontmatter'];
+			$meta = $this->padFileService->extractPadMetadata($frontmatter);
 			$padId = $meta['pad_id'];
 			$accessMode = $meta['access_mode'];
 			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
 
-			$isExternal = $this->padFileService->isExternalFrontmatter($meta, $padId);
+			$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
 			if ($isExternal) {
 				return new DataResponse([
 					'status' => 'unavailable',

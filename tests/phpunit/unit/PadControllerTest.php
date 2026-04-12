@@ -115,6 +115,11 @@ class PadControllerTest extends TestCase {
 					'access_mode' => BindingService::ACCESS_PUBLIC,
 				],
 			]);
+		$padFileService->method('extractPadMetadata')->willReturn([
+			'pad_id' => 'g.ABCDEFGHIJKLMNOP$pad-1',
+			'access_mode' => BindingService::ACCESS_PUBLIC,
+			'pad_url' => '',
+		]);
 		$padFileService->method('isExternalFrontmatter')->willReturn(false);
 
 		$bindingService = $this->createMock(BindingService::class);
@@ -263,6 +268,11 @@ class PadControllerTest extends TestCase {
 				'access_mode' => BindingService::ACCESS_PROTECTED,
 			],
 		]);
+		$padFileService->method('extractPadMetadata')->willReturn([
+			'pad_id' => 'g.ABCDEFGHIJKLMNOP$pad-1',
+			'access_mode' => BindingService::ACCESS_PROTECTED,
+			'pad_url' => '',
+		]);
 		$padFileService->method('isExternalFrontmatter')->willReturn(false);
 		$padFileService->method('getSnapshotRevision')->willReturn(4);
 		$padFileService->method('withExportSnapshot')->with("frontmatter", 'hello', '<p>hello</p>', 5)->willReturn('updated-content');
@@ -313,6 +323,11 @@ class PadControllerTest extends TestCase {
 				'access_mode' => BindingService::ACCESS_PROTECTED,
 			],
 		]);
+		$padFileService->method('extractPadMetadata')->willReturn([
+			'pad_id' => 'g.ABCDEFGHIJKLMNOP$pad-1',
+			'access_mode' => BindingService::ACCESS_PROTECTED,
+			'pad_url' => '',
+		]);
 		$padFileService->method('isExternalFrontmatter')->willReturn(false);
 		$padFileService->method('getSnapshotRevision')->willReturn(1);
 		$padFileService->method('withExportSnapshot')->with("frontmatter", 'hello', '<p>hello</p>', 5)->willReturn('updated-content');
@@ -356,6 +371,11 @@ class PadControllerTest extends TestCase {
 				'pad_id' => 'g.ABCDEFGHIJKLMNOP$pad-1',
 				'access_mode' => BindingService::ACCESS_PROTECTED,
 			],
+		]);
+		$padFileService->method('extractPadMetadata')->willReturn([
+			'pad_id' => 'g.ABCDEFGHIJKLMNOP$pad-1',
+			'access_mode' => BindingService::ACCESS_PROTECTED,
+			'pad_url' => '',
 		]);
 		$padFileService->method('isExternalFrontmatter')->willReturn(false);
 		$padFileService->method('getSnapshotRevision')->willReturn(5);
@@ -409,6 +429,11 @@ class PadControllerTest extends TestCase {
 				'remote_pad_id' => 'public-pad',
 				'pad_origin' => 'https://pad.example.test',
 			],
+		]);
+		$padFileService->method('extractPadMetadata')->willReturn([
+			'pad_id' => 'ext.remote-pad',
+			'access_mode' => BindingService::ACCESS_PUBLIC,
+			'pad_url' => 'https://pad.example.test/p/public-pad',
 		]);
 		$padFileService->method('isExternalFrontmatter')->willReturn(true);
 		$padFileService->method('getTextSnapshotForRestore')->willReturn('same text');

@@ -127,11 +127,12 @@ class PublicViewerController extends Controller {
 
 		try {
 			$parsed = $this->padFileService->parsePadFile($content);
-			$meta = $parsed['frontmatter'];
-			$padId = (string)$meta['pad_id'];
-			$accessMode = (string)$meta['access_mode'];
-			$padUrl = isset($meta['pad_url']) ? trim((string)$meta['pad_url']) : '';
-			$isExternal = $this->padFileService->isExternalFrontmatter($meta, $padId);
+			$frontmatter = $parsed['frontmatter'];
+			$meta = $this->padFileService->extractPadMetadata($frontmatter);
+			$padId = $meta['pad_id'];
+			$accessMode = $meta['access_mode'];
+			$padUrl = $meta['pad_url'];
+			$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
 
 			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
 			$openTarget = $this->resolvePublicOpenTarget($padId, $accessMode, $readOnly, $token, $isExternal, $padUrl);
@@ -263,6 +264,10 @@ class PublicViewerController extends Controller {
 		bool $isExternal,
 		string $padUrl = ''
 	): array {
+		if ($isExternal && $accessMode !== BindingService::ACCESS_PUBLIC) {
+			throw new EtherpadClientException('External pad metadata requires public access_mode.');
+		}
+
 		if ($accessMode === BindingService::ACCESS_PROTECTED) {
 			$authorUid = 'public-share:' . $token;
 			$authorName = 'Public share';
