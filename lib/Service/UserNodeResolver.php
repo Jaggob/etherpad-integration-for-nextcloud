@@ -58,6 +58,24 @@ class UserNodeResolver {
 	/**
 	 * @throws NotFoundException
 	 */
+	public function resolveUserFileNodeByPath(string $uid, string $absolutePath): File {
+		$relativePath = ltrim($absolutePath, '/');
+		if ($relativePath === '') {
+			throw new NotFoundException('Invalid empty file path.');
+		}
+
+		$userFolder = $this->rootFolder->getUserFolder($uid);
+		$node = $userFolder->get($relativePath);
+		if (!$node instanceof File) {
+			throw new NotFoundException('Path does not reference a file.');
+		}
+
+		return $node;
+	}
+
+	/**
+	 * @throws NotFoundException
+	 */
 	public function toUserAbsolutePath(string $uid, File $node): string {
 		$nodePath = (string)$node->getPath();
 		$prefix = '/' . $uid . '/files/';

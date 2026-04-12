@@ -38,6 +38,8 @@
 				iframeSrc: '',
 				isLoading: true,
 				loadError: '',
+				externalOpenUrl: '',
+				externalOpenMessage: '',
 				resolveGeneration: 0,
 				syncUrl: '',
 				syncIntervalMs: 120000,
@@ -251,6 +253,8 @@
 				this.isLoading = true
 				this.loadError = ''
 				this.iframeSrc = ''
+				this.externalOpenUrl = ''
+				this.externalOpenMessage = ''
 				this.syncUrl = ''
 				this.syncInFlight = false
 				this.stopSyncLoop()
@@ -324,7 +328,6 @@
 						if (!isCurrent()) return
 					}
 
-					this.iframeSrc = data.url
 					this.syncUrl = (data && typeof data.sync_url === 'string') ? data.sync_url : ''
 
 					const intervalSeconds = Number(data && data.sync_interval_seconds)
@@ -336,6 +339,24 @@
 					if (this.syncUrl) {
 						this.startSyncLoop()
 					}
+
+					if (data && data.is_external === true && typeof data.url === 'string' && data.url.trim() !== '') {
+						const targetUrl = data.url.trim()
+						const params = new URLSearchParams(window.location.search || '')
+						const alreadyOpened = params.get('epExternalOpened') === '1'
+						const popup = alreadyOpened ? null : window.open(targetUrl, '_blank', 'noopener,noreferrer')
+						if (popup && typeof popup.focus === 'function') {
+							popup.focus()
+						}
+						this.externalOpenUrl = targetUrl
+						this.externalOpenMessage = alreadyOpened || popup
+							? 'This external pad was opened in a new tab.'
+							: 'Your browser blocked the automatic new tab. Open the external pad manually.'
+						this.markLoaded()
+						return
+					}
+
+					this.iframeSrc = data.url
 					this.markLoaded()
 				} catch (error) {
 					if (!isCurrent()) return
@@ -365,6 +386,22 @@
 					createElement('div', { class: 'epnc-native-error-card' }, [
 						createElement('div', { class: 'epnc-native-error-title' }, 'Unable to open pad'),
 						createElement('div', { class: 'epnc-native-error-message' }, this.loadError),
+					]),
+				])
+			}
+			if (this.externalOpenUrl) {
+				return createElement('div', { class: 'epnc-native-status' }, [
+					createElement('div', { class: 'epnc-native-error-card' }, [
+						createElement('div', { class: 'epnc-native-error-title' }, 'External pad'),
+						createElement('div', { class: 'epnc-native-error-message' }, this.externalOpenMessage),
+						createElement('a', {
+							class: 'button primary',
+							attrs: {
+								href: this.externalOpenUrl,
+								target: '_blank',
+								rel: 'noopener noreferrer',
+							},
+						}, 'Open external pad'),
 					]),
 				])
 			}

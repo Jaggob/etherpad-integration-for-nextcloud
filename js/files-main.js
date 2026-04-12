@@ -106,6 +106,60 @@
 	}
 	const hasNativeViewer = () => USE_NATIVE_VIEWER && Boolean(window.OCA && window.OCA.Viewer && typeof window.OCA.Viewer.open === 'function')
 	const isFilesAppRoute = () => (window.location.pathname || '').includes('/apps/files')
+	const reserveNewTab = () => {
+		const popup = window.open('', '_blank')
+		if (!popup) {
+			return null
+		}
+		try {
+			popup.opener = null
+		} catch (error) {
+			// ignore
+		}
+		return popup
+	}
+
+	const openUrlPreferNewTab = (url, reservedTab = null) => {
+		const targetUrl = String(url || '').trim()
+		if (targetUrl === '') {
+			if (reservedTab && !reservedTab.closed) {
+				reservedTab.close()
+			}
+			return false
+		}
+		const popup = reservedTab || window.open(targetUrl, '_blank', 'noopener,noreferrer')
+		if (popup) {
+			try {
+				if (reservedTab) {
+					popup.location.replace(targetUrl)
+				}
+				if (typeof popup.focus === 'function') {
+					popup.focus()
+				}
+				return true
+			} catch (error) {
+				if (reservedTab && !popup.closed) {
+					popup.close()
+				}
+			}
+		}
+		window.location.assign(targetUrl)
+		return false
+	}
+
+	const withQueryParam = (url, key, value) => {
+		const targetUrl = String(url || '').trim()
+		if (targetUrl === '') {
+			return ''
+		}
+		try {
+			const parsed = new URL(targetUrl, window.location.origin)
+			parsed.searchParams.set(key, value)
+			return parsed.toString()
+		} catch (error) {
+			return targetUrl
+		}
+	}
 
 	const parsePadPathFromDavHref = (href) => {
 		if (!href || typeof href !== 'string') {
@@ -1311,6 +1365,7 @@
 		if (!values) {
 			return
 		}
+		const reservedTab = reserveNewTab()
 		const trimmedUrl = values.padUrl.trim()
 		const name = values.name.trim()
 		const dir = getCurrentDir()
@@ -1321,15 +1376,24 @@
 			const created = await apiCreatePadFromUrl(filePath, trimmedUrl)
 			const createdPath = (created && typeof created.file === 'string') ? created.file : filePath
 			const createdFileId = created && Number.isFinite(Number(created.file_id)) ? Number(created.file_id) : null
-			if (isFilesAppRoute() && createdFileId !== null) {
-				window.location.assign(filesUrlForFileId(createdFileId, createdPath))
+			const externalOpenUrl = (created && typeof created.pad_url === 'string') ? created.pad_url.trim() : ''
+			const viewerUrl = (created && typeof created.viewer_url === 'string') ? created.viewer_url.trim() : ''
+			if (externalOpenUrl !== '' && viewerUrl !== '') {
+				const openedInNewTab = openUrlPreferNewTab(externalOpenUrl, reservedTab)
+				if (openedInNewTab) {
+					window.location.assign(withQueryParam(viewerUrl, 'epExternalOpened', '1'))
+				}
 				return
 			}
 			await openPadInNativeViewer({
 				path: createdPath,
 				fileId: createdFileId,
+				reservedTab,
 			})
 		} catch (error) {
+			if (reservedTab && !reservedTab.closed) {
+				reservedTab.close()
+			}
 			const message = error instanceof Error ? error.message : t(APP_ID, 'Could not import public pad URL.')
 			window.alert(message)
 		}
@@ -1508,11 +1572,12 @@
 
 		let path = navigation.path || ''
 		let fileId = navigation.fileId ?? null
+		let resolvedPad = null
 		if (!path && navigation.fileId !== null && navigation.fileId !== undefined) {
 			try {
-				const resolved = await apiResolvePadByFileId(navigation.fileId)
-				path = (resolved && typeof resolved.path === 'string') ? resolved.path : ''
-				fileId = (resolved && Number.isFinite(Number(resolved.file_id))) ? Number(resolved.file_id) : fileId
+				resolvedPad = await apiResolvePadByFileId(navigation.fileId)
+				path = (resolvedPad && typeof resolvedPad.path === 'string') ? resolvedPad.path : ''
+				fileId = (resolvedPad && Number.isFinite(Number(resolvedPad.file_id))) ? Number(resolvedPad.file_id) : fileId
 			} catch (e) {
 				path = ''
 			}
@@ -1524,8 +1589,8 @@
 		}
 		if ((!fileId || !Number.isFinite(Number(fileId))) && path && !inPublicShareRoute) {
 			try {
-				const resolved = await apiResolvePadByPath(path)
-				fileId = (resolved && Number.isFinite(Number(resolved.file_id))) ? Number(resolved.file_id) : fileId
+				resolvedPad = await apiResolvePadByPath(path)
+				fileId = (resolvedPad && Number.isFinite(Number(resolvedPad.file_id))) ? Number(resolvedPad.file_id) : fileId
 			} catch (e) {
 				// resolve failure is handled by route fallback below
 			}
@@ -1534,6 +1599,32 @@
 			const routeFileId = parseFileIdFromCurrentLocation()
 			if (routeFileId) {
 				fileId = routeFileId
+			}
+		}
+		if (!resolvedPad) {
+			try {
+				if (fileId && Number.isFinite(Number(fileId))) {
+					resolvedPad = await apiResolvePadByFileId(Number(fileId))
+				} else if (path && !inPublicShareRoute) {
+					resolvedPad = await apiResolvePadByPath(path)
+				}
+			} catch (e) {
+				resolvedPad = null
+			}
+		}
+		if (resolvedPad && resolvedPad.is_external === true) {
+			const publicOpenUrl = typeof resolvedPad.public_open_url === 'string'
+				? resolvedPad.public_open_url.trim()
+				: ''
+			const viewerUrl = typeof resolvedPad.viewer_url === 'string'
+				? resolvedPad.viewer_url.trim()
+				: ''
+			if (publicOpenUrl !== '' && viewerUrl !== '') {
+				const openedInNewTab = openUrlPreferNewTab(publicOpenUrl, navigation.reservedTab || null)
+				if (openedInNewTab) {
+					window.location.assign(withQueryParam(viewerUrl, 'epExternalOpened', '1'))
+				}
+				return
 			}
 		}
 
@@ -1604,7 +1695,7 @@
 				event.stopImmediatePropagation()
 			}
 			if (hasNativeViewer()) {
-				await openPadInNativeViewer({ path: padPath, fileId: null })
+				await openPadInNativeViewer({ path: padPath, fileId: null, reservedTab: reserveNewTab() })
 				return
 			}
 			window.location.assign(viewerUrlForPublicShare(publicToken, padPath))
@@ -1626,7 +1717,7 @@
 				const dir = (context && context.dir) || getCurrentDir()
 				const filePath = normalizeFilePath(dir, filename)
 				const fileId = extractFileIdFromActionContext(context)
-				void openPadInNativeViewer({ path: filePath, fileId })
+				void openPadInNativeViewer({ path: filePath, fileId, reservedTab: reserveNewTab() })
 			},
 			t(APP_ID, 'Open in Etherpad')
 		)
@@ -1883,7 +1974,7 @@
 			}
 			const dir = params.get('path') || '/'
 			const filePath = normalizeFilePath(dir, fileName)
-			void openPadInNativeViewer({ path: filePath, fileId: null })
+			void openPadInNativeViewer({ path: filePath, fileId: null, reservedTab: reserveNewTab() })
 			return
 		}
 		if (!isPadName(fileName)) {

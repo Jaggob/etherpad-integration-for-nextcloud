@@ -23,6 +23,9 @@
 	const errorNode = root.querySelector('[data-epnc-embed-error]')
 	const errorMessageNode = root.querySelector('[data-epnc-embed-error-message]')
 	const iframe = root.querySelector('[data-epnc-embed-iframe]')
+	const externalOpenedText = String(root.getAttribute('data-l10n-external-opened') || 'This external pad was opened in a new tab.').trim()
+	const externalBlockedText = String(root.getAttribute('data-l10n-external-blocked') || 'Your browser blocked the automatic new tab. Open the external pad manually.').trim()
+	const externalLinkText = String(root.getAttribute('data-l10n-external-link') || 'Open external pad').trim()
 	let syncUrl = ''
 	let syncIntervalMs = 120000
 	let syncPromise = null
@@ -55,6 +58,47 @@
 		if (errorNode instanceof HTMLElement) {
 			errorNode.hidden = false
 		}
+	}
+
+	const showExternalPadNotice = (url, opened) => {
+		if (errorNode instanceof HTMLElement) {
+			errorNode.hidden = true
+		}
+		if (iframe instanceof HTMLIFrameElement) {
+			iframe.hidden = true
+			iframe.removeAttribute('src')
+		}
+		if (!(loadingNode instanceof HTMLElement)) {
+			return
+		}
+		loadingNode.hidden = false
+		loadingNode.textContent = ''
+
+		const message = document.createElement('p')
+		message.className = 'epnc-embed__external-message'
+		message.textContent = opened ? externalOpenedText : externalBlockedText
+
+		const link = document.createElement('a')
+		link.className = 'epnc-embed__external-link'
+		link.href = url
+		link.target = '_blank'
+		link.rel = 'noopener noreferrer'
+		link.textContent = externalLinkText
+
+		loadingNode.appendChild(message)
+		loadingNode.appendChild(link)
+	}
+
+	const tryOpenExternalPad = (url) => {
+		const targetUrl = String(url || '').trim()
+		if (targetUrl === '') {
+			return false
+		}
+		const popup = window.open(targetUrl, '_blank', 'noopener,noreferrer')
+		if (popup && typeof popup.focus === 'function') {
+			popup.focus()
+		}
+		return Boolean(popup)
 	}
 
 	const showIframe = (url) => {
@@ -332,10 +376,15 @@
 			syncUrl = typeof data.sync_url === 'string' ? data.sync_url.trim() : ''
 			const intervalSeconds = Number(data.sync_interval_seconds ?? 0)
 			syncIntervalMs = Number.isFinite(intervalSeconds) && intervalSeconds > 0 ? intervalSeconds * 1000 : 120000
-			showIframe(data.url)
 			installSyncLifecycleHandlers()
 			installHostMessageHandler()
 			startSyncLoop()
+			if (data.is_external === true) {
+				const opened = tryOpenExternalPad(data.url)
+				showExternalPadNotice(data.url, opened)
+				return
+			}
+			showIframe(data.url)
 		} catch (error) {
 			showError(error instanceof Error ? error.message : 'Pad open failed.')
 		}

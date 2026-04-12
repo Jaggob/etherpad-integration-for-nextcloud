@@ -16,7 +16,10 @@
 	data-request-token="<?php p((string)($_['requesttoken'] ?? '')); ?>"
 	data-trusted-origins="<?php p(implode(' ', array_map('strval', $_['trusted_embed_origins'] ?? []))); ?>"
 	data-l10n-loading="<?php p((string)$_['l10n']['loading']); ?>"
-	data-l10n-error-title="<?php p((string)$_['l10n']['error_title']); ?>">
+	data-l10n-error-title="<?php p((string)$_['l10n']['error_title']); ?>"
+	data-l10n-external-opened="<?php p((string)($_['l10n']['external_opened'] ?? 'This external pad was opened in a new tab.')); ?>"
+	data-l10n-external-blocked="<?php p((string)($_['l10n']['external_blocked'] ?? 'Your browser blocked the automatic new tab. Open the external pad manually.')); ?>"
+	data-l10n-external-link="<?php p((string)($_['l10n']['external_link'] ?? 'Open external pad')); ?>">
 	<div class="epnc-embed__loading" data-epnc-embed-loading>
 		<?php p((string)$_['l10n']['loading']); ?>
 	</div>

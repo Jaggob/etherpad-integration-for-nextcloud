@@ -388,11 +388,12 @@ class PadController extends Controller {
 			}
 
 			$parsed = $this->padFileService->parsePadFile((string)$content);
-			$meta = $this->padFileService->extractPadMetadata($parsed['frontmatter']);
+			$frontmatter = $parsed['frontmatter'];
+			$meta = $this->padFileService->extractPadMetadata($frontmatter);
 			$padId = $meta['pad_id'];
 			$accessMode = $meta['access_mode'];
 			$padUrl = $meta['pad_url'];
-			$isExternal = $this->padFileService->isExternalFrontmatter($meta, $padId);
+			$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
 			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
 			return $this->buildOpenResponse(
 				$uid,

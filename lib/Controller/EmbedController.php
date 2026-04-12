@@ -73,6 +73,9 @@ class EmbedController extends Controller {
 			'l10n' => [
 				'loading' => $this->l10n->t('Loading pad...'),
 				'error_title' => $this->l10n->t('Unable to open pad'),
+				'external_opened' => $this->l10n->t('This external pad was opened in a new tab.'),
+				'external_blocked' => $this->l10n->t('Your browser blocked the automatic new tab. Open the external pad manually.'),
+				'external_link' => $this->l10n->t('Open external pad'),
 			],
 		]);
 	}
