@@ -98,6 +98,86 @@ class PublicViewerControllerTest extends TestCase {
 		$this->assertArrayNotHasKey('Set-Cookie', $response->getHeaders());
 	}
 
+	public function testPublicExternalPadShareReturnsStoredTextSnapshot(): void {
+		$file = $this->createMock(File::class);
+		$file->method('getName')->willReturn('External.pad');
+		$file->method('getId')->willReturn(77);
+		$file->method('getContent')->willReturn('frontmatter');
+
+		$share = $this->createMock(IShare::class);
+		$share->method('getNode')->willReturn($file);
+		$share->method('getPermissions')->willReturn(Constants::PERMISSION_READ);
+
+		$shareManager = $this->createMock(IManager::class);
+		$shareManager->expects($this->once())
+			->method('getShareByToken')
+			->with('share-token')
+			->willReturn($share);
+
+		$frontmatter = [
+			'pad_id' => 'ext.abc123',
+			'access_mode' => BindingService::ACCESS_PUBLIC,
+			'pad_url' => 'https://pad.portal.example/p/Test',
+			'pad_origin' => 'https://pad.portal.example',
+			'remote_pad_id' => 'Test',
+		];
+
+		$padFileService = $this->createMock(PadFileService::class);
+		$padFileService->expects($this->once())
+			->method('parsePadFile')
+			->with('frontmatter')
+			->willReturn(['frontmatter' => $frontmatter]);
+		$padFileService->expects($this->once())
+			->method('extractPadMetadata')
+			->with($frontmatter)
+			->willReturn([
+				'pad_id' => 'ext.abc123',
+				'access_mode' => BindingService::ACCESS_PUBLIC,
+				'pad_url' => 'https://pad.portal.example/p/Test',
+			]);
+		$padFileService->expects($this->once())
+			->method('isExternalFrontmatter')
+			->with($frontmatter, 'ext.abc123')
+			->willReturn(true);
+		$padFileService->expects($this->once())
+			->method('getTextSnapshotForRestore')
+			->with('frontmatter')
+			->willReturn("External snapshot\nSecond line");
+		$padFileService->expects($this->never())->method('getHtmlSnapshotForRestore');
+
+		$bindingService = $this->createMock(BindingService::class);
+		$bindingService->expects($this->once())
+			->method('assertConsistentMapping')
+			->with(77, 'ext.abc123', BindingService::ACCESS_PUBLIC);
+
+		$etherpadClient = $this->createMock(EtherpadClient::class);
+		$etherpadClient->expects($this->once())
+			->method('normalizeAndValidateExternalPublicPadUrl')
+			->with('https://pad.portal.example/p/Test')
+			->willReturn(['pad_url' => 'https://pad.portal.example/p/Test']);
+
+		$padSessionService = $this->createMock(PadSessionService::class);
+		$padSessionService->expects($this->never())->method('createProtectedOpenContext');
+		$padSessionService->expects($this->never())->method('buildSetCookieHeader');
+
+		$response = $this->buildController(
+			$shareManager,
+			padFileService: $padFileService,
+			bindingService: $bindingService,
+			etherpadClient: $etherpadClient,
+			padSessionService: $padSessionService,
+		)->openPadData('share-token');
+
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$this->assertSame('https://pad.portal.example/p/Test', $response->getData()['url']);
+		$this->assertSame('https://pad.portal.example/p/Test', $response->getData()['original_pad_url']);
+		$this->assertTrue($response->getData()['is_external']);
+		$this->assertFalse($response->getData()['is_readonly_snapshot']);
+		$this->assertSame("External snapshot\nSecond line", $response->getData()['snapshot_text']);
+		$this->assertSame('', $response->getData()['snapshot_html']);
+		$this->assertArrayNotHasKey('Set-Cookie', $response->getHeaders());
+	}
+
 	public function testOpenPadDataRejectsExternalProtectedMetadata(): void {
 		$file = $this->createMock(File::class);
 		$file->method('getName')->willReturn('Shared.pad');

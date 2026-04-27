@@ -345,7 +345,7 @@ class PublicViewerController extends PublicShareController {
 				'original_pad_url' => $normalized['pad_url'],
 				'cookie_header' => '',
 				'is_readonly_snapshot' => false,
-				'snapshot_text' => '',
+				'snapshot_text' => $this->padFileService->getTextSnapshotForRestore($padFileContent),
 				'snapshot_html' => '',
 			];
 		}
