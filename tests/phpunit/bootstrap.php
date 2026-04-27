@@ -5,6 +5,8 @@ declare(strict_types=1);
 $stubFiles = [
 	__DIR__ . '/stubs/OCA/EtherpadNextcloud/AppInfo/Application.php',
 	__DIR__ . '/stubs/OCP/AppFramework/Controller.php',
+	__DIR__ . '/stubs/OCP/ISession.php',
+	__DIR__ . '/stubs/OCP/AppFramework/PublicShareController.php',
 	__DIR__ . '/stubs/OCP/AppFramework/Http.php',
 	__DIR__ . '/stubs/OCP/AppFramework/Http/ContentSecurityPolicy.php',
 	__DIR__ . '/stubs/OCP/AppFramework/Http/DataResponse.php',

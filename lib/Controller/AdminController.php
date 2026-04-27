@@ -55,6 +55,8 @@ class AdminController extends Controller {
 
 			$this->config->setAppValue(Application::APP_ID, 'etherpad_host', $validated['etherpad_host']);
 			$this->config->setAppValue(Application::APP_ID, 'etherpad_api_host', $validated['etherpad_api_host']);
+			$this->config->setAppValue(Application::APP_ID, 'etherpad_cookie_domain', $validated['etherpad_cookie_domain']);
+			$this->config->setAppValue(Application::APP_ID, 'etherpad_cookie_domain_configured', 'yes');
 			if ($validated['etherpad_api_key'] !== null) {
 				$this->config->setAppValue(Application::APP_ID, 'etherpad_api_key', $validated['etherpad_api_key']);
 			}
@@ -287,6 +289,7 @@ class AdminController extends Controller {
 	 * @return array{
 	 *   etherpad_host: string,
 	 *   etherpad_api_host: string,
+	 *   etherpad_cookie_domain: string,
 	 *   etherpad_api_key: ?string,
 	 *   effective_api_key: string,
 	 *   etherpad_api_version: string,
@@ -300,6 +303,9 @@ class AdminController extends Controller {
 	private function validateSettingsPayload(array $payload, bool $forHealthCheck): array {
 		$host = $this->normalizeEtherpadHost((string)($payload['etherpad_host'] ?? ''));
 		$apiHost = $this->normalizeEtherpadApiHost((string)($payload['etherpad_api_host'] ?? ''), $host);
+		$cookieDomain = $this->normalizeCookieDomain(
+			(string)($payload['etherpad_cookie_domain'] ?? $this->config->getAppValue(Application::APP_ID, 'etherpad_cookie_domain', ''))
+		);
 		$syncIntervalSeconds = $this->normalizeSyncInterval($payload['sync_interval_seconds'] ?? 120);
 		$deleteOnTrash = $this->toBool(
 			$payload['delete_on_trash']
@@ -307,7 +313,7 @@ class AdminController extends Controller {
 		);
 		$allowExternalPads = $this->toBool(
 			$payload['allow_external_pads']
-				?? ((string)$this->config->getAppValue(Application::APP_ID, 'allow_external_pads', 'yes') === 'yes')
+				?? ((string)$this->config->getAppValue(Application::APP_ID, 'allow_external_pads', 'no') === 'yes')
 		);
 		$externalAllowlist = $this->normalizeAllowlist((string)($payload['external_pad_allowlist'] ?? ''));
 		$trustedEmbedOrigins = $this->appConfigService->normalizeTrustedEmbedOrigins(
@@ -330,6 +336,7 @@ class AdminController extends Controller {
 		return [
 			'etherpad_host' => $host,
 			'etherpad_api_host' => $apiHost,
+			'etherpad_cookie_domain' => $cookieDomain,
 			'etherpad_api_key' => $apiKeyToStore,
 			'effective_api_key' => $effectiveApiKey,
 			'etherpad_api_version' => $apiVersion,
@@ -407,6 +414,31 @@ class AdminController extends Controller {
 		}
 
 		return $normalized;
+	}
+
+	private function normalizeCookieDomain(string $rawDomain): string {
+		$domain = strtolower(trim($rawDomain));
+		if ($domain === '') {
+			return '';
+		}
+
+		if (str_contains($domain, '://') || str_contains($domain, '/') || str_contains($domain, ':')) {
+			throw new AdminValidationException('etherpad_cookie_domain', $this->l10n->t('Cookie domain must be a hostname, not a URL.'));
+		}
+
+		$isParentDomain = str_starts_with($domain, '.');
+		$host = ltrim($domain, '.');
+		if ($host === '' || !str_contains($host, '.') || filter_var($host, FILTER_VALIDATE_IP) !== false) {
+			throw new AdminValidationException('etherpad_cookie_domain', $this->l10n->t('Cookie domain must be a valid shared hostname.'));
+		}
+
+		foreach (explode('.', $host) as $label) {
+			if ($label === '' || strlen($label) > 63 || preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $label) !== 1) {
+				throw new AdminValidationException('etherpad_cookie_domain', $this->l10n->t('Cookie domain must be a valid shared hostname.'));
+			}
+		}
+
+		return ($isParentDomain ? '.' : '') . $host;
 	}
 
 	private function normalizeApiVersion(string $rawVersion): string {

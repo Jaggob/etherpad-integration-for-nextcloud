@@ -60,10 +60,7 @@ class PadSessionService {
 
 	/** @return array{name:string,value:string,expires:int,path:string,domain:string,secure:bool,http_only:bool,same_site:string} */
 	private function buildEtherpadSessionCookie(string $sessionId, int $validUntil): array {
-		$cookieDomain = (string)$this->config->getAppValue('etherpad_nextcloud', 'etherpad_cookie_domain', '');
-		if ($cookieDomain === '') {
-			$cookieDomain = $this->deriveCookieDomainFromHost();
-		}
+		$cookieDomain = trim((string)$this->config->getAppValue('etherpad_nextcloud', 'etherpad_cookie_domain', ''));
 		return [
 			'name' => 'sessionID',
 			'value' => $sessionId,
@@ -99,33 +96,6 @@ class PadSessionService {
 			$parts[] = 'SameSite=' . $cookie['same_site'];
 		}
 		return implode('; ', $parts);
-	}
-
-	private function deriveCookieDomainFromHost(): string {
-		$host = (string)$this->config->getAppValue('etherpad_nextcloud', 'etherpad_host', '');
-		if ($host === '') {
-			return '';
-		}
-
-		$parsedHost = parse_url($host, PHP_URL_HOST);
-		if (!is_string($parsedHost) || $parsedHost === '') {
-			return '';
-		}
-		$parsedHost = strtolower(trim($parsedHost));
-		if ($parsedHost === '' || filter_var($parsedHost, FILTER_VALIDATE_IP) !== false || !str_contains($parsedHost, '.')) {
-			return '';
-		}
-
-		$labels = explode('.', $parsedHost);
-		if (count($labels) === 2) {
-			return $parsedHost;
-		}
-		if (count($labels) < 2) {
-			return '';
-		}
-
-		array_shift($labels);
-		return '.' . implode('.', $labels);
 	}
 
 	private function syncAuthorDisplayNameIfNeeded(string $uid, string $authorId, string $displayName): void {

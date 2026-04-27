@@ -74,8 +74,30 @@ class PadSessionServiceTest extends TestCase {
 		$this->assertSame($padUrl, $resultUrl);
 		$this->assertSame('sessionID', $result['cookie']['name']);
 		$this->assertSame($sessionId, $result['cookie']['value']);
+		$this->assertSame('', $result['cookie']['domain']);
 		$this->assertSame('None', $result['cookie']['same_site']);
 		$this->assertTrue($result['cookie']['secure']);
+	}
+
+	public function testCreateProtectedOpenContextUsesExplicitCookieDomainOnly(): void {
+		$uid = 'admin';
+		$padId = 'g.ABCDEFGHIJKLMNOP$pad-1';
+
+		$etherpadClient = $this->createMock(EtherpadClient::class);
+		$etherpadClient->method('createAuthorIfNotExistsFor')->willReturn('a.test-author');
+		$etherpadClient->method('createSession')->willReturn('s.test-session');
+		$etherpadClient->method('buildPadUrl')->willReturn('https://pad.example.test/p/' . rawurlencode($padId));
+
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')
+			->willReturnMap([
+				['etherpad_nextcloud', 'etherpad_cookie_domain', '', '.example.test'],
+			]);
+
+		$service = new PadSessionService($etherpadClient, $config);
+		$result = $service->createProtectedOpenContext($uid, 'Admin', $padId);
+
+		$this->assertSame('.example.test', $result['cookie']['domain']);
 	}
 
 	public function testBuildSetCookieHeaderIncludesExpectedAttributes(): void {

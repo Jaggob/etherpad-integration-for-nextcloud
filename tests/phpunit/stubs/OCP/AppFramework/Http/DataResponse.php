@@ -29,5 +29,10 @@ if (!class_exists(DataResponse::class)) {
 			$this->headers[$name] = $value;
 			return $this;
 		}
+
+		/** @return array<string,string> */
+		public function getHeaders(): array {
+			return $this->headers;
+		}
 	}
 }

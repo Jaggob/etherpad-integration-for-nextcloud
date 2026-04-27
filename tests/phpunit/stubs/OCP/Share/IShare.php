@@ -9,5 +9,7 @@ if (!interface_exists(IShare::class)) {
 		public function getNode();
 
 		public function getPermissions(): int;
+
+		public function getPassword(): ?string;
 	}
 }

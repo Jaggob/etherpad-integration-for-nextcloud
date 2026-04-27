@@ -54,6 +54,18 @@
 		<p class="settings-hint ep-field-hint"><?php p((string)$_['l10n']['etherpad_api_url_hint']); ?></p>
 
 		<p>
+			<label for="etherpad-cookie-domain"><?php p((string)$_['l10n']['etherpad_cookie_domain']); ?></label>
+			<input
+				type="text"
+				id="etherpad-cookie-domain"
+				name="etherpad_cookie_domain"
+				placeholder=".example.org"
+				value="<?php p((string)$_['etherpad_cookie_domain']); ?>">
+			<span class="ep-field-error" data-field-error="etherpad_cookie_domain" aria-live="polite"></span>
+		</p>
+		<p class="settings-hint ep-field-hint"><?php p((string)$_['l10n']['etherpad_cookie_domain_hint']); ?></p>
+
+		<p>
 			<label for="etherpad-api-key"><?php p((string)$_['l10n']['etherpad_api_key']); ?></label>
 			<input
 				type="password"

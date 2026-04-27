@@ -32,6 +32,11 @@ class AdminSettings implements ISettings {
 
 		$etherpadHost = (string)$this->config->getAppValue(Application::APP_ID, 'etherpad_host', '');
 		$etherpadApiHost = (string)$this->config->getAppValue(Application::APP_ID, 'etherpad_api_host', '');
+		$cookieDomainConfigured = (string)$this->config->getAppValue(Application::APP_ID, 'etherpad_cookie_domain_configured', 'no') === 'yes';
+		$storedCookieDomain = (string)$this->config->getAppValue(Application::APP_ID, 'etherpad_cookie_domain', '');
+		$cookieDomain = $cookieDomainConfigured
+			? $storedCookieDomain
+			: $this->deriveCookieDomainFromKnownHosts($this->urlGenerator->getBaseUrl(), $etherpadHost);
 		$apiVersion = (string)$this->config->getAppValue(Application::APP_ID, 'etherpad_api_version', '1.2.15');
 		$syncInterval = (int)$this->config->getAppValue(Application::APP_ID, 'sync_interval_seconds', '120');
 		if ($syncInterval < 5) {
@@ -44,10 +49,11 @@ class AdminSettings implements ISettings {
 		return new TemplateResponse(Application::APP_ID, 'admin-settings', [
 			'etherpad_host' => $etherpadHost,
 			'etherpad_api_host' => $etherpadApiHost,
+			'etherpad_cookie_domain' => $cookieDomain,
 			'etherpad_api_version' => $apiVersion,
 			'sync_interval_seconds' => $syncInterval,
 			'delete_on_trash' => (string)$this->config->getAppValue(Application::APP_ID, 'delete_on_trash', 'yes') === 'yes',
-			'allow_external_pads' => (string)$this->config->getAppValue(Application::APP_ID, 'allow_external_pads', 'yes') === 'yes',
+			'allow_external_pads' => (string)$this->config->getAppValue(Application::APP_ID, 'allow_external_pads', 'no') === 'yes',
 			'external_pad_allowlist' => (string)$this->config->getAppValue(Application::APP_ID, 'external_pad_allowlist', ''),
 			'trusted_embed_origins' => $this->appConfigService->getTrustedEmbedOriginsRaw(),
 			'has_api_key' => (string)$this->config->getAppValue(Application::APP_ID, 'etherpad_api_key', '') !== '',
@@ -61,6 +67,8 @@ class AdminSettings implements ISettings {
 				'etherpad_base_url' => $this->l10n->t('Etherpad Base URL'),
 				'etherpad_api_url' => $this->l10n->t('Etherpad API URL (optional)'),
 				'etherpad_api_url_hint' => $this->l10n->t('Optional internal URL for server-side API calls. Leave empty to use Etherpad Base URL.'),
+				'etherpad_cookie_domain' => $this->l10n->t('Etherpad session cookie domain (optional)'),
+				'etherpad_cookie_domain_hint' => $this->l10n->t('Auto-filled from the Nextcloud and Etherpad hosts when possible. Adjust it if your deployment uses a proxy path or a different trusted parent domain; leave empty for a host-only cookie.'),
 				'etherpad_api_key' => $this->l10n->t('Etherpad API key'),
 				'detected_api_version' => $this->l10n->t('Detected API version:'),
 				'copy_interval' => $this->l10n->t('Copy content to .pad file interval (seconds)'),
@@ -69,7 +77,7 @@ class AdminSettings implements ISettings {
 				'delete_on_trash_hint' => $this->l10n->t('If enabled, moving a .pad file to trash triggers Etherpad delete.'),
 				'allow_external_pads' => $this->l10n->t('Allow linking external public pads'),
 				'external_allowlist' => $this->l10n->t('External host allowlist (optional)'),
-				'external_allowlist_hint' => $this->l10n->t('Leave empty to allow all public hosts. HTTPS is always required.'),
+				'external_allowlist_hint' => $this->l10n->t('Add trusted Etherpad hostnames or https origins. Leave empty only if all public HTTPS hosts should be trusted.'),
 				'trusted_embed_origins' => $this->l10n->t('Trusted embed origins (optional)'),
 				'trusted_embed_origins_hint' => $this->l10n->t('Absolute https origins allowed to embed the /embed/by-id and /embed/create-by-parent routes. Leave empty to disable external embedding.'),
 				'save_button' => $this->l10n->t('Save settings'),
@@ -99,5 +107,77 @@ class AdminSettings implements ISettings {
 
 	public function getPriority(): int {
 		return 10;
+	}
+
+	private function deriveCookieDomainFromKnownHosts(string $nextcloudUrl, string $etherpadUrl): string {
+		$nextcloudHost = $this->extractHost($nextcloudUrl);
+		$etherpadHost = $this->extractHost($etherpadUrl);
+		if ($nextcloudHost === '' || $etherpadHost === '' || $nextcloudHost === $etherpadHost) {
+			return '';
+		}
+		if ($this->isHostUnsuitableForDomainCookie($nextcloudHost) || $this->isHostUnsuitableForDomainCookie($etherpadHost)) {
+			return '';
+		}
+
+		$nextcloudLabels = array_reverse(explode('.', $nextcloudHost));
+		$etherpadLabels = array_reverse(explode('.', $etherpadHost));
+		$common = [];
+		$limit = min(count($nextcloudLabels), count($etherpadLabels));
+		for ($i = 0; $i < $limit; $i++) {
+			if ($nextcloudLabels[$i] !== $etherpadLabels[$i]) {
+				break;
+			}
+			$common[] = $nextcloudLabels[$i];
+		}
+
+		$common = array_reverse($common);
+		if (count($common) < 2 || $this->looksLikeTwoLabelPublicSuffix($common)) {
+			return '';
+		}
+
+		return '.' . implode('.', $common);
+	}
+
+	private function extractHost(string $urlOrHost): string {
+		$value = strtolower(trim($urlOrHost));
+		if ($value === '') {
+			return '';
+		}
+		$host = parse_url($value, PHP_URL_HOST);
+		if (!is_string($host) || $host === '') {
+			$host = preg_replace('/:\d+$/', '', $value) ?? '';
+		}
+		$host = trim(strtolower($host), "[] \t\n\r\0\x0B.");
+		return $this->isValidCookieHost($host) ? $host : '';
+	}
+
+	private function isValidCookieHost(string $host): bool {
+		if ($host === '' || strlen($host) > 253) {
+			return false;
+		}
+		if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
+			return true;
+		}
+		foreach (explode('.', $host) as $label) {
+			if ($label === '' || strlen($label) > 63 || preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $label) !== 1) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private function isHostUnsuitableForDomainCookie(string $host): bool {
+		return filter_var($host, FILTER_VALIDATE_IP) !== false
+			|| $host === 'localhost'
+			|| str_ends_with($host, '.localhost')
+			|| !str_contains($host, '.');
+	}
+
+	/** @param list<string> $commonLabels */
+	private function looksLikeTwoLabelPublicSuffix(array $commonLabels): bool {
+		if (count($commonLabels) !== 2 || strlen($commonLabels[1]) !== 2) {
+			return false;
+		}
+		return in_array($commonLabels[0], ['ac', 'co', 'com', 'edu', 'gov', 'net', 'org'], true);
 	}
 }

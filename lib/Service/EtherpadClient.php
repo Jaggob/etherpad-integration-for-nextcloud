@@ -447,7 +447,7 @@ class EtherpadClient {
 
 	/** @return list<string> */
 	private function resolveAndValidateExternalHost(string $host): array {
-		if ((string)$this->config->getAppValue('etherpad_nextcloud', 'allow_external_pads', 'yes') !== 'yes') {
+		if ((string)$this->config->getAppValue('etherpad_nextcloud', 'allow_external_pads', 'no') !== 'yes') {
 			throw new EtherpadClientException('External pad linking is disabled by admin settings.');
 		}
 		if (!$this->isAllowlistedExternalHost($host)) {

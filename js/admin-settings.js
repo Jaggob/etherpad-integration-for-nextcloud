@@ -16,6 +16,7 @@
 	const fieldNodes = {
 		etherpad_host: form.querySelector('[name="etherpad_host"]'),
 		etherpad_api_host: form.querySelector('[name="etherpad_api_host"]'),
+		etherpad_cookie_domain: form.querySelector('[name="etherpad_cookie_domain"]'),
 		etherpad_api_key: form.querySelector('[name="etherpad_api_key"]'),
 		sync_interval_seconds: form.querySelector('[name="sync_interval_seconds"]'),
 		external_pad_allowlist: form.querySelector('[name="external_pad_allowlist"]'),
@@ -76,6 +77,7 @@
 		return {
 			etherpad_host: String(data.get('etherpad_host') || '').trim(),
 			etherpad_api_host: String(data.get('etherpad_api_host') || '').trim(),
+			etherpad_cookie_domain: String(data.get('etherpad_cookie_domain') || '').trim(),
 			etherpad_api_key: String(data.get('etherpad_api_key') || '').trim(),
 			sync_interval_seconds: Number(data.get('sync_interval_seconds') || 120),
 			delete_on_trash: data.has('delete_on_trash'),

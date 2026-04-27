@@ -47,7 +47,7 @@ class CSPListener implements IEventListener {
 			$domains[$localHost] = true;
 		}
 
-		if ((string)$this->config->getAppValue('etherpad_nextcloud', 'allow_external_pads', 'yes') !== 'yes') {
+		if ((string)$this->config->getAppValue('etherpad_nextcloud', 'allow_external_pads', 'no') !== 'yes') {
 			return array_keys($domains);
 		}
 

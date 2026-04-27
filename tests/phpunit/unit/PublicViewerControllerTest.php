@@ -14,6 +14,7 @@ use OCP\AppFramework\Http;
 use OCP\Constants;
 use OCP\Files\File;
 use OCP\IRequest;
+use OCP\ISession;
 use OCP\IURLGenerator;
 use OCP\Share\IManager;
 use OCP\Share\IShare;
@@ -28,7 +29,7 @@ class PublicViewerControllerTest extends TestCase {
 
 		$share = $this->createMock(IShare::class);
 		$share->method('getNode')->willReturn($file);
-		$share->method('getPermissions')->willReturn(Constants::PERMISSION_UPDATE);
+		$share->method('getPermissions')->willReturn(Constants::PERMISSION_READ | Constants::PERMISSION_UPDATE);
 
 		$shareManager = $this->createMock(IManager::class);
 		$shareManager->expects($this->once())
@@ -91,11 +92,96 @@ class PublicViewerControllerTest extends TestCase {
 			$etherpadClient,
 			$padSessionService,
 			$urlGenerator,
+			$this->createMock(ISession::class),
 		);
 
 		$response = $controller->openPadData('share-token');
 
 		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
 		$this->assertSame('Etherpad is currently unavailable for this shared pad.', $response->getData()['message']);
+	}
+
+	public function testPasswordProtectedShareRequiresAuthenticatedSession(): void {
+		$share = $this->createMock(IShare::class);
+		$share->method('getPassword')->willReturn('stored-password-hash');
+
+		$shareManager = $this->createMock(IManager::class);
+		$shareManager->expects($this->once())
+			->method('getShareByToken')
+			->with('share-token')
+			->willReturn($share);
+
+		$session = $this->createMock(ISession::class);
+		$session->method('get')->with('public_link_authenticated_frontend')->willReturn('[]');
+
+		$controller = $this->buildController($shareManager, session: $session);
+		$controller->setToken('share-token');
+
+		$this->assertTrue($controller->isValidToken());
+		$this->assertFalse($controller->isAuthenticated());
+	}
+
+	public function testPasswordProtectedShareAcceptsMatchingPublicShareSession(): void {
+		$share = $this->createMock(IShare::class);
+		$share->method('getPassword')->willReturn('stored-password-hash');
+
+		$shareManager = $this->createMock(IManager::class);
+		$shareManager->expects($this->once())
+			->method('getShareByToken')
+			->with('share-token')
+			->willReturn($share);
+
+		$session = $this->createMock(ISession::class);
+		$session->method('get')
+			->with('public_link_authenticated_frontend')
+			->willReturn('{"share-token":"stored-password-hash"}');
+
+		$controller = $this->buildController($shareManager, session: $session);
+		$controller->setToken('share-token');
+
+		$this->assertTrue($controller->isValidToken());
+		$this->assertTrue($controller->isAuthenticated());
+	}
+
+	public function testOpenPadDataRejectsShareWithoutReadPermission(): void {
+		$share = $this->createMock(IShare::class);
+		$share->method('getPermissions')->willReturn(Constants::PERMISSION_UPDATE);
+		$share->expects($this->never())->method('getNode');
+
+		$shareManager = $this->createMock(IManager::class);
+		$shareManager->expects($this->once())
+			->method('getShareByToken')
+			->with('share-token')
+			->willReturn($share);
+
+		$response = $this->buildController($shareManager)->openPadData('share-token');
+
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertSame('This share link does not allow reading files.', $response->getData()['message']);
+	}
+
+	private function buildController(
+		IManager $shareManager,
+		?PadFileService $padFileService = null,
+		?BindingService $bindingService = null,
+		?EtherpadClient $etherpadClient = null,
+		?PadSessionService $padSessionService = null,
+		?ISession $session = null,
+	): PublicViewerController {
+		$urlGenerator = $this->createMock(IURLGenerator::class);
+		$urlGenerator->method('getWebroot')->willReturn('');
+
+		return new PublicViewerController(
+			'etherpad_nextcloud',
+			$this->createMock(IRequest::class),
+			$shareManager,
+			new PathNormalizer(),
+			$padFileService ?? $this->createMock(PadFileService::class),
+			$bindingService ?? $this->createMock(BindingService::class),
+			$etherpadClient ?? $this->createMock(EtherpadClient::class),
+			$padSessionService ?? $this->createMock(PadSessionService::class),
+			$urlGenerator,
+			$session ?? $this->createMock(ISession::class),
+		);
 	}
 }

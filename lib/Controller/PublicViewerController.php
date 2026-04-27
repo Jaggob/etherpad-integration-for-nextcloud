@@ -18,9 +18,9 @@ use OCA\EtherpadNextcloud\Service\EtherpadClient;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadSessionService;
 use OCA\EtherpadNextcloud\Util\PathNormalizer;
-use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\AppFramework\Http;
+use OCP\AppFramework\PublicShareController;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\Constants;
@@ -28,11 +28,15 @@ use OCP\Files\File;
 use OCP\Files\Folder;
 use OCP\Files\NotFoundException;
 use OCP\IRequest;
+use OCP\ISession;
 use OCP\IURLGenerator;
 use OCP\Share\Exceptions\ShareNotFound;
 use OCP\Share\IManager;
+use OCP\Share\IShare;
 
-class PublicViewerController extends Controller {
+class PublicViewerController extends PublicShareController {
+	private ?IShare $share = null;
+
 	public function __construct(
 		string $appName,
 		IRequest $request,
@@ -43,8 +47,27 @@ class PublicViewerController extends Controller {
 		private EtherpadClient $etherpadClient,
 		private PadSessionService $padSessionService,
 		private IURLGenerator $urlGenerator,
+		ISession $session,
 	) {
-		parent::__construct($appName, $request);
+		parent::__construct($appName, $request, $session);
+	}
+
+	public function isValidToken(): bool {
+		try {
+			$this->share = $this->shareManager->getShareByToken($this->getToken());
+		} catch (ShareNotFound) {
+			return false;
+		}
+
+		return true;
+	}
+
+	protected function isPasswordProtected(): bool {
+		return $this->share !== null && $this->share->getPassword() !== null;
+	}
+
+	protected function getPasswordHash(): ?string {
+		return $this->share?->getPassword();
 	}
 
 	#[\OCP\AppFramework\Http\Attribute\PublicPage]
@@ -82,10 +105,21 @@ class PublicViewerController extends Controller {
 	}
 
 	private function resolvePublicPadContext(string $token, mixed $fileParam): array {
-		try {
-			$share = $this->shareManager->getShareByToken($token);
-		} catch (ShareNotFound) {
+		$share = $this->share;
+		if ($share === null) {
+			try {
+				$share = $this->shareManager->getShareByToken($token);
+			} catch (ShareNotFound) {
+				$this->publicFail('This share link is invalid or has expired.', Http::STATUS_NOT_FOUND);
+			}
+		}
+
+		if (!$share instanceof IShare) {
 			$this->publicFail('This share link is invalid or has expired.', Http::STATUS_NOT_FOUND);
+		}
+
+		if ((((int)$share->getPermissions()) & Constants::PERMISSION_READ) === 0) {
+			$this->publicFail('This share link does not allow reading files.', Http::STATUS_FORBIDDEN);
 		}
 
 		try {

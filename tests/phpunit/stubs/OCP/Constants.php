@@ -6,6 +6,7 @@ namespace OCP;
 
 if (!class_exists(Constants::class)) {
 	class Constants {
+		public const PERMISSION_READ = 1;
 		public const PERMISSION_UPDATE = 2;
 	}
 }
