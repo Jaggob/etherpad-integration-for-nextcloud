@@ -110,7 +110,9 @@ Regression safety check:
 - Read-only URL is built via `getReadOnlyID`.
 - Authenticated protected GroupPad opens still require a session.
 - Public read-only shares of protected GroupPads do not create an Etherpad session.
-  - They render the last synced text snapshot stored in the `.pad` file.
+  - They render the last synced snapshot stored in the `.pad` file.
+  - If an HTML snapshot is stored, only a small tag whitelist is rendered (`p`, lists, headings, basic inline formatting, block/code tags); attributes and dangerous tags are stripped.
+  - If no HTML snapshot is stored, the viewer falls back to the text snapshot.
   - This prevents the public share response from setting a session cookie that could also open the writable GroupPad URL.
 
 ## Share Permission Mapping

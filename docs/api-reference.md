@@ -68,7 +68,7 @@ Base: `/apps/etherpad_nextcloud`
   - Purpose: resolves a `.pad` file inside a public share for the native viewer.
   - Result:
     - writable protected share: Etherpad URL plus one `sessionID` `Set-Cookie` header
-    - read-only protected share: `is_readonly_snapshot=true`, empty `url`, and `snapshot_text`; no Etherpad session cookie
+    - read-only protected share: `is_readonly_snapshot=true`, empty `url`, `snapshot_text`, and sanitized `snapshot_html`; no Etherpad session cookie
     - public/external pad share: regular public Etherpad URL
 
 - `POST /api/v1/pads`

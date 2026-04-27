@@ -44,6 +44,7 @@
 				externalSnapshotText: '',
 				readonlySnapshotMode: false,
 				readonlySnapshotText: '',
+				readonlySnapshotHtml: '',
 				resolveGeneration: 0,
 				syncUrl: '',
 				syncIntervalMs: 120000,
@@ -262,6 +263,7 @@
 				this.externalSnapshotText = ''
 				this.readonlySnapshotMode = false
 				this.readonlySnapshotText = ''
+				this.readonlySnapshotHtml = ''
 				this.syncUrl = ''
 				this.syncInFlight = false
 				this.stopSyncLoop()
@@ -350,6 +352,7 @@
 					if (data && data.is_readonly_snapshot === true) {
 						this.readonlySnapshotMode = true
 						this.readonlySnapshotText = (typeof data.snapshot_text === 'string') ? data.snapshot_text : ''
+						this.readonlySnapshotHtml = (typeof data.snapshot_html === 'string') ? data.snapshot_html : ''
 						this.markLoaded()
 						return
 					}
@@ -416,13 +419,18 @@
 				])
 			}
 			if (this.readonlySnapshotMode) {
-				return createElement('div', { class: 'epnc-native-status' }, [
-					createElement('div', { class: 'epnc-native-error-card' }, [
-						createElement('div', { class: 'epnc-native-error-title' }, translate('Read-only snapshot')),
-						createElement('div', { class: 'epnc-native-error-message' }, translate('This share shows the last synced snapshot stored in the .pad file.')),
-						createElement('pre', { class: 'epnc-native-preview' }, this.readonlySnapshotText.trim() !== ''
-							? this.readonlySnapshotText
-							: translate('No synced snapshot is stored in this .pad file yet.')),
+				return createElement('div', { class: 'epnc-native-snapshot' }, [
+					createElement('div', { class: 'epnc-native-snapshot__inner' }, [
+						createElement('div', { class: 'epnc-native-snapshot__title' }, translate('Read-only snapshot')),
+						createElement('div', { class: 'epnc-native-snapshot__message' }, translate('This share shows the last synced snapshot stored in the .pad file.')),
+						this.readonlySnapshotHtml.trim() !== ''
+							? createElement('div', {
+								class: 'epnc-native-snapshot__text epnc-native-snapshot__text--html',
+								domProps: { innerHTML: this.readonlySnapshotHtml },
+							})
+							: createElement('pre', { class: 'epnc-native-snapshot__text' }, this.readonlySnapshotText.trim() !== ''
+								? this.readonlySnapshotText
+								: translate('No synced snapshot is stored in this .pad file yet.')),
 					]),
 				])
 			}

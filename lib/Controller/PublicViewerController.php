@@ -98,6 +98,7 @@ class PublicViewerController extends PublicShareController {
 			'is_external' => $context['is_external'],
 			'is_readonly_snapshot' => $context['is_readonly_snapshot'],
 			'snapshot_text' => $context['snapshot_text'],
+			'snapshot_html' => $context['snapshot_html'],
 			'original_pad_url' => $context['original_pad_url'],
 		]);
 		if (($context['cookie_header'] ?? '') !== '') {
@@ -182,6 +183,7 @@ class PublicViewerController extends PublicShareController {
 			'is_external' => $isExternal,
 			'is_readonly_snapshot' => $openTarget['is_readonly_snapshot'],
 			'snapshot_text' => $openTarget['snapshot_text'],
+			'snapshot_html' => $openTarget['snapshot_html'],
 			'is_public_pad' => $accessMode === BindingService::ACCESS_PUBLIC,
 			'open_new_tab_url' => $accessMode === BindingService::ACCESS_PUBLIC ? $openTarget['url'] : '',
 			'original_pad_url' => $openTarget['original_pad_url'],
@@ -293,7 +295,7 @@ class PublicViewerController extends PublicShareController {
 		return $base . '?path=' . rawurlencode($dir) . '&files=' . rawurlencode($name);
 	}
 
-	/** @return array{url:string,original_pad_url:string,cookie_header:string,is_readonly_snapshot:bool,snapshot_text:string} */
+	/** @return array{url:string,original_pad_url:string,cookie_header:string,is_readonly_snapshot:bool,snapshot_text:string,snapshot_html:string} */
 	private function resolvePublicOpenTarget(
 		string $padId,
 		string $accessMode,
@@ -315,6 +317,7 @@ class PublicViewerController extends PublicShareController {
 					'cookie_header' => '',
 					'is_readonly_snapshot' => true,
 					'snapshot_text' => $this->padFileService->getTextSnapshotForRestore($padFileContent),
+					'snapshot_html' => $this->sanitizeSnapshotHtml($this->padFileService->getHtmlSnapshotForRestore($padFileContent)),
 				];
 			}
 
@@ -328,6 +331,7 @@ class PublicViewerController extends PublicShareController {
 				'cookie_header' => $cookieHeader,
 				'is_readonly_snapshot' => false,
 				'snapshot_text' => '',
+				'snapshot_html' => '',
 			];
 		}
 
@@ -342,6 +346,7 @@ class PublicViewerController extends PublicShareController {
 				'cookie_header' => '',
 				'is_readonly_snapshot' => false,
 				'snapshot_text' => '',
+				'snapshot_html' => '',
 			];
 		}
 
@@ -352,6 +357,7 @@ class PublicViewerController extends PublicShareController {
 				'cookie_header' => '',
 				'is_readonly_snapshot' => false,
 				'snapshot_text' => '',
+				'snapshot_html' => '',
 			];
 		}
 
@@ -361,7 +367,63 @@ class PublicViewerController extends PublicShareController {
 			'cookie_header' => '',
 			'is_readonly_snapshot' => false,
 			'snapshot_text' => '',
+			'snapshot_html' => '',
 		];
+	}
+
+	private function sanitizeSnapshotHtml(string $html): string {
+		$trimmed = trim($html);
+		if ($trimmed === '') {
+			return '';
+		}
+
+		$previous = libxml_use_internal_errors(true);
+		$document = new \DOMDocument();
+		$loaded = $document->loadHTML(
+			'<?xml encoding="UTF-8">' . $trimmed,
+			LIBXML_HTML_NODEFDTD | LIBXML_NOERROR | LIBXML_NOWARNING
+		);
+		libxml_clear_errors();
+		libxml_use_internal_errors($previous);
+		if (!$loaded) {
+			return '';
+		}
+
+		$body = $document->getElementsByTagName('body')->item(0);
+		$root = $body instanceof \DOMNode ? $body : $document;
+		$output = '';
+		foreach ($root->childNodes as $child) {
+			$output .= $this->sanitizeSnapshotHtmlNode($child);
+		}
+		return trim($output);
+	}
+
+	private function sanitizeSnapshotHtmlNode(\DOMNode $node): string {
+		if ($node instanceof \DOMText || $node instanceof \DOMCdataSection) {
+			return htmlspecialchars($node->nodeValue ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+		}
+		if (!$node instanceof \DOMElement) {
+			return '';
+		}
+
+		$tag = strtolower($node->tagName);
+		if (in_array($tag, ['script', 'style', 'iframe', 'object', 'embed', 'svg', 'math', 'img', 'video', 'audio', 'source', 'link', 'meta'], true)) {
+			return '';
+		}
+
+		$content = '';
+		foreach ($node->childNodes as $child) {
+			$content .= $this->sanitizeSnapshotHtmlNode($child);
+		}
+
+		$allowed = ['p', 'br', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'b', 'em', 'i', 'u', 's', 'del', 'blockquote', 'pre', 'code'];
+		if (!in_array($tag, $allowed, true)) {
+			return $content;
+		}
+		if ($tag === 'br') {
+			return '<br>';
+		}
+		return '<' . $tag . '>' . $content . '</' . $tag . '>';
 	}
 
 }

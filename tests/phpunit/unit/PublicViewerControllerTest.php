@@ -64,6 +64,10 @@ class PublicViewerControllerTest extends TestCase {
 			->method('getTextSnapshotForRestore')
 			->with('frontmatter')
 			->willReturn("Snapshot text\nSecond line");
+		$padFileService->expects($this->once())
+			->method('getHtmlSnapshotForRestore')
+			->with('frontmatter')
+			->willReturn('<h1 style="color:red" onclick="alert(1)">Title</h1><p><strong>Safe</strong> <span style="color:red">text</span><script>alert(1)</script></p>');
 
 		$bindingService = $this->createMock(BindingService::class);
 		$bindingService->expects($this->once())
@@ -90,6 +94,7 @@ class PublicViewerControllerTest extends TestCase {
 		$this->assertSame('', $response->getData()['url']);
 		$this->assertTrue($response->getData()['is_readonly_snapshot']);
 		$this->assertSame("Snapshot text\nSecond line", $response->getData()['snapshot_text']);
+		$this->assertSame('<h1>Title</h1><p><strong>Safe</strong> text</p>', $response->getData()['snapshot_html']);
 		$this->assertArrayNotHasKey('Set-Cookie', $response->getHeaders());
 	}
 
