@@ -42,6 +42,8 @@
 				externalOpenUrl: '',
 				externalOpenMessage: '',
 				externalSnapshotText: '',
+				readonlySnapshotMode: false,
+				readonlySnapshotText: '',
 				resolveGeneration: 0,
 				syncUrl: '',
 				syncIntervalMs: 120000,
@@ -135,7 +137,7 @@
 				if (!response.ok) {
 					throw new Error((data && data.message) || 'Pad open failed.')
 				}
-				if (!data || typeof data.url !== 'string' || data.url.trim() === '') {
+				if (!data || (data.is_readonly_snapshot !== true && (typeof data.url !== 'string' || data.url.trim() === ''))) {
 					throw new Error('Pad open API did not return a valid URL.')
 				}
 				return data
@@ -258,6 +260,8 @@
 				this.externalOpenUrl = ''
 				this.externalOpenMessage = ''
 				this.externalSnapshotText = ''
+				this.readonlySnapshotMode = false
+				this.readonlySnapshotText = ''
 				this.syncUrl = ''
 				this.syncInFlight = false
 				this.stopSyncLoop()
@@ -343,6 +347,13 @@
 						this.startSyncLoop()
 					}
 
+					if (data && data.is_readonly_snapshot === true) {
+						this.readonlySnapshotMode = true
+						this.readonlySnapshotText = (typeof data.snapshot_text === 'string') ? data.snapshot_text : ''
+						this.markLoaded()
+						return
+					}
+
 					if (data && data.is_external === true && typeof data.url === 'string' && data.url.trim() !== '') {
 						const targetUrl = data.url.trim()
 						this.externalOpenUrl = targetUrl
@@ -401,6 +412,17 @@
 								rel: 'noopener noreferrer',
 							},
 						}, translate('Open original pad in new tab')),
+					]),
+				])
+			}
+			if (this.readonlySnapshotMode) {
+				return createElement('div', { class: 'epnc-native-status' }, [
+					createElement('div', { class: 'epnc-native-error-card' }, [
+						createElement('div', { class: 'epnc-native-error-title' }, translate('Read-only snapshot')),
+						createElement('div', { class: 'epnc-native-error-message' }, translate('This share shows the last synced snapshot stored in the .pad file.')),
+						createElement('pre', { class: 'epnc-native-preview' }, this.readonlySnapshotText.trim() !== ''
+							? this.readonlySnapshotText
+							: translate('No synced snapshot is stored in this .pad file yet.')),
 					]),
 				])
 			}

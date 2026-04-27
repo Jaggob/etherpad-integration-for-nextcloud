@@ -21,6 +21,78 @@ use OCP\Share\IShare;
 use PHPUnit\Framework\TestCase;
 
 class PublicViewerControllerTest extends TestCase {
+	public function testProtectedReadOnlyPublicShareReturnsSnapshotWithoutEtherpadSessionCookie(): void {
+		$file = $this->createMock(File::class);
+		$file->method('getName')->willReturn('Shared.pad');
+		$file->method('getId')->willReturn(42);
+		$file->method('getContent')->willReturn('frontmatter');
+
+		$share = $this->createMock(IShare::class);
+		$share->method('getNode')->willReturn($file);
+		$share->method('getPermissions')->willReturn(Constants::PERMISSION_READ);
+
+		$shareManager = $this->createMock(IManager::class);
+		$shareManager->expects($this->once())
+			->method('getShareByToken')
+			->with('share-token')
+			->willReturn($share);
+
+		$frontmatter = [
+			'pad_id' => 'g.abcdefghijklmnop$Shared',
+			'access_mode' => BindingService::ACCESS_PROTECTED,
+			'pad_url' => '',
+		];
+
+		$padFileService = $this->createMock(PadFileService::class);
+		$padFileService->expects($this->once())
+			->method('parsePadFile')
+			->with('frontmatter')
+			->willReturn(['frontmatter' => $frontmatter]);
+		$padFileService->expects($this->once())
+			->method('extractPadMetadata')
+			->with($frontmatter)
+			->willReturn([
+				'pad_id' => 'g.abcdefghijklmnop$Shared',
+				'access_mode' => BindingService::ACCESS_PROTECTED,
+				'pad_url' => '',
+			]);
+		$padFileService->expects($this->once())
+			->method('isExternalFrontmatter')
+			->with($frontmatter, 'g.abcdefghijklmnop$Shared')
+			->willReturn(false);
+		$padFileService->expects($this->once())
+			->method('getTextSnapshotForRestore')
+			->with('frontmatter')
+			->willReturn("Snapshot text\nSecond line");
+
+		$bindingService = $this->createMock(BindingService::class);
+		$bindingService->expects($this->once())
+			->method('assertConsistentMapping')
+			->with(42, 'g.abcdefghijklmnop$Shared', BindingService::ACCESS_PROTECTED);
+
+		$etherpadClient = $this->createMock(EtherpadClient::class);
+		$etherpadClient->expects($this->never())->method('getReadOnlyPadUrl');
+		$etherpadClient->expects($this->never())->method('buildPadUrl');
+
+		$padSessionService = $this->createMock(PadSessionService::class);
+		$padSessionService->expects($this->never())->method('createProtectedOpenContext');
+		$padSessionService->expects($this->never())->method('buildSetCookieHeader');
+
+		$response = $this->buildController(
+			$shareManager,
+			padFileService: $padFileService,
+			bindingService: $bindingService,
+			etherpadClient: $etherpadClient,
+			padSessionService: $padSessionService,
+		)->openPadData('share-token');
+
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$this->assertSame('', $response->getData()['url']);
+		$this->assertTrue($response->getData()['is_readonly_snapshot']);
+		$this->assertSame("Snapshot text\nSecond line", $response->getData()['snapshot_text']);
+		$this->assertArrayNotHasKey('Set-Cookie', $response->getHeaders());
+	}
+
 	public function testOpenPadDataRejectsExternalProtectedMetadata(): void {
 		$file = $this->createMock(File::class);
 		$file->method('getName')->willReturn('Shared.pad');

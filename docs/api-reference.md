@@ -62,6 +62,15 @@ Base: `/apps/etherpad_nextcloud`
     - Errors are rendered as `noviewer` template (not raw JSON).
     - Error page includes back-link to share entry page (`/s/{token}`).
 
+- `GET /api/v1/public/open/{token}`
+  - Controller: `PublicViewerController::openPadData`
+  - Query (folder share): `file=/subfolder/file.pad`
+  - Purpose: resolves a `.pad` file inside a public share for the native viewer.
+  - Result:
+    - writable protected share: Etherpad URL plus one `sessionID` `Set-Cookie` header
+    - read-only protected share: `is_readonly_snapshot=true`, empty `url`, and `snapshot_text`; no Etherpad session cookie
+    - public/external pad share: regular public Etherpad URL
+
 - `POST /api/v1/pads`
   - Controller: `PadController::create`
   - Params:
@@ -264,7 +273,8 @@ Base: `/apps/etherpad_nextcloud`
 - Controllers use explicit `Set-Cookie` response headers for Etherpad session bootstrap.
 - Rationale: this flow needs explicit cookie attributes for iframe cross-subdomain sessions.
 - Current contract:
-  - one custom Etherpad `Set-Cookie` header line is written by this app on protected-open responses
+  - one custom Etherpad `Set-Cookie` header line is written by this app on protected-open responses that open writable Etherpad iframes
+  - public read-only protected shares render the stored `.pad` snapshot and do not set an Etherpad session cookie
   - no additional custom app cookies are added in the same response
 - If future changes introduce multiple app-level cookies on these responses, this must be implemented and tested explicitly.
 

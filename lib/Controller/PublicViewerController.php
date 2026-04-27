@@ -96,6 +96,8 @@ class PublicViewerController extends PublicShareController {
 			'title' => $context['title'],
 			'url' => $context['url'],
 			'is_external' => $context['is_external'],
+			'is_readonly_snapshot' => $context['is_readonly_snapshot'],
+			'snapshot_text' => $context['snapshot_text'],
 			'original_pad_url' => $context['original_pad_url'],
 		]);
 		if (($context['cookie_header'] ?? '') !== '') {
@@ -169,7 +171,7 @@ class PublicViewerController extends PublicShareController {
 			$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
 
 			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
-			$openTarget = $this->resolvePublicOpenTarget($padId, $accessMode, $readOnly, $token, $isExternal, $padUrl);
+			$openTarget = $this->resolvePublicOpenTarget($padId, $accessMode, $readOnly, $token, $isExternal, $content, $padUrl);
 		} catch (PadFileFormatException|BindingException|EtherpadClientException $e) {
 			$this->publicFail($this->mapPublicOpenError($e), Http::STATUS_BAD_REQUEST);
 		}
@@ -178,6 +180,8 @@ class PublicViewerController extends PublicShareController {
 			'title' => $node->getName(),
 			'url' => $openTarget['url'],
 			'is_external' => $isExternal,
+			'is_readonly_snapshot' => $openTarget['is_readonly_snapshot'],
+			'snapshot_text' => $openTarget['snapshot_text'],
 			'is_public_pad' => $accessMode === BindingService::ACCESS_PUBLIC,
 			'open_new_tab_url' => $accessMode === BindingService::ACCESS_PUBLIC ? $openTarget['url'] : '',
 			'original_pad_url' => $openTarget['original_pad_url'],
@@ -289,13 +293,14 @@ class PublicViewerController extends PublicShareController {
 		return $base . '?path=' . rawurlencode($dir) . '&files=' . rawurlencode($name);
 	}
 
-	/** @return array{url:string,original_pad_url:string,cookie_header:string} */
+	/** @return array{url:string,original_pad_url:string,cookie_header:string,is_readonly_snapshot:bool,snapshot_text:string} */
 	private function resolvePublicOpenTarget(
 		string $padId,
 		string $accessMode,
 		bool $readOnly,
 		string $token,
 		bool $isExternal,
+		string $padFileContent,
 		string $padUrl = ''
 	): array {
 		if ($isExternal && $accessMode !== BindingService::ACCESS_PUBLIC) {
@@ -303,21 +308,26 @@ class PublicViewerController extends PublicShareController {
 		}
 
 		if ($accessMode === BindingService::ACCESS_PROTECTED) {
+			if ($readOnly) {
+				return [
+					'url' => '',
+					'original_pad_url' => '',
+					'cookie_header' => '',
+					'is_readonly_snapshot' => true,
+					'snapshot_text' => $this->padFileService->getTextSnapshotForRestore($padFileContent),
+				];
+			}
+
 			$authorUid = 'public-share:' . $token;
 			$authorName = 'Public share';
 			$openContext = $this->padSessionService->createProtectedOpenContext($authorUid, $authorName, $padId, 3600);
 			$cookieHeader = $this->padSessionService->buildSetCookieHeader($openContext['cookie']);
-			if ($readOnly) {
-				return [
-					'url' => $this->etherpadClient->getReadOnlyPadUrl($padId),
-					'original_pad_url' => '',
-					'cookie_header' => $cookieHeader,
-				];
-			}
 			return [
 				'url' => $openContext['url'],
 				'original_pad_url' => '',
 				'cookie_header' => $cookieHeader,
+				'is_readonly_snapshot' => false,
+				'snapshot_text' => '',
 			];
 		}
 
@@ -330,6 +340,8 @@ class PublicViewerController extends PublicShareController {
 				'url' => $normalized['pad_url'],
 				'original_pad_url' => $normalized['pad_url'],
 				'cookie_header' => '',
+				'is_readonly_snapshot' => false,
+				'snapshot_text' => '',
 			];
 		}
 
@@ -338,6 +350,8 @@ class PublicViewerController extends PublicShareController {
 				'url' => $this->etherpadClient->getReadOnlyPadUrl($padId),
 				'original_pad_url' => '',
 				'cookie_header' => '',
+				'is_readonly_snapshot' => false,
+				'snapshot_text' => '',
 			];
 		}
 
@@ -345,6 +359,8 @@ class PublicViewerController extends PublicShareController {
 			'url' => $this->etherpadClient->buildPadUrl($padId),
 			'original_pad_url' => '',
 			'cookie_header' => '',
+			'is_readonly_snapshot' => false,
+			'snapshot_text' => '',
 		];
 	}
 
