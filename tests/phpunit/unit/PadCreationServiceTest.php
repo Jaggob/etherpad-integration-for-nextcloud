@@ -8,9 +8,12 @@ use OCA\EtherpadNextcloud\Exception\BindingException;
 use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
 use OCA\EtherpadNextcloud\Service\PadBootstrapService;
+use OCA\EtherpadNextcloud\Service\PadCreateRollbackService;
 use OCA\EtherpadNextcloud\Service\PadCreationService;
-use OCA\EtherpadNextcloud\Service\PadFileOperationService;
+use OCA\EtherpadNextcloud\Service\PadFileCreator;
 use OCA\EtherpadNextcloud\Service\PadFileService;
+use OCA\EtherpadNextcloud\Service\PadPathService;
+use OCA\EtherpadNextcloud\Service\UserNodeResolver;
 use OCP\AppFramework\Http;
 use OCP\Files\File;
 use OCP\Files\Folder;
@@ -23,9 +26,10 @@ class PadCreationServiceTest extends TestCase {
 		$fileNode->method('getId')->willReturn(123);
 		$fileNode->expects($this->once())->method('putContent')->with('frontmatter');
 
-		$fileOperations = $this->createMock(PadFileOperationService::class);
-		$fileOperations->method('normalizeCreatePath')->with('/Test')->willReturn('/Test.pad');
-		$fileOperations->method('createUserFile')->with('alice', '/Test.pad')->willReturn($fileNode);
+		$padPaths = $this->createMock(PadPathService::class);
+		$padPaths->method('normalizeCreatePath')->with('/Test')->willReturn('/Test.pad');
+		$fileCreator = $this->createMock(PadFileCreator::class);
+		$fileCreator->method('createUserFile')->with('alice', '/Test.pad')->willReturn($fileNode);
 
 		$bootstrap = $this->createMock(PadBootstrapService::class);
 		$bootstrap->method('provisionPadId')->with(BindingService::ACCESS_PROTECTED)->willReturn('g.ABC$pad');
@@ -44,7 +48,7 @@ class PadCreationServiceTest extends TestCase {
 			->method('createBinding')
 			->with(123, 'g.ABC$pad', BindingService::ACCESS_PROTECTED);
 
-		$result = $this->buildService($padFileService, $fileOperations, $bindingService, $etherpadClient, $bootstrap)
+		$result = $this->buildService($padFileService, $padPaths, $fileCreator, null, null, $bindingService, $etherpadClient, $bootstrap)
 			->create('alice', '/Test', BindingService::ACCESS_PROTECTED);
 
 		$this->assertSame([
@@ -60,10 +64,12 @@ class PadCreationServiceTest extends TestCase {
 		$fileNode = $this->createMock(File::class);
 		$fileNode->method('getId')->willReturn(123);
 
-		$fileOperations = $this->createMock(PadFileOperationService::class);
-		$fileOperations->method('normalizeCreatePath')->with('/Test')->willReturn('/Test.pad');
-		$fileOperations->method('createUserFile')->with('alice', '/Test.pad')->willReturn($fileNode);
-		$fileOperations->expects($this->once())
+		$padPaths = $this->createMock(PadPathService::class);
+		$padPaths->method('normalizeCreatePath')->with('/Test')->willReturn('/Test.pad');
+		$fileCreator = $this->createMock(PadFileCreator::class);
+		$fileCreator->method('createUserFile')->with('alice', '/Test.pad')->willReturn($fileNode);
+		$rollbackService = $this->createMock(PadCreateRollbackService::class);
+		$rollbackService->expects($this->once())
 			->method('rollbackFailedCreate')
 			->with('alice', '/Test.pad', 'g.ABC$pad', true);
 
@@ -81,7 +87,7 @@ class PadCreationServiceTest extends TestCase {
 
 		$this->expectException(BindingException::class);
 
-		$this->buildService($padFileService, $fileOperations, $bindingService, $etherpadClient, $bootstrap)
+		$this->buildService($padFileService, $padPaths, $fileCreator, null, $rollbackService, $bindingService, $etherpadClient, $bootstrap)
 			->create('alice', '/Test', BindingService::ACCESS_PROTECTED);
 	}
 
@@ -89,14 +95,15 @@ class PadCreationServiceTest extends TestCase {
 		$parent = $this->createMock(Folder::class);
 		$parent->method('isCreatable')->willReturn(false);
 
-		$fileOperations = $this->createMock(PadFileOperationService::class);
-		$fileOperations->method('normalizeCreateFileName')->with('Test')->willReturn('Test.pad');
-		$fileOperations->method('resolveUserFolderNodeById')->with('alice', 99)->willReturn($parent);
+		$padPaths = $this->createMock(PadPathService::class);
+		$padPaths->method('normalizeCreateFileName')->with('Test')->willReturn('Test.pad');
+		$userNodeResolver = $this->createMock(UserNodeResolver::class);
+		$userNodeResolver->method('resolveUserFolderNodeById')->with('alice', 99)->willReturn($parent);
 
 		$this->expectException(\RuntimeException::class);
 		$this->expectExceptionCode(Http::STATUS_FORBIDDEN);
 
-		$this->buildService(fileOperations: $fileOperations)
+		$this->buildService(padPaths: $padPaths, userNodeResolver: $userNodeResolver)
 			->createInParent('alice', 99, 'Test', BindingService::ACCESS_PUBLIC);
 	}
 
@@ -105,10 +112,12 @@ class PadCreationServiceTest extends TestCase {
 		$fileNode->method('getId')->willReturn(321);
 		$fileNode->expects($this->once())->method('putContent')->with('external-frontmatter');
 
-		$fileOperations = $this->createMock(PadFileOperationService::class);
-		$fileOperations->method('normalizeCreatePath')->with('/External')->willReturn('/External.pad');
-		$fileOperations->method('createUserFile')->with('alice', '/External.pad')->willReturn($fileNode);
-		$fileOperations->method('buildExternalBindingPadId')->with('https://pad.remote.test', 'RemotePad', 321)->willReturn('ext.hash');
+		$padPaths = $this->createMock(PadPathService::class);
+		$padPaths->method('normalizeCreatePath')->with('/External')->willReturn('/External.pad');
+		$fileCreator = $this->createMock(PadFileCreator::class);
+		$fileCreator->method('createUserFile')->with('alice', '/External.pad')->willReturn($fileNode);
+		$rollbackService = $this->createMock(PadCreateRollbackService::class);
+		$rollbackService->method('buildExternalBindingPadId')->with('https://pad.remote.test', 'RemotePad', 321)->willReturn('ext.hash');
 
 		$etherpadClient = $this->createMock(EtherpadClient::class);
 		$etherpadClient->method('normalizeAndValidateExternalPublicPadUrl')
@@ -144,7 +153,7 @@ class PadCreationServiceTest extends TestCase {
 			->method('createBinding')
 			->with(321, 'ext.hash', BindingService::ACCESS_PUBLIC);
 
-		$result = $this->buildService($padFileService, $fileOperations, $bindingService, $etherpadClient)
+		$result = $this->buildService($padFileService, $padPaths, $fileCreator, null, $rollbackService, $bindingService, $etherpadClient)
 			->createFromUrl('alice', '/External', 'https://pad.remote.test/p/RemotePad');
 
 		$this->assertSame([
@@ -158,14 +167,20 @@ class PadCreationServiceTest extends TestCase {
 
 	private function buildService(
 		?PadFileService $padFileService = null,
-		?PadFileOperationService $fileOperations = null,
+		?PadPathService $padPaths = null,
+		?PadFileCreator $fileCreator = null,
+		?UserNodeResolver $userNodeResolver = null,
+		?PadCreateRollbackService $rollbackService = null,
 		?BindingService $bindingService = null,
 		?EtherpadClient $etherpadClient = null,
 		?PadBootstrapService $bootstrap = null,
 	): PadCreationService {
 		return new PadCreationService(
 			$padFileService ?? $this->createMock(PadFileService::class),
-			$fileOperations ?? $this->createMock(PadFileOperationService::class),
+			$padPaths ?? $this->createMock(PadPathService::class),
+			$fileCreator ?? $this->createMock(PadFileCreator::class),
+			$userNodeResolver ?? $this->createMock(UserNodeResolver::class),
+			$rollbackService ?? $this->createMock(PadCreateRollbackService::class),
 			$bindingService ?? $this->createMock(BindingService::class),
 			$etherpadClient ?? $this->createMock(EtherpadClient::class),
 			$bootstrap ?? $this->createMock(PadBootstrapService::class),

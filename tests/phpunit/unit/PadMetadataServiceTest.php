@@ -6,9 +6,11 @@ namespace OCA\EtherpadNextcloud\Tests\Unit;
 
 use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
-use OCA\EtherpadNextcloud\Service\PadFileOperationService;
+use OCA\EtherpadNextcloud\Service\PadFileLockRetryService;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadMetadataService;
+use OCA\EtherpadNextcloud\Service\PadPathService;
+use OCA\EtherpadNextcloud\Service\UserNodeResolver;
 use OCP\Files\File;
 use OCP\Files\NotFoundException;
 use PHPUnit\Framework\TestCase;
@@ -22,10 +24,11 @@ class PadMetadataServiceTest extends TestCase {
 			'getMimeType' => 'application/x-etherpad-nextcloud',
 		]);
 
-		$fileOperations = $this->createMock(PadFileOperationService::class);
-		$fileOperations->method('resolveUserPadNodeById')->with('alice', 138)->willReturn($file);
-		$fileOperations->method('toUserAbsolutePath')->with('alice', $file)->willReturn('/External.pad');
-		$fileOperations->method('readContentWithOpenLockRetry')->with($file)->willReturn('frontmatter');
+		$userNodeResolver = $this->createMock(UserNodeResolver::class);
+		$userNodeResolver->method('resolveUserFileNodeById')->with('alice', 138)->willReturn($file);
+		$userNodeResolver->method('toUserAbsolutePath')->with('alice', $file)->willReturn('/External.pad');
+		$lockRetryService = $this->createMock(PadFileLockRetryService::class);
+		$lockRetryService->method('readContentWithOpenLockRetry')->with($file)->willReturn('frontmatter');
 
 		$padFileService = $this->createMock(PadFileService::class);
 		$padFileService->method('parsePadFile')->with('frontmatter')->willReturn([
@@ -46,7 +49,7 @@ class PadMetadataServiceTest extends TestCase {
 			->with('https://pad.example.test/p/External')
 			->willReturn(['pad_url' => 'https://pad.example.test/p/External']);
 
-		$result = $this->buildService($padFileService, $fileOperations, $etherpadClient)
+		$result = $this->buildService($padFileService, userNodeResolver: $userNodeResolver, lockRetryService: $lockRetryService, etherpadClient: $etherpadClient)
 			->metaById('alice', 138);
 
 		$this->assertSame([
@@ -64,12 +67,12 @@ class PadMetadataServiceTest extends TestCase {
 	}
 
 	public function testResolveReturnsFalseWhenFileIdIsMissing(): void {
-		$fileOperations = $this->createMock(PadFileOperationService::class);
-		$fileOperations->method('resolveUserPadNodeById')
+		$userNodeResolver = $this->createMock(UserNodeResolver::class);
+		$userNodeResolver->method('resolveUserFileNodeById')
 			->with('alice', 404)
 			->willThrowException(new NotFoundException('missing'));
 
-		$result = $this->buildService(fileOperations: $fileOperations)
+		$result = $this->buildService(userNodeResolver: $userNodeResolver)
 			->resolve('alice', 404);
 
 		$this->assertSame(['is_pad' => false, 'file_id' => 404], $result);
@@ -83,9 +86,9 @@ class PadMetadataServiceTest extends TestCase {
 			'getContent' => 'frontmatter',
 		]);
 
-		$fileOperations = $this->createMock(PadFileOperationService::class);
-		$fileOperations->method('resolveUserPadNodeById')->with('alice', 138)->willReturn($file);
-		$fileOperations->method('toUserAbsolutePath')->with('alice', $file)->willReturn('/Public.pad');
+		$userNodeResolver = $this->createMock(UserNodeResolver::class);
+		$userNodeResolver->method('resolveUserFileNodeById')->with('alice', 138)->willReturn($file);
+		$userNodeResolver->method('toUserAbsolutePath')->with('alice', $file)->willReturn('/Public.pad');
 
 		$padFileService = $this->createMock(PadFileService::class);
 		$padFileService->method('parsePadFile')->with('frontmatter')->willReturn([
@@ -104,7 +107,7 @@ class PadMetadataServiceTest extends TestCase {
 		$etherpadClient = $this->createMock(EtherpadClient::class);
 		$etherpadClient->method('buildPadUrl')->with('g.ABC$pad')->willReturn('https://pad.example.test/p/g.ABC$pad');
 
-		$result = $this->buildService($padFileService, $fileOperations, $etherpadClient)
+		$result = $this->buildService($padFileService, userNodeResolver: $userNodeResolver, etherpadClient: $etherpadClient)
 			->resolve('alice', 138);
 
 		$this->assertSame([
@@ -120,12 +123,16 @@ class PadMetadataServiceTest extends TestCase {
 
 	private function buildService(
 		?PadFileService $padFileService = null,
-		?PadFileOperationService $fileOperations = null,
+		?PadPathService $padPaths = null,
+		?UserNodeResolver $userNodeResolver = null,
+		?PadFileLockRetryService $lockRetryService = null,
 		?EtherpadClient $etherpadClient = null,
 	): PadMetadataService {
 		return new PadMetadataService(
 			$padFileService ?? $this->createMock(PadFileService::class),
-			$fileOperations ?? $this->createMock(PadFileOperationService::class),
+			$padPaths ?? $this->createMock(PadPathService::class),
+			$userNodeResolver ?? $this->createMock(UserNodeResolver::class),
+			$lockRetryService ?? $this->createMock(PadFileLockRetryService::class),
 			$etherpadClient ?? $this->createMock(EtherpadClient::class),
 			$this->createMock(LoggerInterface::class),
 		);

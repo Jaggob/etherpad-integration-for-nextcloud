@@ -17,7 +17,9 @@ use Psr\Log\LoggerInterface;
 class PadMetadataService {
 	public function __construct(
 		private PadFileService $padFileService,
-		private PadFileOperationService $padFileOperations,
+		private PadPathService $padPaths,
+		private UserNodeResolver $userNodeResolver,
+		private PadFileLockRetryService $lockRetryService,
 		private EtherpadClient $etherpadClient,
 		private LoggerInterface $logger,
 	) {
@@ -29,8 +31,8 @@ class PadMetadataService {
 	 * @throws LockedException
 	 */
 	public function metaById(string $uid, int $fileId): array {
-		$node = $this->padFileOperations->resolveUserPadNodeById($uid, $fileId);
-		$absolutePath = $this->padFileOperations->toUserAbsolutePath($uid, $node);
+		$node = $this->userNodeResolver->resolveUserFileNodeById($uid, $fileId);
+		$absolutePath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
 		return $this->buildMeta($node, $absolutePath);
 	}
 
@@ -39,19 +41,19 @@ class PadMetadataService {
 		$resolvedFileId = $fileId;
 		if ($resolvedFileId > 0) {
 			try {
-				$node = $this->padFileOperations->resolveUserPadNodeById($uid, $resolvedFileId);
-				$normalizedPath = $this->padFileOperations->toUserAbsolutePath($uid, $node);
+				$node = $this->userNodeResolver->resolveUserFileNodeById($uid, $resolvedFileId);
+				$normalizedPath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
 			} catch (NotFoundException) {
 				return ['is_pad' => false, 'file_id' => $resolvedFileId];
 			}
 		} else {
-			$requestedPath = $this->padFileOperations->normalizeViewerFilePath($file);
+			$requestedPath = $this->padPaths->normalizeViewerFilePath($file);
 			if ($requestedPath === '') {
 				throw new \InvalidArgumentException('Invalid file path.');
 			}
 
 			try {
-				$node = $this->padFileOperations->resolveUserPadNode($uid, $requestedPath);
+				$node = $this->userNodeResolver->resolveUserFileNodeByPath($uid, $requestedPath);
 			} catch (NotFoundException) {
 				return ['is_pad' => false, 'path' => $requestedPath];
 			}
@@ -60,7 +62,7 @@ class PadMetadataService {
 			if ($resolvedFileId <= 0) {
 				return ['is_pad' => false, 'path' => $requestedPath];
 			}
-			$normalizedPath = $this->padFileOperations->toUserAbsolutePath($uid, $node);
+			$normalizedPath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
 		}
 
 		if (!str_ends_with(strtolower($normalizedPath), '.pad')) {
@@ -130,7 +132,7 @@ class PadMetadataService {
 
 		try {
 			$content = $retryLockedRead
-				? $this->padFileOperations->readContentWithOpenLockRetry($node)
+				? $this->lockRetryService->readContentWithOpenLockRetry($node)
 				: (string)$node->getContent();
 			$parsed = $this->padFileService->parsePadFile((string)$content);
 			$frontmatter = $parsed['frontmatter'];

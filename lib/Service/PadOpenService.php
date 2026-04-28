@@ -20,7 +20,9 @@ use Psr\Log\LoggerInterface;
 class PadOpenService {
 	public function __construct(
 		private PadFileService $padFileService,
-		private PadFileOperationService $padFileOperations,
+		private PadPathService $padPaths,
+		private UserNodeResolver $userNodeResolver,
+		private PadFileLockRetryService $lockRetryService,
 		private BindingService $bindingService,
 		private EtherpadClient $etherpadClient,
 		private PadSessionService $padSessionService,
@@ -33,9 +35,9 @@ class PadOpenService {
 	 * @throws NotFoundException
 	 */
 	public function openByPath(string $uid, string $displayName, string $file): array {
-		$path = $this->padFileOperations->normalizeViewerFilePath($file);
-		$node = $this->padFileOperations->resolveUserPadNode($uid, $path);
-		$absolutePath = $this->padFileOperations->toUserAbsolutePath($uid, $node);
+		$path = $this->padPaths->normalizeViewerFilePath($file);
+		$node = $this->userNodeResolver->resolveUserFileNodeByPath($uid, $path);
+		$absolutePath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
 		return $this->openNode($uid, $displayName, $node, $absolutePath);
 	}
 
@@ -44,8 +46,8 @@ class PadOpenService {
 	 * @throws NotFoundException
 	 */
 	public function openById(string $uid, string $displayName, int $fileId): array {
-		$node = $this->padFileOperations->resolveUserPadNodeById($uid, $fileId);
-		$absolutePath = $this->padFileOperations->toUserAbsolutePath($uid, $node);
+		$node = $this->userNodeResolver->resolveUserFileNodeById($uid, $fileId);
+		$absolutePath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
 		return $this->openNode($uid, $displayName, $node, $absolutePath);
 	}
 
@@ -58,7 +60,7 @@ class PadOpenService {
 	 */
 	private function openNode(string $uid, string $displayName, File $node, string $absolutePath): array {
 		try {
-			$content = $this->padFileOperations->readContentWithOpenLockRetry($node);
+			$content = $this->lockRetryService->readContentWithOpenLockRetry($node);
 			$fileId = (int)$node->getId();
 			if ($fileId <= 0) {
 				throw new \RuntimeException('Could not resolve file ID.');

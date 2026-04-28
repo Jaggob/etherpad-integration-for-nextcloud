@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace OCA\EtherpadNextcloud\Tests\Unit;
 
 use OCA\EtherpadNextcloud\Service\LifecycleService;
-use OCA\EtherpadNextcloud\Service\PadFileOperationService;
 use OCA\EtherpadNextcloud\Service\PadLifecycleOperationService;
+use OCA\EtherpadNextcloud\Service\PadPathService;
+use OCA\EtherpadNextcloud\Service\UserNodeResolver;
 use OCP\Files\File;
 use PHPUnit\Framework\TestCase;
 
@@ -14,13 +15,14 @@ class PadLifecycleOperationServiceTest extends TestCase {
 	public function testTrashByPathFormatsSkippedLifecycleResult(): void {
 		$file = $this->createMock(File::class);
 
-		$fileOperations = $this->createMock(PadFileOperationService::class);
-		$fileOperations->expects($this->once())
+		$padPaths = $this->createMock(PadPathService::class);
+		$padPaths->expects($this->once())
 			->method('normalizeViewerFilePath')
 			->with('/Test.pad')
 			->willReturn('/Test.pad');
-		$fileOperations->expects($this->once())
-			->method('resolveUserPadNode')
+		$userNodeResolver = $this->createMock(UserNodeResolver::class);
+		$userNodeResolver->expects($this->once())
+			->method('resolveUserFileNodeByPath')
 			->with('alice', '/Test.pad')
 			->willReturn($file);
 
@@ -34,7 +36,7 @@ class PadLifecycleOperationServiceTest extends TestCase {
 				'file_id' => 42,
 			]);
 
-		$result = (new PadLifecycleOperationService($fileOperations, $lifecycleService))
+		$result = (new PadLifecycleOperationService($padPaths, $userNodeResolver, $lifecycleService))
 			->trashByPath('alice', '/Test.pad');
 
 		$this->assertSame([
@@ -47,9 +49,10 @@ class PadLifecycleOperationServiceTest extends TestCase {
 	public function testTrashByPathFormatsTrashedLifecycleResult(): void {
 		$file = $this->createMock(File::class);
 
-		$fileOperations = $this->createMock(PadFileOperationService::class);
-		$fileOperations->method('normalizeViewerFilePath')->with('/Test.pad')->willReturn('/Test.pad');
-		$fileOperations->method('resolveUserPadNode')->with('alice', '/Test.pad')->willReturn($file);
+		$padPaths = $this->createMock(PadPathService::class);
+		$padPaths->method('normalizeViewerFilePath')->with('/Test.pad')->willReturn('/Test.pad');
+		$userNodeResolver = $this->createMock(UserNodeResolver::class);
+		$userNodeResolver->method('resolveUserFileNodeByPath')->with('alice', '/Test.pad')->willReturn($file);
 
 		$lifecycleService = $this->createMock(LifecycleService::class);
 		$lifecycleService->method('handleTrash')->with($file)->willReturn([
@@ -59,7 +62,7 @@ class PadLifecycleOperationServiceTest extends TestCase {
 			'delete_pending' => false,
 		]);
 
-		$result = (new PadLifecycleOperationService($fileOperations, $lifecycleService))
+		$result = (new PadLifecycleOperationService($padPaths, $userNodeResolver, $lifecycleService))
 			->trashByPath('alice', '/Test.pad');
 
 		$this->assertSame([
@@ -74,9 +77,10 @@ class PadLifecycleOperationServiceTest extends TestCase {
 	public function testRestoreByPathFormatsRestoredLifecycleResult(): void {
 		$file = $this->createMock(File::class);
 
-		$fileOperations = $this->createMock(PadFileOperationService::class);
-		$fileOperations->method('normalizeViewerFilePath')->with('/Test.pad')->willReturn('/Test.pad');
-		$fileOperations->method('resolveUserPadNode')->with('alice', '/Test.pad')->willReturn($file);
+		$padPaths = $this->createMock(PadPathService::class);
+		$padPaths->method('normalizeViewerFilePath')->with('/Test.pad')->willReturn('/Test.pad');
+		$userNodeResolver = $this->createMock(UserNodeResolver::class);
+		$userNodeResolver->method('resolveUserFileNodeByPath')->with('alice', '/Test.pad')->willReturn($file);
 
 		$lifecycleService = $this->createMock(LifecycleService::class);
 		$lifecycleService->method('handleRestore')->with($file)->willReturn([
@@ -85,7 +89,7 @@ class PadLifecycleOperationServiceTest extends TestCase {
 			'new_pad_id' => 'new-pad',
 		]);
 
-		$result = (new PadLifecycleOperationService($fileOperations, $lifecycleService))
+		$result = (new PadLifecycleOperationService($padPaths, $userNodeResolver, $lifecycleService))
 			->restoreByPath('alice', '/Test.pad');
 
 		$this->assertSame([
@@ -97,8 +101,8 @@ class PadLifecycleOperationServiceTest extends TestCase {
 	}
 
 	public function testTrashByPathRejectsEmptyPath(): void {
-		$fileOperations = $this->createMock(PadFileOperationService::class);
-		$fileOperations->expects($this->once())
+		$padPaths = $this->createMock(PadPathService::class);
+		$padPaths->expects($this->once())
 			->method('normalizeViewerFilePath')
 			->with('   ')
 			->willReturn('');
@@ -106,7 +110,8 @@ class PadLifecycleOperationServiceTest extends TestCase {
 		$this->expectException(\InvalidArgumentException::class);
 
 		(new PadLifecycleOperationService(
-			$fileOperations,
+			$padPaths,
+			$this->createMock(UserNodeResolver::class),
 			$this->createMock(LifecycleService::class),
 		))->trashByPath('alice', '   ');
 	}

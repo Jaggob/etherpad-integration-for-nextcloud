@@ -13,20 +13,19 @@ use OCA\EtherpadNextcloud\Exception\BindingException;
 use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
 use OCA\EtherpadNextcloud\Exception\PadFileFormatException;
 use OCA\EtherpadNextcloud\Service\BindingService;
-use OCA\EtherpadNextcloud\Service\AppConfigService;
+use OCA\EtherpadNextcloud\Service\PadCreateRollbackService;
 use OCA\EtherpadNextcloud\Service\PadCreationService;
-use OCA\EtherpadNextcloud\Service\PadFileOperationService;
 use OCA\EtherpadNextcloud\Service\PadInitializationService;
 use OCA\EtherpadNextcloud\Service\PadLifecycleOperationService;
 use OCA\EtherpadNextcloud\Service\PadMetadataService;
 use OCA\EtherpadNextcloud\Service\PadOpenService;
+use OCA\EtherpadNextcloud\Service\PadResponseService;
 use OCA\EtherpadNextcloud\Service\PadSyncService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\Files\NotFoundException;
 use OCP\IRequest;
-use OCP\IURLGenerator;
 use OCP\IUserSession;
 use OCP\Lock\LockedException;
 use Psr\Log\LoggerInterface;
@@ -35,17 +34,16 @@ class PadController extends Controller {
 	public function __construct(
 		string $appName,
 		IRequest $request,
-		private IURLGenerator $urlGenerator,
 		private IUserSession $userSession,
 		private LoggerInterface $logger,
-		private PadFileOperationService $padFileOperations,
+		private PadCreateRollbackService $rollbackService,
 		private PadCreationService $padCreationService,
 		private PadInitializationService $padInitializationService,
 		private PadMetadataService $padMetadataService,
 		private PadOpenService $padOpenService,
 		private PadSyncService $padSyncService,
-		private AppConfigService $appConfigService,
 		private PadLifecycleOperationService $padLifecycleOperations,
+		private PadResponseService $padResponses,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -68,18 +66,17 @@ class PadController extends Controller {
 			$result = $this->padCreationService->create($user->getUID(), $file, $accessMode);
 		} catch (\InvalidArgumentException) {
 			return new DataResponse(['message' => 'Invalid file path.'], Http::STATUS_BAD_REQUEST);
-		} catch (BindingException $e) {
+		} catch (BindingException) {
 			return new DataResponse(['message' => '.pad file already exists.'], Http::STATUS_CONFLICT);
 		} catch (\Throwable $e) {
-			if ($this->padFileOperations->isCreateConflict($e)) {
+			if ($this->rollbackService->isCreateConflict($e)) {
 				return new DataResponse(['message' => '.pad file already exists.'], Http::STATUS_CONFLICT);
 			}
 
 			return new DataResponse(['message' => 'Pad creation failed.'], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 
-		$result['viewer_url'] = $this->buildFilesViewerUrl((int)$result['file_id'], (string)$result['file']);
-		return new DataResponse($result);
+		return new DataResponse($this->padResponses->withViewerUrl($result));
 	}
 
 	/**
@@ -110,16 +107,14 @@ class PadController extends Controller {
 			if ($e->getCode() === Http::STATUS_FORBIDDEN) {
 				return new DataResponse(['message' => 'Selected parent folder is not writable.'], Http::STATUS_FORBIDDEN);
 			}
-			if ($this->padFileOperations->isCreateConflict($e)) {
+			if ($this->rollbackService->isCreateConflict($e)) {
 				return new DataResponse(['message' => '.pad file already exists.'], Http::STATUS_CONFLICT);
 			}
 
 			return new DataResponse(['message' => 'Pad creation failed.'], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 
-		$result['viewer_url'] = $this->buildFilesViewerUrl((int)$result['file_id'], (string)$result['file']);
-		$result['embed_url'] = $this->buildEmbedUrl((int)$result['file_id']);
-		return new DataResponse($result);
+		return new DataResponse($this->padResponses->withViewerAndEmbedUrls($result));
 	}
 
 	/**
@@ -141,15 +136,14 @@ class PadController extends Controller {
 		} catch (BindingException) {
 			return new DataResponse(['message' => 'Could not create external pad binding.'], Http::STATUS_CONFLICT);
 		} catch (\Throwable $e) {
-			if ($this->padFileOperations->isCreateConflict($e)) {
+			if ($this->rollbackService->isCreateConflict($e)) {
 				return new DataResponse(['message' => '.pad file already exists.'], Http::STATUS_CONFLICT);
 			}
 
 			return new DataResponse(['message' => 'External pad create failed.'], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 
-		$result['viewer_url'] = $this->buildFilesViewerUrl((int)$result['file_id'], (string)$result['file']);
-		return new DataResponse($result);
+		return new DataResponse($this->padResponses->withViewerUrl($result));
 	}
 
 	/**
@@ -163,7 +157,7 @@ class PadController extends Controller {
 		}
 
 		try {
-			return $this->buildOpenDataResponse($this->padOpenService->openByPath($user->getUID(), $user->getDisplayName(), $file));
+			return $this->padResponses->openResponse($this->padOpenService->openByPath($user->getUID(), $user->getDisplayName(), $file));
 		} catch (\InvalidArgumentException) {
 			return new DataResponse(['message' => 'Invalid file path.'], Http::STATUS_BAD_REQUEST);
 		} catch (NotFoundException) {
@@ -174,7 +168,7 @@ class PadController extends Controller {
 				'retryable' => true,
 			], Http::STATUS_SERVICE_UNAVAILABLE);
 		} catch (BindingException $e) {
-			return new DataResponse(['message' => $this->toUserFacingBindingErrorMessage($e)], Http::STATUS_BAD_REQUEST);
+			return new DataResponse(['message' => $this->padResponses->bindingErrorMessage($e)], Http::STATUS_BAD_REQUEST);
 		} catch (PadFileFormatException|EtherpadClientException $e) {
 			return new DataResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
 		} catch (\RuntimeException $e) {
@@ -195,7 +189,7 @@ class PadController extends Controller {
 			return new DataResponse(['message' => 'Invalid file ID.'], Http::STATUS_BAD_REQUEST);
 		}
 		try {
-			return $this->buildOpenDataResponse($this->padOpenService->openById($user->getUID(), $user->getDisplayName(), $fileId));
+			return $this->padResponses->openResponse($this->padOpenService->openById($user->getUID(), $user->getDisplayName(), $fileId));
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot open selected .pad file.'], Http::STATUS_NOT_FOUND);
 		} catch (LockedException) {
@@ -204,7 +198,7 @@ class PadController extends Controller {
 				'retryable' => true,
 			], Http::STATUS_SERVICE_UNAVAILABLE);
 		} catch (BindingException $e) {
-			return new DataResponse(['message' => $this->toUserFacingBindingErrorMessage($e)], Http::STATUS_BAD_REQUEST);
+			return new DataResponse(['message' => $this->padResponses->bindingErrorMessage($e)], Http::STATUS_BAD_REQUEST);
 		} catch (PadFileFormatException|EtherpadClientException $e) {
 			return new DataResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
 		} catch (\RuntimeException $e) {
@@ -227,7 +221,7 @@ class PadController extends Controller {
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot open selected .pad file.'], Http::STATUS_NOT_FOUND);
 		} catch (BindingException $e) {
-			return new DataResponse(['message' => $this->toUserFacingBindingErrorMessage($e)], Http::STATUS_BAD_REQUEST);
+			return new DataResponse(['message' => $this->padResponses->bindingErrorMessage($e)], Http::STATUS_BAD_REQUEST);
 		} catch (PadFileFormatException|EtherpadClientException $e) {
 			return new DataResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
 		} catch (\Throwable $e) {
@@ -256,7 +250,7 @@ class PadController extends Controller {
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot open selected .pad file.'], Http::STATUS_NOT_FOUND);
 		} catch (BindingException $e) {
-			return new DataResponse(['message' => $this->toUserFacingBindingErrorMessage($e)], Http::STATUS_BAD_REQUEST);
+			return new DataResponse(['message' => $this->padResponses->bindingErrorMessage($e)], Http::STATUS_BAD_REQUEST);
 		} catch (PadFileFormatException|EtherpadClientException $e) {
 			return new DataResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
 		} catch (\Throwable $e) {
@@ -294,21 +288,10 @@ class PadController extends Controller {
 		}
 
 		if (($data['is_pad'] ?? false) === true) {
-			$fileId = (int)$data['file_id'];
-			$path = (string)$data['path'];
-			$data['viewer_url'] = $this->buildFilesViewerUrl($fileId, $path);
-			$data['embed_url'] = $this->buildEmbedUrl($fileId);
+			$data = $this->padResponses->withViewerAndEmbedUrls($data);
 		}
 
 		return new DataResponse($data);
-	}
-
-	private function toUserFacingBindingErrorMessage(BindingException $e): string {
-		$message = trim($e->getMessage());
-		if ($message === 'No binding exists for this file.') {
-			return 'This .pad file is not linked to a managed pad. It looks like a copied .pad file. Open the original .pad file or create a new pad.';
-		}
-		return $message;
 	}
 
 	/**
@@ -329,7 +312,7 @@ class PadController extends Controller {
 		}
 
 		if (($data['is_pad'] ?? false) === true) {
-			$data['viewer_url'] = $this->buildFilesViewerUrl((int)$data['file_id'], (string)$data['path']);
+			$data = $this->padResponses->withViewerUrl($data);
 		}
 
 		return new DataResponse($data);
@@ -359,7 +342,7 @@ class PadController extends Controller {
 		} catch (\InvalidArgumentException $e) {
 			return new DataResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
 		} catch (BindingException $e) {
-			return new DataResponse(['message' => $this->toUserFacingBindingErrorMessage($e)], Http::STATUS_BAD_REQUEST);
+			return new DataResponse(['message' => $this->padResponses->bindingErrorMessage($e)], Http::STATUS_BAD_REQUEST);
 		} catch (PadFileFormatException|EtherpadClientException $e) {
 			return new DataResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
 		} catch (\Throwable) {
@@ -382,7 +365,7 @@ class PadController extends Controller {
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot read selected .pad file.'], Http::STATUS_NOT_FOUND);
 		} catch (BindingException $e) {
-			return new DataResponse(['message' => $this->toUserFacingBindingErrorMessage($e)], Http::STATUS_BAD_REQUEST);
+			return new DataResponse(['message' => $this->padResponses->bindingErrorMessage($e)], Http::STATUS_BAD_REQUEST);
 		} catch (PadFileFormatException|EtherpadClientException $e) {
 			return new DataResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
 		} catch (\Throwable) {
@@ -398,7 +381,7 @@ class PadController extends Controller {
 		}
 
 		try {
-			return $this->buildLifecycleDataResponse($this->padLifecycleOperations->trashByPath($user->getUID(), $file));
+			return $this->padResponses->lifecycleResponse($this->padLifecycleOperations->trashByPath($user->getUID(), $file));
 		} catch (\InvalidArgumentException) {
 			return new DataResponse(['message' => 'Invalid file path.'], Http::STATUS_BAD_REQUEST);
 		} catch (NotFoundException) {
@@ -421,7 +404,7 @@ class PadController extends Controller {
 		}
 
 		try {
-			return $this->buildLifecycleDataResponse($this->padLifecycleOperations->restoreByPath($user->getUID(), $file));
+			return $this->padResponses->lifecycleResponse($this->padLifecycleOperations->restoreByPath($user->getUID(), $file));
 		} catch (\InvalidArgumentException) {
 			return new DataResponse(['message' => 'Invalid file path.'], Http::STATUS_BAD_REQUEST);
 		} catch (NotFoundException) {
@@ -434,46 +417,6 @@ class PadController extends Controller {
 			]);
 			return new DataResponse(['message' => 'Restore failed.'], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
-	}
-
-	/** @param array<string,mixed> $data */
-	private function buildLifecycleDataResponse(array $data): DataResponse {
-		$status = ($data['status'] ?? '') === PadLifecycleOperationService::RESULT_SKIPPED
-			? Http::STATUS_CONFLICT
-			: Http::STATUS_OK;
-		return new DataResponse($data, $status);
-	}
-
-	/** @param array<string,mixed> $data */
-	private function buildOpenDataResponse(array $data): DataResponse {
-		$cookieHeader = (string)($data['cookie_header'] ?? '');
-		unset($data['cookie_header']);
-
-		$fileId = (int)$data['file_id'];
-		$data['sync_url'] = $this->urlGenerator->linkToRoute('etherpad_nextcloud.pad.syncById', ['fileId' => $fileId]);
-		$data['sync_status_url'] = $this->urlGenerator->linkToRoute('etherpad_nextcloud.pad.syncStatusById', ['fileId' => $fileId]);
-		$data['sync_interval_seconds'] = $this->appConfigService->getSyncIntervalSeconds();
-
-		$response = new DataResponse($data);
-		if ($cookieHeader !== '') {
-			$response->addHeader('Set-Cookie', $cookieHeader);
-		}
-		return $response;
-	}
-
-	private function buildFilesViewerUrl(int $fileId, string $absolutePath): string {
-		$dir = dirname($absolutePath);
-		if ($dir === '.' || $dir === '') {
-			$dir = '/';
-		}
-		$base = rtrim($this->urlGenerator->linkToRoute('files.view.index'), '/');
-		return $base . '/' . rawurlencode((string)$fileId)
-			. '?dir=' . rawurlencode($dir)
-			. '&editing=false&openfile=true';
-	}
-
-	private function buildEmbedUrl(int $fileId): string {
-		return $this->urlGenerator->linkToRoute('etherpad_nextcloud.embed.showById', ['fileId' => $fileId]);
 	}
 
 }

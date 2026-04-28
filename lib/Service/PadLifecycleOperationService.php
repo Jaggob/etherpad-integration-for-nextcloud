@@ -15,7 +15,8 @@ class PadLifecycleOperationService {
 	public const RESULT_SKIPPED = LifecycleService::RESULT_SKIPPED;
 
 	public function __construct(
-		private PadFileOperationService $padFileOperations,
+		private PadPathService $padPaths,
+		private UserNodeResolver $userNodeResolver,
 		private LifecycleService $lifecycleService,
 	) {
 	}
@@ -26,7 +27,7 @@ class PadLifecycleOperationService {
 	 */
 	public function trashByPath(string $uid, string $file): array {
 		$path = $this->normalizeLifecyclePath($file);
-		$node = $this->padFileOperations->resolveUserPadNode($uid, $path);
+		$node = $this->userNodeResolver->resolveUserFileNodeByPath($uid, $path);
 		$result = $this->lifecycleService->handleTrash($node);
 
 		if (($result['status'] ?? '') === LifecycleService::RESULT_SKIPPED) {
@@ -52,7 +53,7 @@ class PadLifecycleOperationService {
 	 */
 	public function restoreByPath(string $uid, string $file): array {
 		$path = $this->normalizeLifecyclePath($file);
-		$node = $this->padFileOperations->resolveUserPadNode($uid, $path);
+		$node = $this->userNodeResolver->resolveUserFileNodeByPath($uid, $path);
 		$result = $this->lifecycleService->handleRestore($node);
 
 		if (($result['status'] ?? '') === LifecycleService::RESULT_SKIPPED) {
@@ -72,7 +73,7 @@ class PadLifecycleOperationService {
 	}
 
 	private function normalizeLifecyclePath(string $file): string {
-		$path = $this->padFileOperations->normalizeViewerFilePath($file);
+		$path = $this->padPaths->normalizeViewerFilePath($file);
 		if ($path === '') {
 			throw new \InvalidArgumentException('Invalid file path.');
 		}

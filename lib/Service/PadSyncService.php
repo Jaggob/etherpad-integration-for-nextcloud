@@ -20,7 +20,8 @@ use Psr\Log\LoggerInterface;
 class PadSyncService {
 	public function __construct(
 		private PadFileService $padFileService,
-		private PadFileOperationService $padFileOperations,
+		private UserNodeResolver $userNodeResolver,
+		private PadFileLockRetryService $lockRetryService,
 		private BindingService $bindingService,
 		private EtherpadClient $etherpadClient,
 		private LoggerInterface $logger,
@@ -32,8 +33,8 @@ class PadSyncService {
 	 * @throws NotFoundException
 	 */
 	public function syncById(string $uid, int $fileId, bool $force): array {
-		$node = $this->padFileOperations->resolveUserPadNodeById($uid, $fileId);
-		$absolutePath = $this->padFileOperations->toUserAbsolutePath($uid, $node);
+		$node = $this->userNodeResolver->resolveUserFileNodeById($uid, $fileId);
+		$absolutePath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
 		if (!str_ends_with(strtolower($node->getName()), '.pad')) {
 			throw new \InvalidArgumentException('Selected file is not a .pad file.');
 		}
@@ -99,7 +100,7 @@ class PadSyncService {
 	 * @throws NotFoundException
 	 */
 	public function syncStatusById(string $uid, int $fileId): array {
-		$node = $this->padFileOperations->resolveUserPadNodeById($uid, $fileId);
+		$node = $this->userNodeResolver->resolveUserFileNodeById($uid, $fileId);
 
 		try {
 			$content = (string)$node->getContent();
@@ -174,7 +175,7 @@ class PadSyncService {
 		$previousRev = $this->padFileService->getSnapshotRevision($currentContent);
 		$nextRev = max(0, $previousRev + 1);
 		$updatedContent = $this->padFileService->withExportSnapshot($currentContent, $text, '', $nextRev, false);
-		$this->padFileOperations->putContentWithSyncLockRetry($node, $updatedContent, $lockRetries);
+		$this->lockRetryService->putContentWithSyncLockRetry($node, $updatedContent, $lockRetries);
 
 		return [
 			'status' => 'updated',
@@ -230,7 +231,7 @@ class PadSyncService {
 		}
 
 		$updatedContent = $this->padFileService->withExportSnapshot($currentContent, $text, $html, $currentRev);
-		$this->padFileOperations->putContentWithSyncLockRetry($node, $updatedContent, $lockRetries);
+		$this->lockRetryService->putContentWithSyncLockRetry($node, $updatedContent, $lockRetries);
 
 		return [
 			'status' => 'updated',

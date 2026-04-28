@@ -17,7 +17,8 @@ use OCP\Files\NotFoundException;
 class PadInitializationService {
 	public function __construct(
 		private PadFileService $padFileService,
-		private PadFileOperationService $padFileOperations,
+		private PadPathService $padPaths,
+		private UserNodeResolver $userNodeResolver,
 		private PadBootstrapService $padBootstrapService,
 	) {
 	}
@@ -27,12 +28,12 @@ class PadInitializationService {
 	 * @throws NotFoundException
 	 */
 	public function initializeByPath(string $uid, string $file): array {
-		$path = $this->padFileOperations->normalizeViewerFilePath($file);
+		$path = $this->padPaths->normalizeViewerFilePath($file);
 		if ($path === '') {
 			throw new \InvalidArgumentException('Invalid file path.');
 		}
 
-		$node = $this->padFileOperations->resolveUserPadNode($uid, $path);
+		$node = $this->userNodeResolver->resolveUserFileNodeByPath($uid, $path);
 		return $this->initializeNode($uid, $node);
 	}
 
@@ -41,7 +42,7 @@ class PadInitializationService {
 	 * @throws NotFoundException
 	 */
 	public function initializeById(string $uid, int $fileId): array {
-		$node = $this->padFileOperations->resolveUserPadNodeById($uid, $fileId);
+		$node = $this->userNodeResolver->resolveUserFileNodeById($uid, $fileId);
 		return $this->initializeNode($uid, $node);
 	}
 
@@ -58,7 +59,7 @@ class PadInitializationService {
 	/** @return array{status:string,file:string,file_id:int,pad_id:string,access_mode:string} */
 	public function initialize(string $uid, File $file, string $content): array {
 		$fileId = (int)$file->getId();
-		$path = $this->padFileOperations->toUserAbsolutePath($uid, $file);
+		$path = $this->userNodeResolver->toUserAbsolutePath($uid, $file);
 		try {
 			$parsed = $this->padFileService->parsePadFile($content);
 			$meta = $parsed['frontmatter'];

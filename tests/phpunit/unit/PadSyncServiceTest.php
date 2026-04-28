@@ -6,9 +6,10 @@ namespace OCA\EtherpadNextcloud\Tests\Unit;
 
 use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
-use OCA\EtherpadNextcloud\Service\PadFileOperationService;
+use OCA\EtherpadNextcloud\Service\PadFileLockRetryService;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadSyncService;
+use OCA\EtherpadNextcloud\Service\UserNodeResolver;
 use OCP\Files\File;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -18,8 +19,8 @@ class PadSyncServiceTest extends TestCase {
 		$file = $this->createMock(File::class);
 		$file->method('getContent')->willReturn('frontmatter');
 
-		$fileOperations = $this->createMock(PadFileOperationService::class);
-		$fileOperations->method('resolveUserPadNodeById')->with('alice', 138)->willReturn($file);
+		$userNodeResolver = $this->createMock(UserNodeResolver::class);
+		$userNodeResolver->method('resolveUserFileNodeById')->with('alice', 138)->willReturn($file);
 
 		$padFileService = $this->createMock(PadFileService::class);
 		$padFileService->method('parsePadFile')->with('frontmatter')->willReturn([
@@ -40,7 +41,7 @@ class PadSyncServiceTest extends TestCase {
 			->method('assertConsistentMapping')
 			->with(138, 'ext.remote', BindingService::ACCESS_PUBLIC);
 
-		$result = $this->buildService($padFileService, $fileOperations, $bindingService)
+		$result = $this->buildService($padFileService, $userNodeResolver, $bindingService)
 			->syncStatusById('alice', 138);
 
 		$this->assertSame([
@@ -54,8 +55,8 @@ class PadSyncServiceTest extends TestCase {
 		$file = $this->createMock(File::class);
 		$file->method('getContent')->willReturn('frontmatter');
 
-		$fileOperations = $this->createMock(PadFileOperationService::class);
-		$fileOperations->method('resolveUserPadNodeById')->with('alice', 138)->willReturn($file);
+		$userNodeResolver = $this->createMock(UserNodeResolver::class);
+		$userNodeResolver->method('resolveUserFileNodeById')->with('alice', 138)->willReturn($file);
 
 		$padFileService = $this->createMock(PadFileService::class);
 		$padFileService->method('parsePadFile')->with('frontmatter')->willReturn([
@@ -83,7 +84,7 @@ class PadSyncServiceTest extends TestCase {
 			->with('g.ABC$pad')
 			->willReturn(5);
 
-		$result = $this->buildService($padFileService, $fileOperations, $bindingService, $etherpadClient)
+		$result = $this->buildService($padFileService, $userNodeResolver, $bindingService, $etherpadClient)
 			->syncStatusById('alice', 138);
 
 		$this->assertSame([
@@ -96,13 +97,14 @@ class PadSyncServiceTest extends TestCase {
 
 	private function buildService(
 		?PadFileService $padFileService = null,
-		?PadFileOperationService $fileOperations = null,
+		?UserNodeResolver $userNodeResolver = null,
 		?BindingService $bindingService = null,
 		?EtherpadClient $etherpadClient = null,
 	): PadSyncService {
 		return new PadSyncService(
 			$padFileService ?? $this->createMock(PadFileService::class),
-			$fileOperations ?? $this->createMock(PadFileOperationService::class),
+			$userNodeResolver ?? $this->createMock(UserNodeResolver::class),
+			$this->createMock(PadFileLockRetryService::class),
 			$bindingService ?? $this->createMock(BindingService::class),
 			$etherpadClient ?? $this->createMock(EtherpadClient::class),
 			$this->createMock(LoggerInterface::class),
