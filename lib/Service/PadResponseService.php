@@ -68,9 +68,11 @@ class PadResponseService {
 	public function bindingErrorMessage(BindingException $e): string {
 		$message = trim($e->getMessage());
 		if ($message === 'No binding exists for this file.') {
-			// Usually means a .pad file was copied without its DB binding. Keep
-			// this string in sync with BindingService and translate it to
-			// user-facing guidance here.
+			/*
+			 * Usually means a .pad file was copied without its DB binding. Keep
+			 * this string in sync with BindingService and translate it to
+			 * user-facing guidance here.
+			 */
 			return 'This .pad file is not linked to a managed pad. It looks like a copied .pad file. Open the original .pad file or create a new pad.';
 		}
 		return $message;

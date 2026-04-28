@@ -18,8 +18,10 @@ use OCP\Lock\LockedException;
  * short empirical backoff.
  */
 class PadFileLockRetryService {
-	// Exponential backoff in microseconds. Sync waits slightly longer because
-	// putContent usually holds the file lock longer than getContent.
+	/*
+	 * Exponential backoff in microseconds. Sync waits slightly longer because
+	 * putContent usually holds the file lock longer than getContent.
+	 */
 	private const OPEN_LOCK_RETRY_DELAYS_US = [100000, 200000, 400000];
 	private const SYNC_LOCK_RETRY_DELAYS_US = [150000, 300000, 600000];
 
