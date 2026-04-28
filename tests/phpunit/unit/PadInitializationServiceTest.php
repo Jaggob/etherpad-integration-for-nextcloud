@@ -14,6 +14,96 @@ use OCP\Files\File;
 use PHPUnit\Framework\TestCase;
 
 class PadInitializationServiceTest extends TestCase {
+	public function testInitializeByPathResolvesFileAndReadsContent(): void {
+		$file = $this->createMock(File::class);
+		$file->method('getId')->willReturn(42);
+		$file->expects($this->once())
+			->method('getContent')
+			->willReturn('content');
+
+		$fileOperations = $this->createMock(PadFileOperationService::class);
+		$fileOperations->expects($this->once())
+			->method('normalizeViewerFilePath')
+			->with('/Existing.pad')
+			->willReturn('/Existing.pad');
+		$fileOperations->expects($this->once())
+			->method('resolveUserPadNode')
+			->with('alice', '/Existing.pad')
+			->willReturn($file);
+		$fileOperations->method('toUserAbsolutePath')->with('alice', $file)->willReturn('/Existing.pad');
+
+		$padFileService = $this->createMock(PadFileService::class);
+		$padFileService->method('parsePadFile')
+			->with('content')
+			->willReturn([
+				'frontmatter' => [
+					'pad_id' => 'g.ABC$pad',
+					'access_mode' => BindingService::ACCESS_PUBLIC,
+				],
+			]);
+
+		$bootstrap = $this->createMock(PadBootstrapService::class);
+		$bootstrap->expects($this->never())->method('initializeMissingFrontmatter');
+
+		$result = (new PadInitializationService($padFileService, $fileOperations, $bootstrap))
+			->initializeByPath('alice', '/Existing.pad');
+
+		$this->assertSame('already_initialized', $result['status']);
+		$this->assertSame('/Existing.pad', $result['file']);
+		$this->assertSame(42, $result['file_id']);
+	}
+
+	public function testInitializeByIdResolvesFileAndReadsContent(): void {
+		$file = $this->createMock(File::class);
+		$file->method('getId')->willReturn(42);
+		$file->expects($this->once())
+			->method('getContent')
+			->willReturn('content');
+
+		$fileOperations = $this->createMock(PadFileOperationService::class);
+		$fileOperations->expects($this->once())
+			->method('resolveUserPadNodeById')
+			->with('alice', 42)
+			->willReturn($file);
+		$fileOperations->method('toUserAbsolutePath')->with('alice', $file)->willReturn('/Existing.pad');
+
+		$padFileService = $this->createMock(PadFileService::class);
+		$padFileService->method('parsePadFile')
+			->with('content')
+			->willReturn([
+				'frontmatter' => [
+					'pad_id' => 'g.ABC$pad',
+					'access_mode' => BindingService::ACCESS_PUBLIC,
+				],
+			]);
+
+		$bootstrap = $this->createMock(PadBootstrapService::class);
+		$bootstrap->expects($this->never())->method('initializeMissingFrontmatter');
+
+		$result = (new PadInitializationService($padFileService, $fileOperations, $bootstrap))
+			->initializeById('alice', 42);
+
+		$this->assertSame('already_initialized', $result['status']);
+		$this->assertSame('/Existing.pad', $result['file']);
+		$this->assertSame(42, $result['file_id']);
+	}
+
+	public function testInitializeByPathRejectsEmptyPath(): void {
+		$fileOperations = $this->createMock(PadFileOperationService::class);
+		$fileOperations->expects($this->once())
+			->method('normalizeViewerFilePath')
+			->with('   ')
+			->willReturn('');
+
+		$this->expectException(\InvalidArgumentException::class);
+
+		(new PadInitializationService(
+			$this->createMock(PadFileService::class),
+			$fileOperations,
+			$this->createMock(PadBootstrapService::class),
+		))->initializeByPath('alice', '   ');
+	}
+
 	public function testInitializeReturnsExistingFrontmatter(): void {
 		$file = $this->createMock(File::class);
 		$file->method('getId')->willReturn(42);

@@ -13,7 +13,9 @@ use OCA\EtherpadNextcloud\Service\PadCreationService;
 use OCA\EtherpadNextcloud\Service\PadFileOperationService;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadInitializationService;
+use OCA\EtherpadNextcloud\Service\PadLifecycleOperationService;
 use OCA\EtherpadNextcloud\Service\PadMetadataService;
+use OCA\EtherpadNextcloud\Service\PadOpenService;
 use OCA\EtherpadNextcloud\Service\PadSessionService;
 use OCA\EtherpadNextcloud\Service\PadSyncService;
 use OCA\EtherpadNextcloud\Service\UserNodeResolver;
@@ -150,6 +152,14 @@ class PadControllerTest extends TestCase {
 			]);
 		$logger = $this->createMock(LoggerInterface::class);
 		$padFileOperations = new PadFileOperationService(new PathNormalizer(), $rootFolder, new UserNodeResolver($rootFolder), $etherpadClient, $logger);
+		$padOpenService = new PadOpenService(
+			$padFileService,
+			$padFileOperations,
+			$bindingService,
+			$etherpadClient,
+			$this->createMock(PadSessionService::class),
+			$logger,
+		);
 
 		$controller = new PadController(
 			'etherpad_nextcloud',
@@ -157,17 +167,14 @@ class PadControllerTest extends TestCase {
 			$urlGenerator,
 			$userSession,
 			$logger,
-			$padFileService,
 			$padFileOperations,
 			$this->createMock(PadCreationService::class),
 			$this->createMock(PadInitializationService::class),
 			$this->createMock(PadMetadataService::class),
+			$padOpenService,
 			$this->createMock(PadSyncService::class),
-			$bindingService,
-			$etherpadClient,
-			$this->createMock(PadSessionService::class),
 			$appConfigService,
-			$this->createMock(LifecycleService::class),
+			$this->createMock(PadLifecycleOperationService::class),
 		);
 
 		$response = $controller->openById(138);
@@ -268,6 +275,14 @@ class PadControllerTest extends TestCase {
 			]);
 		$logger = $this->createMock(LoggerInterface::class);
 		$padFileOperations = new PadFileOperationService(new PathNormalizer(), $rootFolder, new UserNodeResolver($rootFolder), $etherpadClient, $logger);
+		$padOpenService = new PadOpenService(
+			$padFileService,
+			$padFileOperations,
+			$bindingService,
+			$etherpadClient,
+			$this->createMock(PadSessionService::class),
+			$logger,
+		);
 
 		$controller = new PadController(
 			'etherpad_nextcloud',
@@ -275,17 +290,14 @@ class PadControllerTest extends TestCase {
 			$urlGenerator,
 			$userSession,
 			$logger,
-			$padFileService,
 			$padFileOperations,
 			$this->createMock(PadCreationService::class),
 			$this->createMock(PadInitializationService::class),
 			$this->createMock(PadMetadataService::class),
+			$padOpenService,
 			$this->createMock(PadSyncService::class),
-			$bindingService,
-			$etherpadClient,
-			$this->createMock(PadSessionService::class),
 			$appConfigService,
-			$this->createMock(LifecycleService::class),
+			$this->createMock(PadLifecycleOperationService::class),
 		);
 
 		$response = $controller->openById(138);
@@ -584,24 +596,30 @@ class PadControllerTest extends TestCase {
 		$logger = $this->createMock(LoggerInterface::class);
 		$padFileOperations = new PadFileOperationService(new PathNormalizer(), $resolvedRootFolder, new UserNodeResolver($resolvedRootFolder), $resolvedEtherpadClient, $logger);
 		$padMetadataService = new PadMetadataService($resolvedPadFileService, $padFileOperations, $resolvedEtherpadClient, $logger);
+		$padOpenService = new PadOpenService(
+			$resolvedPadFileService,
+			$padFileOperations,
+			$resolvedBindingService,
+			$resolvedEtherpadClient,
+			$this->createMock(PadSessionService::class),
+			$logger,
+		);
 		$padSyncService = new PadSyncService($resolvedPadFileService, $padFileOperations, $resolvedBindingService, $resolvedEtherpadClient, $logger);
+		$padLifecycleOperations = new PadLifecycleOperationService($padFileOperations, $this->createMock(LifecycleService::class));
 		return new PadController(
 			'etherpad_nextcloud',
 			$request,
 			$this->createMock(IURLGenerator::class),
 			$userSession,
 			$logger,
-			$resolvedPadFileService,
 			$padFileOperations,
 			$this->createMock(PadCreationService::class),
 			$this->createMock(PadInitializationService::class),
 			$padMetadataService,
+			$padOpenService,
 			$padSyncService,
-			$resolvedBindingService,
-			$resolvedEtherpadClient,
-			$this->createMock(PadSessionService::class),
 			$this->createMock(AppConfigService::class),
-			$this->createMock(LifecycleService::class),
+			$padLifecycleOperations,
 		);
 	}
 

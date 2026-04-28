@@ -12,6 +12,7 @@ namespace OCA\EtherpadNextcloud\Service;
 use OCA\EtherpadNextcloud\Exception\MissingFrontmatterException;
 use OCA\EtherpadNextcloud\Exception\PadFileFormatException;
 use OCP\Files\File;
+use OCP\Files\NotFoundException;
 
 class PadInitializationService {
 	public function __construct(
@@ -19,6 +20,39 @@ class PadInitializationService {
 		private PadFileOperationService $padFileOperations,
 		private PadBootstrapService $padBootstrapService,
 	) {
+	}
+
+	/**
+	 * @return array{status:string,file:string,file_id:int,pad_id:string,access_mode:string}
+	 * @throws NotFoundException
+	 */
+	public function initializeByPath(string $uid, string $file): array {
+		$path = $this->padFileOperations->normalizeViewerFilePath($file);
+		if ($path === '') {
+			throw new \InvalidArgumentException('Invalid file path.');
+		}
+
+		$node = $this->padFileOperations->resolveUserPadNode($uid, $path);
+		return $this->initializeNode($uid, $node);
+	}
+
+	/**
+	 * @return array{status:string,file:string,file_id:int,pad_id:string,access_mode:string}
+	 * @throws NotFoundException
+	 */
+	public function initializeById(string $uid, int $fileId): array {
+		$node = $this->padFileOperations->resolveUserPadNodeById($uid, $fileId);
+		return $this->initializeNode($uid, $node);
+	}
+
+	/** @return array{status:string,file:string,file_id:int,pad_id:string,access_mode:string} */
+	private function initializeNode(string $uid, File $node): array {
+		$fileId = (int)$node->getId();
+		if ($fileId <= 0) {
+			throw new \RuntimeException('Could not resolve file ID.');
+		}
+
+		return $this->initialize($uid, $node, (string)$node->getContent());
 	}
 
 	/** @return array{status:string,file:string,file_id:int,pad_id:string,access_mode:string} */
