@@ -21,6 +21,7 @@ use OCA\EtherpadNextcloud\Service\PadFileOperationService;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadInitializationService;
 use OCA\EtherpadNextcloud\Service\PadSessionService;
+use OCA\EtherpadNextcloud\Service\PadSyncService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\DataResponse;
@@ -43,6 +44,7 @@ class PadController extends Controller {
 		private PadFileOperationService $padFileOperations,
 		private PadCreationService $padCreationService,
 		private PadInitializationService $padInitializationService,
+		private PadSyncService $padSyncService,
 		private BindingService $bindingService,
 		private EtherpadClient $etherpadClient,
 		private PadSessionService $padSessionService,
@@ -541,150 +543,17 @@ class PadController extends Controller {
 
 		$forceParam = (string)$this->request->getParam('force', '0');
 		$force = in_array(strtolower($forceParam), ['1', 'true', 'yes'], true);
-		$uid = $user->getUID();
-		$absolutePath = '';
-		$padId = '';
-		$accessMode = '';
-		$isExternal = false;
 		try {
-			$node = $this->padFileOperations->resolveUserPadNodeById($uid, $fileId);
-			$absolutePath = $this->padFileOperations->toUserAbsolutePath($uid, $node);
+			return new DataResponse($this->padSyncService->syncById($user->getUID(), $fileId, $force));
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot resolve file path for file ID.'], Http::STATUS_NOT_FOUND);
-		}
-		if (!str_ends_with(strtolower($node->getName()), '.pad')) {
-			return new DataResponse(['message' => 'Selected file is not a .pad file.'], Http::STATUS_BAD_REQUEST);
-		}
-
-		try {
-				$currentContent = (string)$node->getContent();
-				$parsed = $this->padFileService->parsePadFile((string)$currentContent);
-				$frontmatter = $parsed['frontmatter'];
-				$meta = $this->padFileService->extractPadMetadata($frontmatter);
-				$padId = $meta['pad_id'];
-				$accessMode = $meta['access_mode'];
-				$padUrl = $meta['pad_url'];
-				$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
-			$lockRetries = 0;
-			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
-
-			if ($isExternal) {
-				if ($padUrl === '') {
-					return new DataResponse(['message' => 'External pad URL metadata is missing or invalid.'], Http::STATUS_BAD_REQUEST);
-				}
-				$normalized = $this->etherpadClient->normalizeAndValidateExternalPublicPadUrl($padUrl);
-
-				// External sync already performs a live upstream text fetch on every call.
-				// force=1 therefore does not unlock a cheaper fast path here; it only marks
-				// the caller intent while preserving the "no blind rewrite" invariant.
-				$text = $this->etherpadClient->getPublicTextFromPadUrl($normalized['pad_url']);
-
-				$existingText = $this->padFileService->getTextSnapshotForRestore((string)$currentContent);
-				if ($existingText === $text) {
-					return new DataResponse([
-						'status' => 'unchanged',
-						'file_id' => $fileId,
-						'pad_id' => $padId,
-						'external' => true,
-						'forced' => $force,
-					]);
-				}
-
-				$previousRev = $this->padFileService->getSnapshotRevision((string)$currentContent);
-				$nextRev = max(0, $previousRev + 1);
-				$updatedContent = $this->padFileService->withExportSnapshot((string)$currentContent, $text, '', $nextRev, false);
-				$this->padFileOperations->putContentWithSyncLockRetry($node, $updatedContent, $lockRetries);
-
-				return new DataResponse([
-					'status' => 'updated',
-					'file_id' => $fileId,
-					'pad_id' => $padId,
-					'external' => true,
-					'forced' => $force,
-					'snapshot_rev' => $nextRev,
-					'lock_retries' => $lockRetries,
-				]);
-			}
-
-			$currentRev = $this->etherpadClient->getRevisionsCount($padId);
-			$snapshotRev = $this->padFileService->getSnapshotRevision((string)$currentContent);
-			if (!$force && $snapshotRev >= $currentRev) {
-				return new DataResponse([
-					'status' => 'unchanged',
-					'file_id' => $fileId,
-					'pad_id' => $padId,
-					'external' => false,
-					'forced' => false,
-					'snapshot_rev' => $snapshotRev,
-					'current_rev' => $currentRev,
-				]);
-			}
-
-			$text = $this->etherpadClient->getText($padId);
-			$html = $this->etherpadClient->getHTML($padId);
-			if ($force && $snapshotRev >= $currentRev) {
-				// force=1 still matters for internal pads: it bypasses the cheap revision
-				// short-circuit and performs a live content re-check before deciding that
-				// the local snapshot is unchanged.
-				$existingText = $this->padFileService->getTextSnapshotForRestore((string)$currentContent);
-				$existingHtml = $this->padFileService->getHtmlSnapshotForRestore((string)$currentContent);
-				if ($existingText === $text && $existingHtml === $html) {
-					return new DataResponse([
-						'status' => 'unchanged',
-						'file_id' => $fileId,
-						'pad_id' => $padId,
-						'external' => false,
-						'forced' => true,
-						'snapshot_rev' => $snapshotRev,
-						'current_rev' => $currentRev,
-					]);
-				}
-			}
-			$updatedContent = $this->padFileService->withExportSnapshot((string)$currentContent, $text, $html, $currentRev);
-			$this->padFileOperations->putContentWithSyncLockRetry($node, $updatedContent, $lockRetries);
-
-			return new DataResponse([
-				'status' => 'updated',
-				'file_id' => $fileId,
-				'pad_id' => $padId,
-				'external' => false,
-				'forced' => $force,
-				'snapshot_rev' => $currentRev,
-				'lock_retries' => $lockRetries,
-			]);
-		} catch (LockedException $e) {
-			$this->logger->warning('Pad sync deferred because .pad file is locked', [
-				'app' => 'etherpad_nextcloud',
-				'fileId' => $fileId,
-				'path' => $absolutePath,
-				'padId' => $padId,
-				'accessMode' => $accessMode,
-				'external' => $isExternal,
-				'force' => $force,
-				'lockRetryAttempts' => $lockRetries ?? 0,
-				'exception' => $e,
-			]);
-			return new DataResponse([
-				'status' => 'locked',
-				'file_id' => $fileId,
-				'pad_id' => $padId,
-				'external' => $isExternal,
-				'forced' => $force,
-				'lock_retries' => $lockRetries ?? 0,
-				'retryable' => true,
-			]);
+		} catch (\InvalidArgumentException $e) {
+			return new DataResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
 		} catch (BindingException $e) {
 			return new DataResponse(['message' => $this->toUserFacingBindingErrorMessage($e)], Http::STATUS_BAD_REQUEST);
 		} catch (PadFileFormatException|EtherpadClientException $e) {
 			return new DataResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
-		} catch (\Throwable $e) {
-			$this->logger->error('Pad sync failed', [
-				'app' => 'etherpad_nextcloud',
-				'fileId' => $fileId,
-				'path' => $absolutePath,
-				'force' => $force,
-				'exception' => $e,
-			]);
+		} catch (\Throwable) {
 			return new DataResponse(['message' => 'Pad sync failed.'], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
@@ -699,51 +568,15 @@ class PadController extends Controller {
 		if ($fileId <= 0) {
 			return new DataResponse(['message' => 'Invalid file ID.'], Http::STATUS_BAD_REQUEST);
 		}
-		$uid = $user->getUID();
 		try {
-			$node = $this->padFileOperations->resolveUserPadNodeById($uid, $fileId);
+			return new DataResponse($this->padSyncService->syncStatusById($user->getUID(), $fileId));
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot read selected .pad file.'], Http::STATUS_NOT_FOUND);
-		}
-		$content = (string)$node->getContent();
-
-		try {
-			$parsed = $this->padFileService->parsePadFile((string)$content);
-			$frontmatter = $parsed['frontmatter'];
-			$meta = $this->padFileService->extractPadMetadata($frontmatter);
-			$padId = $meta['pad_id'];
-			$accessMode = $meta['access_mode'];
-			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
-
-			$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
-			if ($isExternal) {
-				return new DataResponse([
-					'status' => 'unavailable',
-					'in_sync' => null,
-					'reason' => 'external_no_revision',
-				]);
-			}
-
-			$currentRev = $this->etherpadClient->getRevisionsCount($padId);
-			$snapshotRev = $this->padFileService->getSnapshotRevision((string)$content);
-			$inSync = $snapshotRev >= $currentRev;
-
-			return new DataResponse([
-				'status' => $inSync ? 'synced' : 'out_of_sync',
-				'in_sync' => $inSync,
-				'snapshot_rev' => $snapshotRev,
-				'current_rev' => $currentRev,
-			]);
 		} catch (BindingException $e) {
 			return new DataResponse(['message' => $this->toUserFacingBindingErrorMessage($e)], Http::STATUS_BAD_REQUEST);
 		} catch (PadFileFormatException|EtherpadClientException $e) {
 			return new DataResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
-		} catch (\Throwable $e) {
-			$this->logger->error('Pad sync status check failed', [
-				'app' => 'etherpad_nextcloud',
-				'fileId' => $fileId,
-				'exception' => $e,
-			]);
+		} catch (\Throwable) {
 			return new DataResponse(['message' => 'Sync status check failed.'], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
