@@ -18,16 +18,13 @@ use OCA\EtherpadNextcloud\Service\PadBootstrapService;
 use OCA\EtherpadNextcloud\Service\AppConfigService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
 use OCA\EtherpadNextcloud\Service\LifecycleService;
+use OCA\EtherpadNextcloud\Service\PadFileOperationService;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadSessionService;
-use OCA\EtherpadNextcloud\Service\UserNodeResolver;
-use OCA\EtherpadNextcloud\Util\PathNormalizer;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\Files\File;
-use OCP\Files\Folder;
-use OCP\Files\IRootFolder;
 use OCP\Files\NotFoundException;
 use OCP\IRequest;
 use OCP\IURLGenerator;
@@ -36,25 +33,20 @@ use OCP\Lock\LockedException;
 use Psr\Log\LoggerInterface;
 
 class PadController extends Controller {
-	private const OPEN_LOCK_RETRY_DELAYS_US = [100000, 200000, 400000];
-	private const SYNC_LOCK_RETRY_DELAYS_US = [150000, 300000, 600000];
-
 	public function __construct(
 		string $appName,
 		IRequest $request,
 		private IURLGenerator $urlGenerator,
 		private IUserSession $userSession,
 		private LoggerInterface $logger,
-		private PathNormalizer $pathNormalizer,
 		private PadFileService $padFileService,
+		private PadFileOperationService $padFileOperations,
 		private BindingService $bindingService,
 		private EtherpadClient $etherpadClient,
 		private PadSessionService $padSessionService,
 		private PadBootstrapService $padBootstrapService,
 		private AppConfigService $appConfigService,
 		private LifecycleService $lifecycleService,
-		private IRootFolder $rootFolder,
-		private UserNodeResolver $userNodeResolver,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -74,7 +66,7 @@ class PadController extends Controller {
 		}
 
 		try {
-			$path = $this->normalizeCreatePath($file);
+			$path = $this->padFileOperations->normalizeCreatePath($file);
 		} catch (\Throwable) {
 			return new DataResponse(['message' => 'Invalid file path.'], Http::STATUS_BAD_REQUEST);
 		}
@@ -83,7 +75,7 @@ class PadController extends Controller {
 		$padId = '';
 		$fileCreated = false;
 		try {
-			$fileNode = $this->createUserFile($uid, $path);
+			$fileNode = $this->padFileOperations->createUserFile($uid, $path);
 			$fileCreated = true;
 			$fileId = (int)$fileNode->getId();
 			if ($fileId <= 0) {
@@ -118,11 +110,11 @@ class PadController extends Controller {
 				'padId' => $padId,
 				'exception' => $e,
 			]);
-			$this->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
+			$this->padFileOperations->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
 			return new DataResponse(['message' => '.pad file already exists.'], Http::STATUS_CONFLICT);
 		} catch (\Throwable $e) {
-			if ($this->isCreateConflict($e)) {
-				$this->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
+			if ($this->padFileOperations->isCreateConflict($e)) {
+				$this->padFileOperations->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
 				return new DataResponse(['message' => '.pad file already exists.'], Http::STATUS_CONFLICT);
 			}
 
@@ -134,7 +126,7 @@ class PadController extends Controller {
 				'exception' => $e,
 			]);
 
-			$this->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
+			$this->padFileOperations->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
 			return new DataResponse(['message' => 'Pad creation failed.'], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
@@ -156,14 +148,14 @@ class PadController extends Controller {
 		}
 
 		try {
-			$fileName = $this->normalizeCreateFileName($name);
+			$fileName = $this->padFileOperations->normalizeCreateFileName($name);
 		} catch (\Throwable) {
 			return new DataResponse(['message' => 'Invalid pad name.'], Http::STATUS_BAD_REQUEST);
 		}
 
 		$uid = $user->getUID();
 		try {
-			$parentFolder = $this->userNodeResolver->resolveUserFolderNodeById($uid, $parentFolderId);
+			$parentFolder = $this->padFileOperations->resolveUserFolderNodeById($uid, $parentFolderId);
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot resolve selected parent folder.'], Http::STATUS_NOT_FOUND);
 		}
@@ -177,9 +169,9 @@ class PadController extends Controller {
 		$path = '';
 
 		try {
-			$fileNode = $this->createUserFileInFolder($parentFolder, $fileName);
+			$fileNode = $this->padFileOperations->createUserFileInFolder($parentFolder, $fileName);
 			$fileCreated = true;
-			$path = $this->userNodeResolver->toUserAbsolutePath($uid, $fileNode);
+			$path = $this->padFileOperations->toUserAbsolutePath($uid, $fileNode);
 			$fileId = (int)$fileNode->getId();
 			if ($fileId <= 0) {
 				throw new \RuntimeException('Could not resolve new file ID.');
@@ -216,11 +208,11 @@ class PadController extends Controller {
 				'padId' => $padId,
 				'exception' => $e,
 			]);
-			$this->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
+			$this->padFileOperations->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
 			return new DataResponse(['message' => '.pad file already exists.'], Http::STATUS_CONFLICT);
 		} catch (\Throwable $e) {
-			if ($this->isCreateConflict($e)) {
-				$this->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
+			if ($this->padFileOperations->isCreateConflict($e)) {
+				$this->padFileOperations->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
 				return new DataResponse(['message' => '.pad file already exists.'], Http::STATUS_CONFLICT);
 			}
 
@@ -234,7 +226,7 @@ class PadController extends Controller {
 				'exception' => $e,
 			]);
 
-			$this->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
+			$this->padFileOperations->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
 			return new DataResponse(['message' => 'Pad creation failed.'], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
@@ -250,7 +242,7 @@ class PadController extends Controller {
 		}
 
 		try {
-			$path = $this->normalizeCreatePath($file);
+			$path = $this->padFileOperations->normalizeCreatePath($file);
 			$external = $this->etherpadClient->normalizeAndValidateExternalPublicPadUrl($padUrl);
 		} catch (EtherpadClientException $e) {
 			return new DataResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
@@ -261,14 +253,14 @@ class PadController extends Controller {
 
 		$fileCreated = false;
 		try {
-			$fileNode = $this->createUserFile($uid, $path);
+			$fileNode = $this->padFileOperations->createUserFile($uid, $path);
 			$fileCreated = true;
 			$fileId = (int)$fileNode->getId();
 			if ($fileId <= 0) {
 				throw new \RuntimeException('Could not resolve new file ID.');
 			}
 
-			$bindingPadId = $this->buildExternalBindingPadId($external['origin'], $external['pad_id'], $fileId);
+			$bindingPadId = $this->padFileOperations->buildExternalBindingPadId($external['origin'], $external['pad_id'], $fileId);
 			// Validate that the target behaves like a public Etherpad pad before persisting binding.
 			$this->etherpadClient->getPublicTextFromPadUrl($external['pad_url']);
 			$content = $this->padFileService->buildInitialDocument(
@@ -302,7 +294,7 @@ class PadController extends Controller {
 				'remotePadId' => $external['pad_id'],
 				'exception' => $e,
 			]);
-			$this->rollbackExternalCreate($uid, $path, $fileCreated);
+			$this->padFileOperations->rollbackExternalCreate($uid, $path, $fileCreated);
 			return new DataResponse(['message' => 'Could not create external pad binding.'], Http::STATUS_CONFLICT);
 		} catch (EtherpadClientException $e) {
 			$this->logger->warning('External pad URL validation failed', [
@@ -311,11 +303,11 @@ class PadController extends Controller {
 				'padUrl' => $padUrl,
 				'exception' => $e,
 			]);
-			$this->rollbackExternalCreate($uid, $path, $fileCreated);
+			$this->padFileOperations->rollbackExternalCreate($uid, $path, $fileCreated);
 			return new DataResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
 		} catch (\Throwable $e) {
-			if ($this->isCreateConflict($e)) {
-				$this->rollbackExternalCreate($uid, $path, $fileCreated);
+			if ($this->padFileOperations->isCreateConflict($e)) {
+				$this->padFileOperations->rollbackExternalCreate($uid, $path, $fileCreated);
 				return new DataResponse(['message' => '.pad file already exists.'], Http::STATUS_CONFLICT);
 			}
 
@@ -325,7 +317,7 @@ class PadController extends Controller {
 				'padUrl' => $padUrl,
 				'exception' => $e,
 			]);
-			$this->rollbackExternalCreate($uid, $path, $fileCreated);
+			$this->padFileOperations->rollbackExternalCreate($uid, $path, $fileCreated);
 			return new DataResponse(['message' => 'External pad create failed.'], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 	}
@@ -341,14 +333,14 @@ class PadController extends Controller {
 		}
 
 		try {
-			$path = $this->pathNormalizer->normalizeViewerFilePath($file);
+			$path = $this->padFileOperations->normalizeViewerFilePath($file);
 		} catch (\Throwable) {
 			return new DataResponse(['message' => 'Invalid file path.'], Http::STATUS_BAD_REQUEST);
 		}
 		$uid = $user->getUID();
 		try {
-			$node = $this->resolveUserPadNode($uid, $path);
-			$absolutePath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
+			$node = $this->padFileOperations->resolveUserPadNode($uid, $path);
+			$absolutePath = $this->padFileOperations->toUserAbsolutePath($uid, $node);
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot open selected .pad file.'], Http::STATUS_NOT_FOUND);
 		}
@@ -370,8 +362,8 @@ class PadController extends Controller {
 		}
 		$uid = $user->getUID();
 		try {
-			$node = $this->resolveUserPadNodeById($uid, $fileId);
-			$absolutePath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
+			$node = $this->padFileOperations->resolveUserPadNodeById($uid, $fileId);
+			$absolutePath = $this->padFileOperations->toUserAbsolutePath($uid, $node);
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot open selected .pad file.'], Http::STATUS_NOT_FOUND);
 		}
@@ -381,7 +373,7 @@ class PadController extends Controller {
 
 	private function openPadInternal(string $uid, string $displayName, File $node, string $absolutePath): DataResponse {
 		try {
-			$content = $this->readContentWithOpenLockRetry($node);
+			$content = $this->padFileOperations->readContentWithOpenLockRetry($node);
 			$fileId = (int)$node->getId();
 			if ($fileId <= 0) {
 				return new DataResponse(['message' => 'Could not resolve file ID.'], Http::STATUS_INTERNAL_SERVER_ERROR);
@@ -433,7 +425,7 @@ class PadController extends Controller {
 		}
 
 		try {
-			$path = $this->pathNormalizer->normalizeViewerFilePath($file);
+			$path = $this->padFileOperations->normalizeViewerFilePath($file);
 		} catch (\Throwable) {
 			return new DataResponse(['message' => 'Invalid file path.'], Http::STATUS_BAD_REQUEST);
 		}
@@ -442,7 +434,7 @@ class PadController extends Controller {
 		}
 		$uid = $user->getUID();
 		try {
-			$node = $this->resolveUserPadNode($uid, $path);
+			$node = $this->padFileOperations->resolveUserPadNode($uid, $path);
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot open selected .pad file.'], Http::STATUS_NOT_FOUND);
 		}
@@ -481,8 +473,8 @@ class PadController extends Controller {
 		}
 		$uid = $user->getUID();
 		try {
-			$node = $this->resolveUserPadNodeById($uid, $fileId);
-			$absolutePath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
+			$node = $this->padFileOperations->resolveUserPadNodeById($uid, $fileId);
+			$absolutePath = $this->padFileOperations->toUserAbsolutePath($uid, $node);
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot open selected .pad file.'], Http::STATUS_NOT_FOUND);
 		}
@@ -519,8 +511,8 @@ class PadController extends Controller {
 
 		$uid = $user->getUID();
 		try {
-			$node = $this->resolveUserPadNodeById($uid, $fileId);
-			$absolutePath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
+			$node = $this->padFileOperations->resolveUserPadNodeById($uid, $fileId);
+			$absolutePath = $this->padFileOperations->toUserAbsolutePath($uid, $node);
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot resolve selected .pad file.'], Http::STATUS_NOT_FOUND);
 		}
@@ -559,7 +551,7 @@ class PadController extends Controller {
 		$padUrl = '';
 		$padId = '';
 		try {
-			$parsed = $this->padFileService->parsePadFile($this->readContentWithOpenLockRetry($node));
+			$parsed = $this->padFileService->parsePadFile($this->padFileOperations->readContentWithOpenLockRetry($node));
 			$frontmatter = $parsed['frontmatter'];
 			$meta = $this->padFileService->extractPadMetadata($frontmatter);
 			$padId = $meta['pad_id'];
@@ -624,15 +616,15 @@ class PadController extends Controller {
 		$mime = '';
 		if ($resolvedFileId > 0) {
 			try {
-				$node = $this->resolveUserPadNodeById($uid, $resolvedFileId);
-				$normalizedPath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
+				$node = $this->padFileOperations->resolveUserPadNodeById($uid, $resolvedFileId);
+				$normalizedPath = $this->padFileOperations->toUserAbsolutePath($uid, $node);
 				$mime = (string)$node->getMimeType();
 			} catch (NotFoundException) {
 				return new DataResponse(['is_pad' => false, 'file_id' => $resolvedFileId]);
 			}
 		} else {
 			try {
-				$requestedPath = $this->pathNormalizer->normalizeViewerFilePath($file);
+				$requestedPath = $this->padFileOperations->normalizeViewerFilePath($file);
 			} catch (\Throwable) {
 				return new DataResponse(['message' => 'Invalid file path.'], Http::STATUS_BAD_REQUEST);
 			}
@@ -641,7 +633,7 @@ class PadController extends Controller {
 			}
 
 			try {
-				$node = $this->resolveUserPadNode($uid, $requestedPath);
+				$node = $this->padFileOperations->resolveUserPadNode($uid, $requestedPath);
 			} catch (NotFoundException) {
 				return new DataResponse(['is_pad' => false, 'path' => $requestedPath]);
 			}
@@ -649,7 +641,7 @@ class PadController extends Controller {
 			if ($resolvedFileId <= 0) {
 				return new DataResponse(['is_pad' => false, 'path' => $requestedPath]);
 			}
-			$normalizedPath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
+			$normalizedPath = $this->padFileOperations->toUserAbsolutePath($uid, $node);
 			$mime = (string)$node->getMimeType();
 		}
 
@@ -723,8 +715,8 @@ class PadController extends Controller {
 		$accessMode = '';
 		$isExternal = false;
 		try {
-			$node = $this->resolveUserPadNodeById($uid, $fileId);
-			$absolutePath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
+			$node = $this->padFileOperations->resolveUserPadNodeById($uid, $fileId);
+			$absolutePath = $this->padFileOperations->toUserAbsolutePath($uid, $node);
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot resolve file path for file ID.'], Http::STATUS_NOT_FOUND);
 		}
@@ -769,7 +761,7 @@ class PadController extends Controller {
 				$previousRev = $this->padFileService->getSnapshotRevision((string)$currentContent);
 				$nextRev = max(0, $previousRev + 1);
 				$updatedContent = $this->padFileService->withExportSnapshot((string)$currentContent, $text, '', $nextRev, false);
-				$this->putContentWithSyncLockRetry($node, $updatedContent, $lockRetries);
+				$this->padFileOperations->putContentWithSyncLockRetry($node, $updatedContent, $lockRetries);
 
 				return new DataResponse([
 					'status' => 'updated',
@@ -817,7 +809,7 @@ class PadController extends Controller {
 				}
 			}
 			$updatedContent = $this->padFileService->withExportSnapshot((string)$currentContent, $text, $html, $currentRev);
-			$this->putContentWithSyncLockRetry($node, $updatedContent, $lockRetries);
+			$this->padFileOperations->putContentWithSyncLockRetry($node, $updatedContent, $lockRetries);
 
 			return new DataResponse([
 				'status' => 'updated',
@@ -865,34 +857,6 @@ class PadController extends Controller {
 		}
 	}
 
-	private function putContentWithSyncLockRetry(File $node, string $content, int &$lockRetries): void {
-		foreach (self::SYNC_LOCK_RETRY_DELAYS_US as $delay) {
-			try {
-				$node->putContent($content);
-				return;
-			} catch (LockedException) {
-				\usleep($delay);
-				$lockRetries++;
-			}
-		}
-
-		$node->putContent($content);
-	}
-
-	private function readContentWithOpenLockRetry(File $node): string {
-		foreach (self::OPEN_LOCK_RETRY_DELAYS_US as $delay) {
-			try {
-				return (string)$node->getContent();
-			} catch (LockedException) {
-				\usleep($delay);
-			}
-		}
-
-		// Final uncaught attempt preserves the original LockedException for the caller
-		// once the bounded retry budget has been exhausted.
-		return (string)$node->getContent();
-	}
-
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	#[\OCP\AppFramework\Http\Attribute\NoCSRFRequired]
 	public function syncStatusById(int $fileId): DataResponse {
@@ -905,7 +869,7 @@ class PadController extends Controller {
 		}
 		$uid = $user->getUID();
 		try {
-			$node = $this->resolveUserPadNodeById($uid, $fileId);
+			$node = $this->padFileOperations->resolveUserPadNodeById($uid, $fileId);
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot read selected .pad file.'], Http::STATUS_NOT_FOUND);
 		}
@@ -960,8 +924,8 @@ class PadController extends Controller {
 		}
 
 		try {
-			$path = $this->pathNormalizer->normalizeViewerFilePath($file);
-			$node = $this->resolveUserPadNode($user->getUID(), $path);
+			$path = $this->padFileOperations->normalizeViewerFilePath($file);
+			$node = $this->padFileOperations->resolveUserPadNode($user->getUID(), $path);
 			$result = $this->lifecycleService->handleTrash($node);
 			if (($result['status'] ?? '') === LifecycleService::RESULT_SKIPPED) {
 				return new DataResponse([
@@ -997,8 +961,8 @@ class PadController extends Controller {
 		}
 
 		try {
-			$path = $this->pathNormalizer->normalizeViewerFilePath($file);
-			$node = $this->resolveUserPadNode($user->getUID(), $path);
+			$path = $this->padFileOperations->normalizeViewerFilePath($file);
+			$node = $this->padFileOperations->resolveUserPadNode($user->getUID(), $path);
 			$result = $this->lifecycleService->handleRestore($node);
 			if (($result['status'] ?? '') === LifecycleService::RESULT_SKIPPED) {
 				return new DataResponse([
@@ -1028,7 +992,7 @@ class PadController extends Controller {
 	/** @return array{status:string,file:string,file_id:int,pad_id:string,access_mode:string} */
 	private function initializePadFrontmatter(string $uid, File $file, string $content): array {
 		$fileId = (int)$file->getId();
-		$path = $this->userNodeResolver->toUserAbsolutePath($uid, $file);
+		$path = $this->padFileOperations->toUserAbsolutePath($uid, $file);
 		try {
 			$parsed = $this->padFileService->parsePadFile($content);
 			$meta = $parsed['frontmatter'];
@@ -1057,73 +1021,6 @@ class PadController extends Controller {
 			'pad_id' => (string)$meta['pad_id'],
 			'access_mode' => (string)$meta['access_mode'],
 		];
-	}
-
-	private function normalizeCreatePath(string $file): string {
-		$path = $this->pathNormalizer->normalizeViewerFilePath($file);
-		if (!str_ends_with(strtolower($path), '.pad')) {
-			$path .= '.pad';
-		}
-		return $path;
-	}
-
-	private function normalizeCreateFileName(string $name): string {
-		$fileName = trim($name);
-		$fileName = preg_replace('/\s+\.pad$/i', '.pad', $fileName) ?? $fileName;
-		if ($fileName === '' || $fileName === '.' || $fileName === '..') {
-			throw new \InvalidArgumentException('Invalid file name.');
-		}
-		if (str_contains($fileName, '/') || str_contains($fileName, '\\')) {
-			throw new \InvalidArgumentException('Invalid file name.');
-		}
-		if (!str_ends_with(strtolower($fileName), '.pad')) {
-			$fileName .= '.pad';
-		}
-		return $fileName;
-	}
-
-	private function rollbackFailedCreate(string $uid, string $path, string $padId, bool $fileCreated): void {
-		try {
-			if ($fileCreated || $this->userNodeExists($uid, $path)) {
-				$this->deleteUserNodeIfExists($uid, $path);
-			}
-		} catch (\Throwable $cleanupError) {
-			$this->logger->warning('Could not cleanup failed .pad file create', [
-				'app' => 'etherpad_nextcloud',
-				'file' => $path,
-				'exception' => $cleanupError,
-			]);
-		}
-
-		if ($padId !== '') {
-			try {
-				$this->etherpadClient->deletePad($padId);
-			} catch (\Throwable $cleanupError) {
-				$this->logger->warning('Could not cleanup failed Etherpad create', [
-					'app' => 'etherpad_nextcloud',
-					'padId' => $padId,
-					'exception' => $cleanupError,
-				]);
-			}
-		}
-	}
-
-	private function rollbackExternalCreate(string $uid, string $path, bool $fileCreated): void {
-		try {
-			if ($fileCreated || $this->userNodeExists($uid, $path)) {
-				$this->deleteUserNodeIfExists($uid, $path);
-			}
-		} catch (\Throwable $cleanupError) {
-			$this->logger->warning('Could not cleanup failed external .pad create', [
-				'app' => 'etherpad_nextcloud',
-				'file' => $path,
-				'exception' => $cleanupError,
-			]);
-		}
-	}
-
-	private function buildExternalBindingPadId(string $origin, string $remotePadId, int $fileId): string {
-		return 'ext.' . substr(hash('sha256', $origin . '|' . $remotePadId . '|' . $fileId), 0, 40);
 	}
 
 	private function buildOpenResponse(
@@ -1182,113 +1079,6 @@ class PadController extends Controller {
 			$response->addHeader('Set-Cookie', $cookieHeader);
 		}
 		return $response;
-	}
-
-	/**
-	 * @throws NotFoundException
-	 */
-	private function resolveUserPadNode(string $uid, string $absolutePath): File {
-		$relativePath = ltrim($absolutePath, '/');
-		if ($relativePath === '') {
-			throw new NotFoundException('Invalid empty file path.');
-		}
-
-		$userFolder = $this->rootFolder->getUserFolder($uid);
-		$node = $userFolder->get($relativePath);
-		if (!$node instanceof File) {
-			throw new NotFoundException('Path does not reference a file.');
-		}
-
-		return $node;
-	}
-
-	/**
-	 * @throws NotFoundException
-	 */
-	private function resolveUserPadNodeById(string $uid, int $fileId): File {
-		return $this->userNodeResolver->resolveUserFileNodeById($uid, $fileId);
-	}
-
-	/**
-	 * @throws NotFoundException
-	 */
-	private function toUserAbsolutePath(string $uid, File $node): string {
-		return $this->userNodeResolver->toUserAbsolutePath($uid, $node);
-	}
-
-	private function userNodeExists(string $uid, string $absolutePath): bool {
-		$relativePath = ltrim($absolutePath, '/');
-		if ($relativePath === '') {
-			return false;
-		}
-		try {
-			$userFolder = $this->rootFolder->getUserFolder($uid);
-			return $userFolder->nodeExists($relativePath);
-		} catch (\Throwable) {
-			return false;
-		}
-	}
-
-	private function deleteUserNodeIfExists(string $uid, string $absolutePath): void {
-		$relativePath = ltrim($absolutePath, '/');
-		if ($relativePath === '') {
-			return;
-		}
-		$userFolder = $this->rootFolder->getUserFolder($uid);
-		if (!$userFolder->nodeExists($relativePath)) {
-			return;
-		}
-		$userFolder->get($relativePath)->delete();
-	}
-
-	/**
-	 * @throws \RuntimeException
-	 */
-	private function createUserFile(string $uid, string $absolutePath): File {
-		$relativePath = ltrim($absolutePath, '/');
-		if ($relativePath === '') {
-			throw new \RuntimeException('Invalid empty create path.');
-		}
-
-		$parentPath = dirname($relativePath);
-		$fileName = basename($relativePath);
-		if ($fileName === '' || $fileName === '.' || $fileName === '..') {
-			throw new \RuntimeException('Invalid target filename.');
-		}
-
-		$userFolder = $this->rootFolder->getUserFolder($uid);
-		try {
-			$parent = $parentPath === '.' ? $userFolder : $userFolder->get($parentPath);
-		} catch (NotFoundException $e) {
-			throw new \RuntimeException('Target parent folder does not exist.', 0, $e);
-		}
-		if (!($parent instanceof \OCP\Files\Folder)) {
-			throw new \RuntimeException('Target parent folder does not exist.');
-		}
-
-		return $this->createUserFileInFolder($parent, $fileName);
-	}
-
-	/**
-	 * @throws \RuntimeException
-	 */
-	private function createUserFileInFolder(Folder $parent, string $fileName): File {
-		try {
-			$node = $parent->newFile($fileName);
-		} catch (\Throwable $e) {
-			if ($parent->nodeExists($fileName)) {
-				throw new \RuntimeException('Target .pad file already exists.', Http::STATUS_CONFLICT, $e);
-			}
-			throw new \RuntimeException('Could not create .pad file.', 0, $e);
-		}
-		if (!$node instanceof File) {
-			throw new \RuntimeException('Could not create .pad file.');
-		}
-		return $node;
-	}
-
-	private function isCreateConflict(\Throwable $e): bool {
-		return $e->getCode() === Http::STATUS_CONFLICT;
 	}
 
 	private function buildFilesViewerUrl(int $fileId, string $absolutePath): string {

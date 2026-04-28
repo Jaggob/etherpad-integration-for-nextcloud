@@ -10,6 +10,7 @@ use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
 use OCA\EtherpadNextcloud\Service\LifecycleService;
 use OCA\EtherpadNextcloud\Service\PadBootstrapService;
+use OCA\EtherpadNextcloud\Service\PadFileOperationService;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadSessionService;
 use OCA\EtherpadNextcloud\Service\UserNodeResolver;
@@ -144,23 +145,23 @@ class PadControllerTest extends TestCase {
 				['etherpad_nextcloud.pad.syncById', ['fileId' => 138], '/sync/138'],
 				['etherpad_nextcloud.pad.syncStatusById', ['fileId' => 138], '/sync-status/138'],
 			]);
+		$logger = $this->createMock(LoggerInterface::class);
+		$padFileOperations = new PadFileOperationService(new PathNormalizer(), $rootFolder, new UserNodeResolver($rootFolder), $etherpadClient, $logger);
 
 		$controller = new PadController(
 			'etherpad_nextcloud',
 			$this->createMock(IRequest::class),
 			$urlGenerator,
 			$userSession,
-			$this->createMock(LoggerInterface::class),
-			new PathNormalizer(),
+			$logger,
 			$padFileService,
+			$padFileOperations,
 			$bindingService,
 			$etherpadClient,
 			$this->createMock(PadSessionService::class),
 			$this->createMock(PadBootstrapService::class),
 			$appConfigService,
 			$this->createMock(LifecycleService::class),
-			$rootFolder,
-			new UserNodeResolver($rootFolder),
 		);
 
 		$response = $controller->openById(138);
@@ -259,23 +260,23 @@ class PadControllerTest extends TestCase {
 				['etherpad_nextcloud.pad.syncById', ['fileId' => 138], '/sync/138'],
 				['etherpad_nextcloud.pad.syncStatusById', ['fileId' => 138], '/sync-status/138'],
 			]);
+		$logger = $this->createMock(LoggerInterface::class);
+		$padFileOperations = new PadFileOperationService(new PathNormalizer(), $rootFolder, new UserNodeResolver($rootFolder), $etherpadClient, $logger);
 
 		$controller = new PadController(
 			'etherpad_nextcloud',
 			$this->createMock(IRequest::class),
 			$urlGenerator,
 			$userSession,
-			$this->createMock(LoggerInterface::class),
-			new PathNormalizer(),
+			$logger,
 			$padFileService,
+			$padFileOperations,
 			$bindingService,
 			$etherpadClient,
 			$this->createMock(PadSessionService::class),
 			$this->createMock(PadBootstrapService::class),
 			$appConfigService,
 			$this->createMock(LifecycleService::class),
-			$rootFolder,
-			new UserNodeResolver($rootFolder),
 		);
 
 		$response = $controller->openById(138);
@@ -568,22 +569,23 @@ class PadControllerTest extends TestCase {
 		?EtherpadClient $etherpadClient = null,
 	): PadController {
 		$resolvedRootFolder = $rootFolder ?? $this->createMock(IRootFolder::class);
+		$resolvedEtherpadClient = $etherpadClient ?? $this->createMock(EtherpadClient::class);
+		$logger = $this->createMock(LoggerInterface::class);
+		$padFileOperations = new PadFileOperationService(new PathNormalizer(), $resolvedRootFolder, new UserNodeResolver($resolvedRootFolder), $resolvedEtherpadClient, $logger);
 		return new PadController(
 			'etherpad_nextcloud',
 			$request,
 			$this->createMock(IURLGenerator::class),
 			$userSession,
-			$this->createMock(LoggerInterface::class),
-			new PathNormalizer(),
+			$logger,
 			$padFileService ?? $this->createMock(PadFileService::class),
+			$padFileOperations,
 			$bindingService ?? $this->createMock(BindingService::class),
-			$etherpadClient ?? $this->createMock(EtherpadClient::class),
+			$resolvedEtherpadClient,
 			$this->createMock(PadSessionService::class),
 			$this->createMock(PadBootstrapService::class),
 			$this->createMock(AppConfigService::class),
 			$this->createMock(LifecycleService::class),
-			$resolvedRootFolder,
-			new UserNodeResolver($resolvedRootFolder),
 		);
 	}
 
