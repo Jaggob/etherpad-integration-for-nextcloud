@@ -54,15 +54,15 @@ class PadControllerErrorMapperTest extends TestCase {
 		$this->assertSame('.pad file already exists.', $response->getData()['message']);
 	}
 
-	public function testRunUsesRuntimeMessageWhenRequested(): void {
+	public function testRunMapsRuntimeExceptionToGenericMessageByDefault(): void {
 		$response = $this->buildMapper()->run(
 			static fn(): array => throw new \RuntimeException('Detailed failure.'),
 			static fn(array $result): DataResponse => new DataResponse($result),
-			['runtime_message_from_exception' => true],
+			['generic' => 'Pad open failed.'],
 		);
 
 		$this->assertSame(Http::STATUS_INTERNAL_SERVER_ERROR, $response->getStatus());
-		$this->assertSame('Detailed failure.', $response->getData()['message']);
+		$this->assertSame('Pad open failed.', $response->getData()['message']);
 	}
 
 	private function buildMapper(?PadCreateRollbackService $rollbackService = null): PadControllerErrorMapper {

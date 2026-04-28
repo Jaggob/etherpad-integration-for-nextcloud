@@ -36,7 +36,6 @@ class PadControllerErrorMapper {
 	 *   binding_status?: int,
 	 *   conflict_message?: string,
 	 *   generic?: string,
-	 *   runtime_message_from_exception?: bool,
 	 *   map_throwable?: callable(\Throwable): ?DataResponse,
 	 *   on_throwable?: callable(\Throwable): void
 	 * } $options
@@ -73,9 +72,6 @@ class PadControllerErrorMapper {
 			}
 			if (isset($options['conflict_message']) && $this->rollbackService->isCreateConflict($e)) {
 				return new DataResponse(['message' => (string)$options['conflict_message']], Http::STATUS_CONFLICT);
-			}
-			if (($options['runtime_message_from_exception'] ?? false) === true) {
-				return new DataResponse(['message' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
 			}
 			return $this->genericResponse($e, $options);
 		} catch (\Throwable $e) {

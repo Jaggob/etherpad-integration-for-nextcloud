@@ -131,7 +131,6 @@ class PadController extends Controller {
 				'invalid_argument' => 'Invalid file path.',
 				'not_found' => 'Cannot open selected .pad file.',
 				'generic' => 'Pad open failed.',
-				'runtime_message_from_exception' => true,
 			],
 		);
 	}
@@ -153,7 +152,6 @@ class PadController extends Controller {
 			[
 				'not_found' => 'Cannot open selected .pad file.',
 				'generic' => 'Pad open failed.',
-				'runtime_message_from_exception' => true,
 			],
 		);
 	}
@@ -227,7 +225,6 @@ class PadController extends Controller {
 			[
 				'not_found' => 'Cannot resolve selected .pad file.',
 				'generic' => 'Pad meta failed.',
-				'runtime_message_from_exception' => true,
 			],
 		);
 	}
