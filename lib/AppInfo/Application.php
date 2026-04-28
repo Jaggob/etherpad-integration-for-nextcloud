@@ -67,6 +67,14 @@ class Application extends App implements IBootstrap {
 			'OCA\\Files_Trashbin\\Events\\NodeRestoredEvent',
 			\OCA\EtherpadNextcloud\Listeners\RestoreFromTrashListener::class,
 		);
+
+		// Groupfolders still emits this legacy trashbin restore hook instead of NodeRestoredEvent.
+		\OCP\Util::connectHook(
+			'\OCA\Files_Trashbin\Trashbin',
+			'post_restore',
+			\OCA\EtherpadNextcloud\Hooks\TrashbinHookHandler::class,
+			'postRestore',
+		);
 	}
 
 	public function boot(IBootContext $context): void {
