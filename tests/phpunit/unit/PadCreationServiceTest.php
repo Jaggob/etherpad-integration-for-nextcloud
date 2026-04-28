@@ -1,0 +1,175 @@
+<?php
+
+declare(strict_types=1);
+
+namespace OCA\EtherpadNextcloud\Tests\Unit;
+
+use OCA\EtherpadNextcloud\Exception\BindingException;
+use OCA\EtherpadNextcloud\Service\BindingService;
+use OCA\EtherpadNextcloud\Service\EtherpadClient;
+use OCA\EtherpadNextcloud\Service\PadBootstrapService;
+use OCA\EtherpadNextcloud\Service\PadCreationService;
+use OCA\EtherpadNextcloud\Service\PadFileOperationService;
+use OCA\EtherpadNextcloud\Service\PadFileService;
+use OCP\AppFramework\Http;
+use OCP\Files\File;
+use OCP\Files\Folder;
+use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
+
+class PadCreationServiceTest extends TestCase {
+	public function testCreateBuildsPadFileAndBinding(): void {
+		$fileNode = $this->createMock(File::class);
+		$fileNode->method('getId')->willReturn(123);
+		$fileNode->expects($this->once())->method('putContent')->with('frontmatter');
+
+		$fileOperations = $this->createMock(PadFileOperationService::class);
+		$fileOperations->method('normalizeCreatePath')->with('/Test')->willReturn('/Test.pad');
+		$fileOperations->method('createUserFile')->with('alice', '/Test.pad')->willReturn($fileNode);
+
+		$bootstrap = $this->createMock(PadBootstrapService::class);
+		$bootstrap->method('provisionPadId')->with(BindingService::ACCESS_PROTECTED)->willReturn('g.ABC$pad');
+
+		$etherpadClient = $this->createMock(EtherpadClient::class);
+		$etherpadClient->method('buildPadUrl')->with('g.ABC$pad')->willReturn('https://pad.example.test/p/g.ABC$pad');
+
+		$padFileService = $this->createMock(PadFileService::class);
+		$padFileService->expects($this->once())
+			->method('buildInitialDocument')
+			->with(123, 'g.ABC$pad', BindingService::ACCESS_PROTECTED, '', 'https://pad.example.test/p/g.ABC$pad')
+			->willReturn('frontmatter');
+
+		$bindingService = $this->createMock(BindingService::class);
+		$bindingService->expects($this->once())
+			->method('createBinding')
+			->with(123, 'g.ABC$pad', BindingService::ACCESS_PROTECTED);
+
+		$result = $this->buildService($padFileService, $fileOperations, $bindingService, $etherpadClient, $bootstrap)
+			->create('alice', '/Test', BindingService::ACCESS_PROTECTED);
+
+		$this->assertSame([
+			'file' => '/Test.pad',
+			'file_id' => 123,
+			'pad_id' => 'g.ABC$pad',
+			'access_mode' => BindingService::ACCESS_PROTECTED,
+			'pad_url' => 'https://pad.example.test/p/g.ABC$pad',
+		], $result);
+	}
+
+	public function testCreateRollsBackWhenBindingFails(): void {
+		$fileNode = $this->createMock(File::class);
+		$fileNode->method('getId')->willReturn(123);
+
+		$fileOperations = $this->createMock(PadFileOperationService::class);
+		$fileOperations->method('normalizeCreatePath')->with('/Test')->willReturn('/Test.pad');
+		$fileOperations->method('createUserFile')->with('alice', '/Test.pad')->willReturn($fileNode);
+		$fileOperations->expects($this->once())
+			->method('rollbackFailedCreate')
+			->with('alice', '/Test.pad', 'g.ABC$pad', true);
+
+		$bootstrap = $this->createMock(PadBootstrapService::class);
+		$bootstrap->method('provisionPadId')->willReturn('g.ABC$pad');
+
+		$etherpadClient = $this->createMock(EtherpadClient::class);
+		$etherpadClient->method('buildPadUrl')->willReturn('https://pad.example.test/p/g.ABC$pad');
+
+		$padFileService = $this->createMock(PadFileService::class);
+		$padFileService->method('buildInitialDocument')->willReturn('frontmatter');
+
+		$bindingService = $this->createMock(BindingService::class);
+		$bindingService->method('createBinding')->willThrowException(new BindingException('Duplicate binding.'));
+
+		$this->expectException(BindingException::class);
+
+		$this->buildService($padFileService, $fileOperations, $bindingService, $etherpadClient, $bootstrap)
+			->create('alice', '/Test', BindingService::ACCESS_PROTECTED);
+	}
+
+	public function testCreateInParentRejectsNonCreatableFolder(): void {
+		$parent = $this->createMock(Folder::class);
+		$parent->method('isCreatable')->willReturn(false);
+
+		$fileOperations = $this->createMock(PadFileOperationService::class);
+		$fileOperations->method('normalizeCreateFileName')->with('Test')->willReturn('Test.pad');
+		$fileOperations->method('resolveUserFolderNodeById')->with('alice', 99)->willReturn($parent);
+
+		$this->expectException(\RuntimeException::class);
+		$this->expectExceptionCode(Http::STATUS_FORBIDDEN);
+
+		$this->buildService(fileOperations: $fileOperations)
+			->createInParent('alice', 99, 'Test', BindingService::ACCESS_PUBLIC);
+	}
+
+	public function testCreateFromUrlBuildsExternalBinding(): void {
+		$fileNode = $this->createMock(File::class);
+		$fileNode->method('getId')->willReturn(321);
+		$fileNode->expects($this->once())->method('putContent')->with('external-frontmatter');
+
+		$fileOperations = $this->createMock(PadFileOperationService::class);
+		$fileOperations->method('normalizeCreatePath')->with('/External')->willReturn('/External.pad');
+		$fileOperations->method('createUserFile')->with('alice', '/External.pad')->willReturn($fileNode);
+		$fileOperations->method('buildExternalBindingPadId')->with('https://pad.remote.test', 'RemotePad', 321)->willReturn('ext.hash');
+
+		$etherpadClient = $this->createMock(EtherpadClient::class);
+		$etherpadClient->method('normalizeAndValidateExternalPublicPadUrl')
+			->with('https://pad.remote.test/p/RemotePad')
+			->willReturn([
+				'pad_url' => 'https://pad.remote.test/p/RemotePad',
+				'origin' => 'https://pad.remote.test',
+				'pad_id' => 'RemotePad',
+			]);
+		$etherpadClient->expects($this->once())
+			->method('getPublicTextFromPadUrl')
+			->with('https://pad.remote.test/p/RemotePad')
+			->willReturn('Remote text');
+
+		$padFileService = $this->createMock(PadFileService::class);
+		$padFileService->expects($this->once())
+			->method('buildInitialDocument')
+			->with(
+				321,
+				'ext.hash',
+				BindingService::ACCESS_PUBLIC,
+				'',
+				'https://pad.remote.test/p/RemotePad',
+				[
+					'pad_origin' => 'https://pad.remote.test',
+					'remote_pad_id' => 'RemotePad',
+				]
+			)
+			->willReturn('external-frontmatter');
+
+		$bindingService = $this->createMock(BindingService::class);
+		$bindingService->expects($this->once())
+			->method('createBinding')
+			->with(321, 'ext.hash', BindingService::ACCESS_PUBLIC);
+
+		$result = $this->buildService($padFileService, $fileOperations, $bindingService, $etherpadClient)
+			->createFromUrl('alice', '/External', 'https://pad.remote.test/p/RemotePad');
+
+		$this->assertSame([
+			'file' => '/External.pad',
+			'file_id' => 321,
+			'pad_id' => 'ext.hash',
+			'access_mode' => BindingService::ACCESS_PUBLIC,
+			'pad_url' => 'https://pad.remote.test/p/RemotePad',
+		], $result);
+	}
+
+	private function buildService(
+		?PadFileService $padFileService = null,
+		?PadFileOperationService $fileOperations = null,
+		?BindingService $bindingService = null,
+		?EtherpadClient $etherpadClient = null,
+		?PadBootstrapService $bootstrap = null,
+	): PadCreationService {
+		return new PadCreationService(
+			$padFileService ?? $this->createMock(PadFileService::class),
+			$fileOperations ?? $this->createMock(PadFileOperationService::class),
+			$bindingService ?? $this->createMock(BindingService::class),
+			$etherpadClient ?? $this->createMock(EtherpadClient::class),
+			$bootstrap ?? $this->createMock(PadBootstrapService::class),
+			$this->createMock(LoggerInterface::class),
+		);
+	}
+}

@@ -9,9 +9,10 @@ use OCA\EtherpadNextcloud\Service\AppConfigService;
 use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
 use OCA\EtherpadNextcloud\Service\LifecycleService;
-use OCA\EtherpadNextcloud\Service\PadBootstrapService;
+use OCA\EtherpadNextcloud\Service\PadCreationService;
 use OCA\EtherpadNextcloud\Service\PadFileOperationService;
 use OCA\EtherpadNextcloud\Service\PadFileService;
+use OCA\EtherpadNextcloud\Service\PadInitializationService;
 use OCA\EtherpadNextcloud\Service\PadSessionService;
 use OCA\EtherpadNextcloud\Service\UserNodeResolver;
 use OCA\EtherpadNextcloud\Util\PathNormalizer;
@@ -156,10 +157,11 @@ class PadControllerTest extends TestCase {
 			$logger,
 			$padFileService,
 			$padFileOperations,
+			$this->createMock(PadCreationService::class),
+			$this->createMock(PadInitializationService::class),
 			$bindingService,
 			$etherpadClient,
 			$this->createMock(PadSessionService::class),
-			$this->createMock(PadBootstrapService::class),
 			$appConfigService,
 			$this->createMock(LifecycleService::class),
 		);
@@ -271,10 +273,11 @@ class PadControllerTest extends TestCase {
 			$logger,
 			$padFileService,
 			$padFileOperations,
+			$this->createMock(PadCreationService::class),
+			$this->createMock(PadInitializationService::class),
 			$bindingService,
 			$etherpadClient,
 			$this->createMock(PadSessionService::class),
-			$this->createMock(PadBootstrapService::class),
 			$appConfigService,
 			$this->createMock(LifecycleService::class),
 		);
@@ -580,10 +583,11 @@ class PadControllerTest extends TestCase {
 			$logger,
 			$padFileService ?? $this->createMock(PadFileService::class),
 			$padFileOperations,
+			$this->createMock(PadCreationService::class),
+			$this->createMock(PadInitializationService::class),
 			$bindingService ?? $this->createMock(BindingService::class),
 			$resolvedEtherpadClient,
 			$this->createMock(PadSessionService::class),
-			$this->createMock(PadBootstrapService::class),
 			$this->createMock(AppConfigService::class),
 			$this->createMock(LifecycleService::class),
 		);
