@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\EtherpadNextcloud\Tests\Unit;
 
 use OCA\EtherpadNextcloud\Exception\BindingException;
+use OCA\EtherpadNextcloud\Exception\PadParentFolderNotWritableException;
 use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
 use OCA\EtherpadNextcloud\Service\PadBootstrapService;
@@ -14,7 +15,6 @@ use OCA\EtherpadNextcloud\Service\PadFileCreator;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadPathService;
 use OCA\EtherpadNextcloud\Service\UserNodeResolver;
-use OCP\AppFramework\Http;
 use OCP\Files\File;
 use OCP\Files\Folder;
 use PHPUnit\Framework\TestCase;
@@ -100,8 +100,7 @@ class PadCreationServiceTest extends TestCase {
 		$userNodeResolver = $this->createMock(UserNodeResolver::class);
 		$userNodeResolver->method('resolveUserFolderNodeById')->with('alice', 99)->willReturn($parent);
 
-		$this->expectException(\RuntimeException::class);
-		$this->expectExceptionCode(Http::STATUS_FORBIDDEN);
+		$this->expectException(PadParentFolderNotWritableException::class);
 
 		$this->buildService(padPaths: $padPaths, userNodeResolver: $userNodeResolver)
 			->createInParent('alice', 99, 'Test', BindingService::ACCESS_PUBLIC);

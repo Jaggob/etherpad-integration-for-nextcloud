@@ -11,7 +11,8 @@ namespace OCA\EtherpadNextcloud\Service;
 
 use OCA\EtherpadNextcloud\Exception\BindingException;
 use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
-use OCP\AppFramework\Http;
+use OCA\EtherpadNextcloud\Exception\PadFileAlreadyExistsException;
+use OCA\EtherpadNextcloud\Exception\PadParentFolderNotWritableException;
 use Psr\Log\LoggerInterface;
 
 class PadCreationService {
@@ -75,7 +76,7 @@ class PadCreationService {
 			$this->rollbackService->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
 			throw $e;
 		} catch (\Throwable $e) {
-			if (!$this->rollbackService->isCreateConflict($e)) {
+			if (!($e instanceof PadFileAlreadyExistsException)) {
 				$this->logger->error('Pad creation failed', [
 					'app' => 'etherpad_nextcloud',
 					'file' => $path,
@@ -96,7 +97,7 @@ class PadCreationService {
 		$fileName = $this->padPaths->normalizeCreateFileName($name);
 		$parentFolder = $this->userNodeResolver->resolveUserFolderNodeById($uid, $parentFolderId);
 		if (!$parentFolder->isCreatable()) {
-			throw new \RuntimeException('Selected parent folder is not writable.', Http::STATUS_FORBIDDEN);
+			throw new PadParentFolderNotWritableException('Selected parent folder is not writable.');
 		}
 
 		$padId = '';
@@ -145,7 +146,7 @@ class PadCreationService {
 			$this->rollbackService->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
 			throw $e;
 		} catch (\Throwable $e) {
-			if (!$this->rollbackService->isCreateConflict($e)) {
+			if (!($e instanceof PadFileAlreadyExistsException)) {
 				$this->logger->error('Pad creation by parent failed', [
 					'app' => 'etherpad_nextcloud',
 					'parentFolderId' => $parentFolderId,
@@ -222,7 +223,7 @@ class PadCreationService {
 			$this->rollbackService->rollbackExternalCreate($uid, $path, $fileCreated);
 			throw $e;
 		} catch (\Throwable $e) {
-			if (!$this->rollbackService->isCreateConflict($e)) {
+			if (!($e instanceof PadFileAlreadyExistsException)) {
 				$this->logger->error('External pad create failed', [
 					'app' => 'etherpad_nextcloud',
 					'file' => $path,

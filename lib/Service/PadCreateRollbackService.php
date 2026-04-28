@@ -9,7 +9,6 @@ declare(strict_types=1);
 
 namespace OCA\EtherpadNextcloud\Service;
 
-use OCP\AppFramework\Http;
 use OCP\Files\IRootFolder;
 use Psr\Log\LoggerInterface;
 
@@ -28,7 +27,7 @@ class PadCreateRollbackService {
 
 	public function rollbackFailedCreate(string $uid, string $path, string $padId, bool $fileCreated): void {
 		try {
-			if ($fileCreated || $this->userNodeExists($uid, $path)) {
+			if ($fileCreated) {
 				$this->deleteUserNodeIfExists($uid, $path);
 			}
 		} catch (\Throwable $cleanupError) {
@@ -54,7 +53,7 @@ class PadCreateRollbackService {
 
 	public function rollbackExternalCreate(string $uid, string $path, bool $fileCreated): void {
 		try {
-			if ($fileCreated || $this->userNodeExists($uid, $path)) {
+			if ($fileCreated) {
 				$this->deleteUserNodeIfExists($uid, $path);
 			}
 		} catch (\Throwable $cleanupError) {
@@ -74,27 +73,6 @@ class PadCreateRollbackService {
 		 * retaining a SHA-1-length identifier space for this namespace.
 		 */
 		return 'ext.' . substr(hash('sha256', $origin . '|' . $remotePadId . '|' . $fileId), 0, 40);
-	}
-
-	public function isCreateConflict(\Throwable $e): bool {
-		/*
-		 * 409s come from concurrent file creates and are handled as expected
-		 * conflicts by callers instead of being logged as real create failures.
-		 */
-		return $e->getCode() === Http::STATUS_CONFLICT;
-	}
-
-	private function userNodeExists(string $uid, string $absolutePath): bool {
-		$relativePath = ltrim($absolutePath, '/');
-		if ($relativePath === '') {
-			return false;
-		}
-		try {
-			$userFolder = $this->rootFolder->getUserFolder($uid);
-			return $userFolder->nodeExists($relativePath);
-		} catch (\Throwable) {
-			return false;
-		}
 	}
 
 	private function deleteUserNodeIfExists(string $uid, string $absolutePath): void {

@@ -11,13 +11,15 @@ namespace OCA\EtherpadNextcloud\Controller;
 
 use OCA\EtherpadNextcloud\Exception\BindingException;
 use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
+use OCA\EtherpadNextcloud\Exception\PadFileAlreadyExistsException;
 use OCA\EtherpadNextcloud\Exception\PadFileFormatException;
-use OCA\EtherpadNextcloud\Service\PadCreateRollbackService;
+use OCA\EtherpadNextcloud\Exception\PadParentFolderNotWritableException;
 use OCA\EtherpadNextcloud\Service\PadResponseService;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\Files\NotFoundException;
 use OCP\Lock\LockedException;
+use Psr\Log\LoggerInterface;
 
 /**
  * Centralizes mapping domain and framework exceptions to HTTP DataResponses.
@@ -26,8 +28,8 @@ use OCP\Lock\LockedException;
  */
 class PadControllerErrorMapper {
 	public function __construct(
-		private PadCreateRollbackService $rollbackService,
 		private PadResponseService $padResponses,
+		private LoggerInterface $logger,
 	) {
 	}
 
@@ -39,7 +41,6 @@ class PadControllerErrorMapper {
 	 *   not_found?: string,
 	 *   binding_message?: string,
 	 *   binding_status?: int,
-	 *   conflict_message?: string,
 	 *   generic?: string,
 	 *   map_throwable?: callable(\Throwable): ?DataResponse,
 	 *   on_throwable?: callable(\Throwable): void
@@ -69,6 +70,14 @@ class PadControllerErrorMapper {
 				'message' => 'Pad file is temporarily locked. Please retry.',
 				'retryable' => true,
 			], Http::STATUS_SERVICE_UNAVAILABLE);
+		} catch (PadFileAlreadyExistsException) {
+			return new DataResponse([
+				'message' => '.pad file already exists.',
+			], Http::STATUS_CONFLICT);
+		} catch (PadParentFolderNotWritableException) {
+			return new DataResponse([
+				'message' => 'Selected parent folder is not writable.',
+			], Http::STATUS_FORBIDDEN);
 		} catch (BindingException $e) {
 			$message = isset($options['binding_message'])
 				? (string)$options['binding_message']
@@ -83,17 +92,11 @@ class PadControllerErrorMapper {
 			if ($mapped instanceof DataResponse) {
 				return $mapped;
 			}
-			if (isset($options['conflict_message']) && $this->rollbackService->isCreateConflict($e)) {
-				return new DataResponse(['message' => (string)$options['conflict_message']], Http::STATUS_CONFLICT);
-			}
 			return $this->genericResponse($e, $options);
 		} catch (\Throwable $e) {
 			$mapped = $this->mapThrowable($e, $options);
 			if ($mapped instanceof DataResponse) {
 				return $mapped;
-			}
-			if (isset($options['conflict_message']) && $this->rollbackService->isCreateConflict($e)) {
-				return new DataResponse(['message' => (string)$options['conflict_message']], Http::STATUS_CONFLICT);
 			}
 			return $this->genericResponse($e, $options);
 		}
@@ -116,6 +119,11 @@ class PadControllerErrorMapper {
 		$logger = $options['on_throwable'] ?? null;
 		if (is_callable($logger)) {
 			$logger($e);
+		} else {
+			$this->logger->error('Unhandled pad controller error', [
+				'app' => 'etherpad_nextcloud',
+				'exception' => $e,
+			]);
 		}
 		return new DataResponse([
 			'message' => (string)($options['generic'] ?? 'Request failed.'),

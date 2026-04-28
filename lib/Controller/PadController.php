@@ -60,7 +60,6 @@ class PadController extends Controller {
 				'invalid_argument' => 'Invalid file path.',
 				'binding_message' => '.pad file already exists.',
 				'binding_status' => Http::STATUS_CONFLICT,
-				'conflict_message' => '.pad file already exists.',
 				'generic' => 'Pad creation failed.',
 			],
 		);
@@ -88,11 +87,7 @@ class PadController extends Controller {
 				'not_found' => 'Cannot resolve selected parent folder.',
 				'binding_message' => '.pad file already exists.',
 				'binding_status' => Http::STATUS_CONFLICT,
-				'conflict_message' => '.pad file already exists.',
 				'generic' => 'Pad creation failed.',
-				'map_throwable' => static fn(\Throwable $e): ?DataResponse => $e->getCode() === Http::STATUS_FORBIDDEN
-					? new DataResponse(['message' => 'Selected parent folder is not writable.'], Http::STATUS_FORBIDDEN)
-					: null,
 			],
 		);
 	}
@@ -111,7 +106,6 @@ class PadController extends Controller {
 				'invalid_argument' => 'Invalid input.',
 				'binding_message' => 'Could not create external pad binding.',
 				'binding_status' => Http::STATUS_CONFLICT,
-				'conflict_message' => '.pad file already exists.',
 				'generic' => 'External pad create failed.',
 			],
 		);

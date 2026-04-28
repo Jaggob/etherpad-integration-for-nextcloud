@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\EtherpadNextcloud\Service;
 
-use OCP\AppFramework\Http;
+use OCA\EtherpadNextcloud\Exception\PadFileAlreadyExistsException;
 use OCP\Files\File;
 use OCP\Files\Folder;
 use OCP\Files\IRootFolder;
@@ -57,7 +57,7 @@ class PadFileCreator {
 			$node = $parent->newFile($fileName);
 		} catch (\Throwable $e) {
 			if ($parent->nodeExists($fileName)) {
-				throw new \RuntimeException('Target .pad file already exists.', Http::STATUS_CONFLICT, $e);
+				throw new PadFileAlreadyExistsException('Target .pad file already exists.', 0, $e);
 			}
 			throw new \RuntimeException('Could not create .pad file.', 0, $e);
 		}

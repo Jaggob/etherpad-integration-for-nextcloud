@@ -10,7 +10,6 @@ use OCA\EtherpadNextcloud\Service\AppConfigService;
 use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
 use OCA\EtherpadNextcloud\Service\LifecycleService;
-use OCA\EtherpadNextcloud\Service\PadCreateRollbackService;
 use OCA\EtherpadNextcloud\Service\PadCreationService;
 use OCA\EtherpadNextcloud\Service\PadFileLockRetryService;
 use OCA\EtherpadNextcloud\Service\PadFileService;
@@ -168,7 +167,6 @@ class PadControllerTest extends TestCase {
 			$this->createMock(PadSessionService::class),
 			$logger,
 		);
-		$rollbackService = new PadCreateRollbackService($rootFolder, $etherpadClient, $logger);
 		$padResponseService = new PadResponseService($urlGenerator, $appConfigService);
 
 		$controller = new PadController(
@@ -183,7 +181,7 @@ class PadControllerTest extends TestCase {
 			$this->createMock(PadSyncService::class),
 			$this->createMock(PadLifecycleOperationService::class),
 			$padResponseService,
-			new PadControllerErrorMapper($rollbackService, $padResponseService),
+			new PadControllerErrorMapper($padResponseService, $logger),
 		);
 
 		$response = $controller->openById(138);
@@ -296,7 +294,6 @@ class PadControllerTest extends TestCase {
 			$this->createMock(PadSessionService::class),
 			$logger,
 		);
-		$rollbackService = new PadCreateRollbackService($rootFolder, $etherpadClient, $logger);
 		$padResponseService = new PadResponseService($urlGenerator, $appConfigService);
 
 		$controller = new PadController(
@@ -311,7 +308,7 @@ class PadControllerTest extends TestCase {
 			$this->createMock(PadSyncService::class),
 			$this->createMock(PadLifecycleOperationService::class),
 			$padResponseService,
-			new PadControllerErrorMapper($rollbackService, $padResponseService),
+			new PadControllerErrorMapper($padResponseService, $logger),
 		);
 
 		$response = $controller->openById(138);
@@ -628,7 +625,6 @@ class PadControllerTest extends TestCase {
 		$padPaths = new PadPathService(new PathNormalizer());
 		$userNodeResolver = new UserNodeResolver($resolvedRootFolder);
 		$lockRetryService = new PadFileLockRetryService();
-		$rollbackService = new PadCreateRollbackService($resolvedRootFolder, $resolvedEtherpadClient, $logger);
 		$padMetadataService = new PadMetadataService($resolvedPadFileService, $padPaths, $userNodeResolver, $lockRetryService, $resolvedEtherpadClient, $logger);
 		$padOpenService = new PadOpenService(
 			$resolvedPadFileService,
@@ -657,7 +653,7 @@ class PadControllerTest extends TestCase {
 			$padSyncService,
 			$padLifecycleOperations,
 			$padResponseService,
-			new PadControllerErrorMapper($rollbackService, $padResponseService),
+			new PadControllerErrorMapper($padResponseService, $logger),
 		);
 	}
 
