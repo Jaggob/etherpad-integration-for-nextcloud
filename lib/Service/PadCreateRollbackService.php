@@ -13,6 +13,11 @@ use OCP\AppFramework\Http;
 use OCP\Files\IRootFolder;
 use Psr\Log\LoggerInterface;
 
+/**
+ * Cleans up Nextcloud files and Etherpad pads after partially failed creates.
+ * Cleanup steps are isolated and best-effort so cleanup errors do not mask
+ * the original create failure.
+ */
 class PadCreateRollbackService {
 	public function __construct(
 		private IRootFolder $rootFolder,
@@ -62,10 +67,16 @@ class PadCreateRollbackService {
 	}
 
 	public function buildExternalBindingPadId(string $origin, string $remotePadId, int $fileId): string {
+		// ext. separates external bindings from managed Etherpad IDs. fileId is
+		// part of the hash so the same external pad can be linked by multiple
+		// .pad files without colliding. 40 hex chars keeps the ID compact while
+		// retaining a SHA-1-length identifier space for this namespace.
 		return 'ext.' . substr(hash('sha256', $origin . '|' . $remotePadId . '|' . $fileId), 0, 40);
 	}
 
 	public function isCreateConflict(\Throwable $e): bool {
+		// 409s come from concurrent file creates and are handled as expected
+		// conflicts by callers instead of being logged as real create failures.
 		return $e->getCode() === Http::STATUS_CONFLICT;
 	}
 

@@ -19,6 +19,11 @@ use OCP\AppFramework\Http\DataResponse;
 use OCP\Files\NotFoundException;
 use OCP\Lock\LockedException;
 
+/**
+ * Centralizes mapping domain and framework exceptions to HTTP DataResponses.
+ * Endpoints only provide wording per category; RuntimeException messages are
+ * intentionally not exposed to clients to avoid leaking internal details.
+ */
 class PadControllerErrorMapper {
 	public function __construct(
 		private PadCreateRollbackService $rollbackService,

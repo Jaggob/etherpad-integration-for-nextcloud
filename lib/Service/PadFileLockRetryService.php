@@ -12,7 +12,14 @@ namespace OCA\EtherpadNextcloud\Service;
 use OCP\Files\File;
 use OCP\Lock\LockedException;
 
+/**
+ * Retry wrapper for transient Nextcloud file locks. Open and sync paths can
+ * hit concurrent locks; instead of failing immediately, callers retry with a
+ * short empirical backoff.
+ */
 class PadFileLockRetryService {
+	// Exponential backoff in microseconds. Sync waits slightly longer because
+	// putContent usually holds the file lock longer than getContent.
 	private const OPEN_LOCK_RETRY_DELAYS_US = [100000, 200000, 400000];
 	private const SYNC_LOCK_RETRY_DELAYS_US = [150000, 300000, 600000];
 
