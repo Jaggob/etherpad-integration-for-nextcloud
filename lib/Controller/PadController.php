@@ -20,6 +20,7 @@ use OCA\EtherpadNextcloud\Service\PadCreationService;
 use OCA\EtherpadNextcloud\Service\PadFileOperationService;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadInitializationService;
+use OCA\EtherpadNextcloud\Service\PadMetadataService;
 use OCA\EtherpadNextcloud\Service\PadSessionService;
 use OCA\EtherpadNextcloud\Service\PadSyncService;
 use OCP\AppFramework\Controller;
@@ -44,6 +45,7 @@ class PadController extends Controller {
 		private PadFileOperationService $padFileOperations,
 		private PadCreationService $padCreationService,
 		private PadInitializationService $padInitializationService,
+		private PadMetadataService $padMetadataService,
 		private PadSyncService $padSyncService,
 		private BindingService $bindingService,
 		private EtherpadClient $etherpadClient,
@@ -343,15 +345,27 @@ class PadController extends Controller {
 			return new DataResponse(['message' => 'Invalid file ID.'], Http::STATUS_BAD_REQUEST);
 		}
 
-		$uid = $user->getUID();
 		try {
-			$node = $this->padFileOperations->resolveUserPadNodeById($uid, $fileId);
-			$absolutePath = $this->padFileOperations->toUserAbsolutePath($uid, $node);
+			$data = $this->padMetadataService->metaById($user->getUID(), $fileId);
 		} catch (NotFoundException) {
 			return new DataResponse(['message' => 'Cannot resolve selected .pad file.'], Http::STATUS_NOT_FOUND);
+		} catch (LockedException) {
+			return new DataResponse([
+				'message' => 'Pad file is temporarily locked. Please retry.',
+				'retryable' => true,
+			], Http::STATUS_SERVICE_UNAVAILABLE);
+		} catch (\RuntimeException $e) {
+			return new DataResponse(['message' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 
-		return $this->buildMetaResponse($node, $absolutePath);
+		if (($data['is_pad'] ?? false) === true) {
+			$fileId = (int)$data['file_id'];
+			$path = (string)$data['path'];
+			$data['viewer_url'] = $this->buildFilesViewerUrl($fileId, $path);
+			$data['embed_url'] = $this->buildEmbedUrl($fileId);
+		}
+
+		return new DataResponse($data);
 	}
 
 	private function toUserFacingBindingErrorMessage(BindingException $e): string {
@@ -360,77 +374,6 @@ class PadController extends Controller {
 			return 'This .pad file is not linked to a managed pad. It looks like a copied .pad file. Open the original .pad file or create a new pad.';
 		}
 		return $message;
-	}
-
-	private function buildMetaResponse(File $node, string $absolutePath): DataResponse {
-		$fileId = (int)$node->getId();
-		if ($fileId <= 0) {
-			return new DataResponse(['message' => 'Could not resolve file ID.'], Http::STATUS_INTERNAL_SERVER_ERROR);
-		}
-
-		$isPad = str_ends_with(strtolower($absolutePath), '.pad');
-		if (!$isPad) {
-			return new DataResponse([
-				'is_pad' => false,
-				'file_id' => $fileId,
-				'name' => $node->getName(),
-				'path' => $absolutePath,
-			]);
-		}
-
-		$isPadMime = (string)$node->getMimeType() === 'application/x-etherpad-nextcloud';
-		$accessMode = '';
-		$isExternal = false;
-		$publicOpenUrl = '';
-		$padUrl = '';
-		$padId = '';
-		try {
-			$parsed = $this->padFileService->parsePadFile($this->padFileOperations->readContentWithOpenLockRetry($node));
-			$frontmatter = $parsed['frontmatter'];
-			$meta = $this->padFileService->extractPadMetadata($frontmatter);
-			$padId = $meta['pad_id'];
-			$accessMode = $meta['access_mode'];
-			$padUrl = $meta['pad_url'];
-			$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
-
-			if ($accessMode === BindingService::ACCESS_PUBLIC) {
-				if ($isExternal && $padUrl !== '') {
-					$normalized = $this->etherpadClient->normalizeAndValidateExternalPublicPadUrl($padUrl);
-					$publicOpenUrl = (string)$normalized['pad_url'];
-					$padUrl = $publicOpenUrl;
-				} elseif ($padId !== '') {
-					$publicOpenUrl = $this->etherpadClient->buildPadUrl($padId);
-					$padUrl = $publicOpenUrl;
-				}
-			}
-		} catch (LockedException) {
-			return new DataResponse([
-				'message' => 'Pad file is temporarily locked. Please retry.',
-				'retryable' => true,
-			], Http::STATUS_SERVICE_UNAVAILABLE);
-		} catch (\Throwable $e) {
-			$this->logger->debug('Pad meta parse skipped', [
-				'app' => 'etherpad_nextcloud',
-				'fileId' => $fileId,
-				'path' => $absolutePath,
-				'exception' => $e,
-			]);
-		}
-
-		return new DataResponse([
-			'is_pad' => true,
-			'is_pad_mime' => $isPadMime,
-			'file_id' => $fileId,
-			'name' => $node->getName(),
-			'path' => $absolutePath,
-			'access_mode' => $accessMode,
-			'is_external' => $isExternal,
-			'pad_id' => $padId,
-			'pad_url' => $padUrl,
-			'public_open_url' => $publicOpenUrl,
-			'viewer_url' => $this->buildFilesViewerUrl($fileId, $absolutePath),
-			'embed_url' => $this->buildEmbedUrl($fileId),
-		]);
 	}
 
 	/**
@@ -444,86 +387,17 @@ class PadController extends Controller {
 			return new DataResponse(['message' => 'Authentication required.'], Http::STATUS_UNAUTHORIZED);
 		}
 
-		$uid = $user->getUID();
-		$resolvedFileId = $fileId;
-		$normalizedPath = '';
-		$mime = '';
-		if ($resolvedFileId > 0) {
-			try {
-				$node = $this->padFileOperations->resolveUserPadNodeById($uid, $resolvedFileId);
-				$normalizedPath = $this->padFileOperations->toUserAbsolutePath($uid, $node);
-				$mime = (string)$node->getMimeType();
-			} catch (NotFoundException) {
-				return new DataResponse(['is_pad' => false, 'file_id' => $resolvedFileId]);
-			}
-		} else {
-			try {
-				$requestedPath = $this->padFileOperations->normalizeViewerFilePath($file);
-			} catch (\Throwable) {
-				return new DataResponse(['message' => 'Invalid file path.'], Http::STATUS_BAD_REQUEST);
-			}
-			if ($requestedPath === '') {
-				return new DataResponse(['message' => 'Invalid file path.'], Http::STATUS_BAD_REQUEST);
-			}
-
-			try {
-				$node = $this->padFileOperations->resolveUserPadNode($uid, $requestedPath);
-			} catch (NotFoundException) {
-				return new DataResponse(['is_pad' => false, 'path' => $requestedPath]);
-			}
-			$resolvedFileId = (int)$node->getId();
-			if ($resolvedFileId <= 0) {
-				return new DataResponse(['is_pad' => false, 'path' => $requestedPath]);
-			}
-			$normalizedPath = $this->padFileOperations->toUserAbsolutePath($uid, $node);
-			$mime = (string)$node->getMimeType();
-		}
-
-		$isPad = str_ends_with(strtolower($normalizedPath), '.pad');
-		if (!$isPad) {
-			return new DataResponse(['is_pad' => false, 'file_id' => $resolvedFileId, 'path' => $normalizedPath]);
-		}
-
-		$isPadMime = $mime === 'application/x-etherpad-nextcloud';
-		$accessMode = '';
-		$isExternal = false;
-		$publicOpenUrl = '';
 		try {
-				$parsed = $this->padFileService->parsePadFile((string)$node->getContent());
-				$frontmatter = $parsed['frontmatter'];
-				$meta = $this->padFileService->extractPadMetadata($frontmatter);
-				$padId = $meta['pad_id'];
-				$accessMode = $meta['access_mode'];
-				$padUrl = $meta['pad_url'];
-				$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
-
-			if ($accessMode === BindingService::ACCESS_PUBLIC) {
-				if ($isExternal && $padUrl !== '') {
-					$normalized = $this->etherpadClient->normalizeAndValidateExternalPublicPadUrl($padUrl);
-					$publicOpenUrl = (string)$normalized['pad_url'];
-				} elseif ($padId !== '') {
-					$publicOpenUrl = $this->etherpadClient->buildPadUrl($padId);
-				}
-			}
-		} catch (\Throwable $e) {
-			$this->logger->debug('Pad resolve metadata parse skipped', [
-				'app' => 'etherpad_nextcloud',
-				'fileId' => $resolvedFileId,
-				'path' => $normalizedPath,
-				'exception' => $e,
-			]);
+			$data = $this->padMetadataService->resolve($user->getUID(), $fileId, $file);
+		} catch (\Throwable) {
+			return new DataResponse(['message' => 'Invalid file path.'], Http::STATUS_BAD_REQUEST);
 		}
 
-		return new DataResponse([
-			'is_pad' => true,
-			'is_pad_mime' => $isPadMime,
-			'file_id' => $resolvedFileId,
-			'path' => $normalizedPath,
-			'access_mode' => $accessMode,
-			'is_external' => $isExternal,
-			'public_open_url' => $publicOpenUrl,
-			'viewer_url' => $this->buildFilesViewerUrl($resolvedFileId, $normalizedPath),
-		]);
+		if (($data['is_pad'] ?? false) === true) {
+			$data['viewer_url'] = $this->buildFilesViewerUrl((int)$data['file_id'], (string)$data['path']);
+		}
+
+		return new DataResponse($data);
 	}
 
 	/**

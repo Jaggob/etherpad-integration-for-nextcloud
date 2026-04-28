@@ -13,6 +13,7 @@ use OCA\EtherpadNextcloud\Service\PadCreationService;
 use OCA\EtherpadNextcloud\Service\PadFileOperationService;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadInitializationService;
+use OCA\EtherpadNextcloud\Service\PadMetadataService;
 use OCA\EtherpadNextcloud\Service\PadSessionService;
 use OCA\EtherpadNextcloud\Service\PadSyncService;
 use OCA\EtherpadNextcloud\Service\UserNodeResolver;
@@ -160,6 +161,7 @@ class PadControllerTest extends TestCase {
 			$padFileOperations,
 			$this->createMock(PadCreationService::class),
 			$this->createMock(PadInitializationService::class),
+			$this->createMock(PadMetadataService::class),
 			$this->createMock(PadSyncService::class),
 			$bindingService,
 			$etherpadClient,
@@ -277,6 +279,7 @@ class PadControllerTest extends TestCase {
 			$padFileOperations,
 			$this->createMock(PadCreationService::class),
 			$this->createMock(PadInitializationService::class),
+			$this->createMock(PadMetadataService::class),
 			$this->createMock(PadSyncService::class),
 			$bindingService,
 			$etherpadClient,
@@ -580,6 +583,7 @@ class PadControllerTest extends TestCase {
 		$resolvedBindingService = $bindingService ?? $this->createMock(BindingService::class);
 		$logger = $this->createMock(LoggerInterface::class);
 		$padFileOperations = new PadFileOperationService(new PathNormalizer(), $resolvedRootFolder, new UserNodeResolver($resolvedRootFolder), $resolvedEtherpadClient, $logger);
+		$padMetadataService = new PadMetadataService($resolvedPadFileService, $padFileOperations, $resolvedEtherpadClient, $logger);
 		$padSyncService = new PadSyncService($resolvedPadFileService, $padFileOperations, $resolvedBindingService, $resolvedEtherpadClient, $logger);
 		return new PadController(
 			'etherpad_nextcloud',
@@ -591,6 +595,7 @@ class PadControllerTest extends TestCase {
 			$padFileOperations,
 			$this->createMock(PadCreationService::class),
 			$this->createMock(PadInitializationService::class),
+			$padMetadataService,
 			$padSyncService,
 			$resolvedBindingService,
 			$resolvedEtherpadClient,
