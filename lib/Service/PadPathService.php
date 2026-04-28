@@ -23,6 +23,9 @@ class PadPathService {
 
 	public function normalizeCreatePath(string $file): string {
 		$path = $this->pathNormalizer->normalizeViewerFilePath($file);
+		if ($path === '') {
+			throw new \InvalidArgumentException('Invalid file path.');
+		}
 		if (!str_ends_with(strtolower($path), '.pad')) {
 			$path .= '.pad';
 		}

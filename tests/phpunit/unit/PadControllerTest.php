@@ -359,6 +359,23 @@ class PadControllerTest extends TestCase {
 		$this->assertTrue($response->getData()['retryable']);
 	}
 
+	public function testResolveByIdReturnsGenericServerErrorForUnexpectedFailures(): void {
+		$user = $this->createConfiguredMock(IUser::class, ['getUID' => 'alice']);
+		$userSession = $this->createConfiguredMock(IUserSession::class, ['getUser' => $user]);
+		$rootFolder = $this->createMock(IRootFolder::class);
+		$rootFolder->method('getById')->with(138)->willThrowException(new \RuntimeException('Storage offline.'));
+
+		$controller = $this->buildController(
+			$this->createMock(IRequest::class),
+			$userSession,
+			rootFolder: $rootFolder,
+		);
+		$response = $controller->resolveById(138);
+
+		$this->assertSame(Http::STATUS_INTERNAL_SERVER_ERROR, $response->getStatus());
+		$this->assertSame('Pad resolve failed.', $response->getData()['message']);
+	}
+
 	public function testSyncByIdRejectsInvalidFileId(): void {
 		$user = $this->createMock(IUser::class);
 		$userSession = $this->createMock(IUserSession::class);

@@ -246,8 +246,7 @@ class PadController extends Controller {
 			),
 			[
 				'invalid_argument' => 'Invalid file path.',
-				'generic' => 'Invalid file path.',
-				'map_throwable' => static fn(\Throwable $e): DataResponse => new DataResponse(['message' => 'Invalid file path.'], Http::STATUS_BAD_REQUEST),
+				'generic' => 'Pad resolve failed.',
 			],
 		);
 	}

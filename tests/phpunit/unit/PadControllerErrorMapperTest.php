@@ -26,6 +26,17 @@ class PadControllerErrorMapperTest extends TestCase {
 		$this->assertSame('Invalid file path.', $response->getData()['message']);
 	}
 
+	public function testRunMapsInvalidArgumentWithDefaultMessageWhenMessagesAreEmpty(): void {
+		$response = $this->buildMapper()->run(
+			static fn(): array => throw new \InvalidArgumentException(''),
+			static fn(array $result): DataResponse => new DataResponse($result),
+			['invalid_argument' => ''],
+		);
+
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame('Invalid input.', $response->getData()['message']);
+	}
+
 	public function testRunMapsBindingExceptionWithConfiguredConflictMessage(): void {
 		$response = $this->buildMapper()->run(
 			static fn(): array => throw new BindingException('duplicate'),

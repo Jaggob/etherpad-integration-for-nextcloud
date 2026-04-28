@@ -44,8 +44,16 @@ class PadControllerErrorMapper {
 		try {
 			return $success($action());
 		} catch (\InvalidArgumentException $e) {
+			$configuredMessage = isset($options['invalid_argument'])
+				? (string)$options['invalid_argument']
+				: '';
+			$exceptionMessage = $e->getMessage();
+			$message = $configuredMessage !== ''
+				? $configuredMessage
+				: ($exceptionMessage !== '' ? $exceptionMessage : 'Invalid input.');
+
 			return new DataResponse([
-				'message' => (string)($options['invalid_argument'] ?? $e->getMessage() ?: 'Invalid input.'),
+				'message' => $message,
 			], Http::STATUS_BAD_REQUEST);
 		} catch (NotFoundException) {
 			return new DataResponse([
