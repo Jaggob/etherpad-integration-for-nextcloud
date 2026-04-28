@@ -23,6 +23,10 @@
 	const errorNode = root.querySelector('[data-epnc-embed-error]')
 	const errorMessageNode = root.querySelector('[data-epnc-embed-error-message]')
 	const iframe = root.querySelector('[data-epnc-embed-iframe]')
+	const externalTitleText = String(root.getAttribute('data-l10n-external-title') || 'Pad from another server').trim()
+	const externalMessageText = String(root.getAttribute('data-l10n-external-message') || 'This view shows the last synced snapshot stored in the .pad file. It is read-only here. To edit the pad, open the original pad in a new tab.').trim()
+	const externalEmptyText = String(root.getAttribute('data-l10n-external-empty') || 'No synced snapshot is stored in this .pad file yet.').trim()
+	const externalLinkText = String(root.getAttribute('data-l10n-external-link') || 'Open original pad in new tab').trim()
 	let syncUrl = ''
 	let syncIntervalMs = 120000
 	let syncPromise = null
@@ -55,6 +59,49 @@
 		if (errorNode instanceof HTMLElement) {
 			errorNode.hidden = false
 		}
+	}
+
+	const showExternalPadPreview = (url, snapshotText) => {
+		if (errorNode instanceof HTMLElement) {
+			errorNode.hidden = true
+		}
+		if (iframe instanceof HTMLIFrameElement) {
+			iframe.hidden = true
+			iframe.removeAttribute('src')
+		}
+		if (!(loadingNode instanceof HTMLElement)) {
+			return
+		}
+		loadingNode.hidden = false
+		loadingNode.textContent = ''
+
+		const card = document.createElement('div')
+		card.className = 'epnc-embed__external-card'
+
+		const title = document.createElement('h2')
+		title.className = 'epnc-embed__external-title'
+		title.textContent = externalTitleText
+
+		const message = document.createElement('p')
+		message.className = 'epnc-embed__external-message'
+		message.textContent = externalMessageText
+
+		const preview = document.createElement('pre')
+		preview.className = 'epnc-embed__external-preview'
+		preview.textContent = String(snapshotText || '').trim() !== '' ? String(snapshotText) : externalEmptyText
+
+		const link = document.createElement('a')
+		link.className = 'epnc-embed__external-link'
+		link.href = url
+		link.target = '_blank'
+		link.rel = 'noopener noreferrer'
+		link.textContent = externalLinkText
+
+		card.appendChild(title)
+		card.appendChild(message)
+		card.appendChild(link)
+		card.appendChild(preview)
+		loadingNode.appendChild(card)
 	}
 
 	const showIframe = (url) => {
@@ -332,10 +379,14 @@
 			syncUrl = typeof data.sync_url === 'string' ? data.sync_url.trim() : ''
 			const intervalSeconds = Number(data.sync_interval_seconds ?? 0)
 			syncIntervalMs = Number.isFinite(intervalSeconds) && intervalSeconds > 0 ? intervalSeconds * 1000 : 120000
-			showIframe(data.url)
 			installSyncLifecycleHandlers()
 			installHostMessageHandler()
 			startSyncLoop()
+			if (data.is_external === true) {
+				showExternalPadPreview(data.url, typeof data.snapshot_text === 'string' ? data.snapshot_text : '')
+				return
+			}
+			showIframe(data.url)
 		} catch (error) {
 			showError(error instanceof Error ? error.message : 'Pad open failed.')
 		}

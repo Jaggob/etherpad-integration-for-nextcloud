@@ -106,7 +106,6 @@
 	}
 	const hasNativeViewer = () => USE_NATIVE_VIEWER && Boolean(window.OCA && window.OCA.Viewer && typeof window.OCA.Viewer.open === 'function')
 	const isFilesAppRoute = () => (window.location.pathname || '').includes('/apps/files')
-
 	const parsePadPathFromDavHref = (href) => {
 		if (!href || typeof href !== 'string') {
 			return null
@@ -1510,9 +1509,9 @@
 		let fileId = navigation.fileId ?? null
 		if (!path && navigation.fileId !== null && navigation.fileId !== undefined) {
 			try {
-				const resolved = await apiResolvePadByFileId(navigation.fileId)
-				path = (resolved && typeof resolved.path === 'string') ? resolved.path : ''
-				fileId = (resolved && Number.isFinite(Number(resolved.file_id))) ? Number(resolved.file_id) : fileId
+				const resolvedPad = await apiResolvePadByFileId(navigation.fileId)
+				path = (resolvedPad && typeof resolvedPad.path === 'string') ? resolvedPad.path : ''
+				fileId = (resolvedPad && Number.isFinite(Number(resolvedPad.file_id))) ? Number(resolvedPad.file_id) : fileId
 			} catch (e) {
 				path = ''
 			}
@@ -1524,8 +1523,8 @@
 		}
 		if ((!fileId || !Number.isFinite(Number(fileId))) && path && !inPublicShareRoute) {
 			try {
-				const resolved = await apiResolvePadByPath(path)
-				fileId = (resolved && Number.isFinite(Number(resolved.file_id))) ? Number(resolved.file_id) : fileId
+				const resolvedPad = await apiResolvePadByPath(path)
+				fileId = (resolvedPad && Number.isFinite(Number(resolvedPad.file_id))) ? Number(resolvedPad.file_id) : fileId
 			} catch (e) {
 				// resolve failure is handled by route fallback below
 			}
@@ -1536,7 +1535,6 @@
 				fileId = routeFileId
 			}
 		}
-
 		if (isFilesAppRoute()) {
 			if (fileId && Number.isFinite(Number(fileId)) && navigateFilesRouteAndOpen(Number(fileId), path)) {
 				return

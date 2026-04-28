@@ -55,6 +55,8 @@ class AdminController extends Controller {
 
 			$this->config->setAppValue(Application::APP_ID, 'etherpad_host', $validated['etherpad_host']);
 			$this->config->setAppValue(Application::APP_ID, 'etherpad_api_host', $validated['etherpad_api_host']);
+			$this->config->setAppValue(Application::APP_ID, 'etherpad_cookie_domain', $validated['etherpad_cookie_domain']);
+			$this->config->setAppValue(Application::APP_ID, 'etherpad_cookie_domain_configured', 'yes');
 			if ($validated['etherpad_api_key'] !== null) {
 				$this->config->setAppValue(Application::APP_ID, 'etherpad_api_key', $validated['etherpad_api_key']);
 			}
@@ -287,6 +289,7 @@ class AdminController extends Controller {
 	 * @return array{
 	 *   etherpad_host: string,
 	 *   etherpad_api_host: string,
+	 *   etherpad_cookie_domain: string,
 	 *   etherpad_api_key: ?string,
 	 *   effective_api_key: string,
 	 *   etherpad_api_version: string,
@@ -300,6 +303,9 @@ class AdminController extends Controller {
 	private function validateSettingsPayload(array $payload, bool $forHealthCheck): array {
 		$host = $this->normalizeEtherpadHost((string)($payload['etherpad_host'] ?? ''));
 		$apiHost = $this->normalizeEtherpadApiHost((string)($payload['etherpad_api_host'] ?? ''), $host);
+		$cookieDomain = $this->normalizeCookieDomain(
+			(string)($payload['etherpad_cookie_domain'] ?? $this->config->getAppValue(Application::APP_ID, 'etherpad_cookie_domain', ''))
+		);
 		$syncIntervalSeconds = $this->normalizeSyncInterval($payload['sync_interval_seconds'] ?? 120);
 		$deleteOnTrash = $this->toBool(
 			$payload['delete_on_trash']
@@ -307,7 +313,7 @@ class AdminController extends Controller {
 		);
 		$allowExternalPads = $this->toBool(
 			$payload['allow_external_pads']
-				?? ((string)$this->config->getAppValue(Application::APP_ID, 'allow_external_pads', 'yes') === 'yes')
+				?? ((string)$this->config->getAppValue(Application::APP_ID, 'allow_external_pads', 'no') === 'yes')
 		);
 		$externalAllowlist = $this->normalizeAllowlist((string)($payload['external_pad_allowlist'] ?? ''));
 		$trustedEmbedOrigins = $this->appConfigService->normalizeTrustedEmbedOrigins(
@@ -330,6 +336,7 @@ class AdminController extends Controller {
 		return [
 			'etherpad_host' => $host,
 			'etherpad_api_host' => $apiHost,
+			'etherpad_cookie_domain' => $cookieDomain,
 			'etherpad_api_key' => $apiKeyToStore,
 			'effective_api_key' => $effectiveApiKey,
 			'etherpad_api_version' => $apiVersion,
@@ -409,6 +416,31 @@ class AdminController extends Controller {
 		return $normalized;
 	}
 
+	private function normalizeCookieDomain(string $rawDomain): string {
+		$domain = strtolower(trim($rawDomain));
+		if ($domain === '') {
+			return '';
+		}
+
+		if (str_contains($domain, '://') || str_contains($domain, '/') || str_contains($domain, ':')) {
+			throw new AdminValidationException('etherpad_cookie_domain', $this->l10n->t('Cookie domain must be a hostname, not a URL.'));
+		}
+
+		$isParentDomain = str_starts_with($domain, '.');
+		$host = ltrim($domain, '.');
+		if ($host === '' || !str_contains($host, '.') || filter_var($host, FILTER_VALIDATE_IP) !== false) {
+			throw new AdminValidationException('etherpad_cookie_domain', $this->l10n->t('Cookie domain must be a valid shared hostname.'));
+		}
+
+		foreach (explode('.', $host) as $label) {
+			if ($label === '' || strlen($label) > 63 || preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $label) !== 1) {
+				throw new AdminValidationException('etherpad_cookie_domain', $this->l10n->t('Cookie domain must be a valid shared hostname.'));
+			}
+		}
+
+		return ($isParentDomain ? '.' : '') . $host;
+	}
+
 	private function normalizeApiVersion(string $rawVersion): string {
 		$version = trim($rawVersion);
 		if ($version === '') {
@@ -440,32 +472,43 @@ class AdminController extends Controller {
 			if (preg_match('#^https?://#i', $entry) === 1) {
 				$parts = parse_url($entry);
 				$scheme = strtolower((string)($parts['scheme'] ?? ''));
-				if ($scheme !== 'https') {
+				$host = strtolower((string)($parts['host'] ?? ''));
+				$port = isset($parts['port']) ? (int)$parts['port'] : 443;
+				$path = (string)($parts['path'] ?? '');
+				if ($scheme !== 'https' || $host === '' || $port <= 0 || $port > 65535 || ($path !== '' && $path !== '/')
+					|| isset($parts['user']) || isset($parts['pass']) || isset($parts['query']) || isset($parts['fragment'])
+				) {
 					throw new AdminValidationException(
 						'external_pad_allowlist',
 						$this->l10n->t('External allowlist URL must use https: {host}', ['host' => $token])
 					);
 				}
-				$entry = (string)($parts['host'] ?? '');
+				$entry = $this->normalizeAllowlistHost($host, $token);
+				$normalized[($port === 443 ? 'https://' . $entry : 'https://' . $entry . ':' . $port)] = true;
+				continue;
 			}
 
-			$entry = strtolower(trim($entry, ". \t\n\r\0\x0B"));
-			if ($entry === '' || str_contains($entry, '..') || str_starts_with($entry, '-') || str_ends_with($entry, '-')) {
-				throw new AdminValidationException(
-					'external_pad_allowlist',
-					$this->l10n->t('External allowlist contains invalid host: {host}', ['host' => $token])
-				);
-			}
-			if (preg_match('/^[a-z0-9.-]+$/', $entry) !== 1) {
-				throw new AdminValidationException(
-					'external_pad_allowlist',
-					$this->l10n->t('External allowlist contains invalid host: {host}', ['host' => $token])
-				);
-			}
-			$normalized[$entry] = true;
+			$normalized[$this->normalizeAllowlistHost($entry, $token)] = true;
 		}
 
 		return implode("\n", array_keys($normalized));
+	}
+
+	private function normalizeAllowlistHost(string $rawHost, string $sourceToken): string {
+		$host = strtolower(trim($rawHost, ". \t\n\r\0\x0B"));
+		if ($host === '' || str_contains($host, '..') || str_starts_with($host, '-') || str_ends_with($host, '-')) {
+			throw new AdminValidationException(
+				'external_pad_allowlist',
+				$this->l10n->t('External allowlist contains invalid host: {host}', ['host' => $sourceToken])
+			);
+		}
+		if (preg_match('/^[a-z0-9.-]+$/', $host) !== 1) {
+			throw new AdminValidationException(
+				'external_pad_allowlist',
+				$this->l10n->t('External allowlist contains invalid host: {host}', ['host' => $sourceToken])
+			);
+		}
+		return $host;
 	}
 
 	private function toBool(mixed $value): bool {

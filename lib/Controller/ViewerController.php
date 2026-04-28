@@ -104,16 +104,7 @@ class ViewerController extends Controller {
 	 * @throws NotFoundException
 	 */
 	private function resolveUserFileNode(string $uid, string $absolutePath): File {
-		$relativePath = ltrim($absolutePath, '/');
-		if ($relativePath === '') {
-			throw new NotFoundException('Invalid empty file path.');
-		}
-		$userFolder = $this->rootFolder->getUserFolder($uid);
-		$node = $userFolder->get($relativePath);
-		if (!$node instanceof File) {
-			throw new NotFoundException('Path does not reference a file.');
-		}
-		return $node;
+		return $this->userNodeResolver->resolveUserFileNodeByPath($uid, $absolutePath);
 	}
 
 }

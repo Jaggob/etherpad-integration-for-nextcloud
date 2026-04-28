@@ -60,10 +60,7 @@ class PadSessionService {
 
 	/** @return array{name:string,value:string,expires:int,path:string,domain:string,secure:bool,http_only:bool,same_site:string} */
 	private function buildEtherpadSessionCookie(string $sessionId, int $validUntil): array {
-		$cookieDomain = (string)$this->config->getAppValue('etherpad_nextcloud', 'etherpad_cookie_domain', '');
-		if ($cookieDomain === '') {
-			$cookieDomain = $this->deriveCookieDomainFromHost();
-		}
+		$cookieDomain = $this->resolveCookieDomain();
 		return [
 			'name' => 'sessionID',
 			'value' => $sessionId,
@@ -101,24 +98,24 @@ class PadSessionService {
 		return implode('; ', $parts);
 	}
 
+	private function resolveCookieDomain(): string {
+		$storedCookieDomain = trim((string)$this->config->getAppValue('etherpad_nextcloud', 'etherpad_cookie_domain', ''));
+		$cookieDomainConfigured = (string)$this->config->getAppValue('etherpad_nextcloud', 'etherpad_cookie_domain_configured', 'no') === 'yes';
+		if ($cookieDomainConfigured || $storedCookieDomain !== '') {
+			return $storedCookieDomain;
+		}
+		return $this->deriveCookieDomainFromHost();
+	}
+
 	private function deriveCookieDomainFromHost(): string {
-		$host = (string)$this->config->getAppValue('etherpad_nextcloud', 'etherpad_host', '');
-		if ($host === '') {
+		$host = $this->extractHost((string)$this->config->getAppValue('etherpad_nextcloud', 'etherpad_host', ''));
+		if ($host === '' || filter_var($host, FILTER_VALIDATE_IP) !== false || !str_contains($host, '.')) {
 			return '';
 		}
 
-		$parsedHost = parse_url($host, PHP_URL_HOST);
-		if (!is_string($parsedHost) || $parsedHost === '') {
-			return '';
-		}
-		$parsedHost = strtolower(trim($parsedHost));
-		if ($parsedHost === '' || filter_var($parsedHost, FILTER_VALIDATE_IP) !== false || !str_contains($parsedHost, '.')) {
-			return '';
-		}
-
-		$labels = explode('.', $parsedHost);
+		$labels = explode('.', $host);
 		if (count($labels) === 2) {
-			return $parsedHost;
+			return $host;
 		}
 		if (count($labels) < 2) {
 			return '';
@@ -126,6 +123,29 @@ class PadSessionService {
 
 		array_shift($labels);
 		return '.' . implode('.', $labels);
+	}
+
+	private function extractHost(string $urlOrHost): string {
+		$value = strtolower(trim($urlOrHost));
+		if ($value === '') {
+			return '';
+		}
+
+		$host = parse_url($value, PHP_URL_HOST);
+		if (!is_string($host) || $host === '') {
+			$host = preg_replace('/:\d+$/', '', $value) ?? '';
+		}
+		$host = trim(strtolower($host), "[] \t\n\r\0\x0B.");
+		if ($host === '' || strlen($host) > 253) {
+			return '';
+		}
+
+		foreach (explode('.', $host) as $label) {
+			if ($label === '' || strlen($label) > 63 || preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $label) !== 1) {
+				return '';
+			}
+		}
+		return $host;
 	}
 
 	private function syncAuthorDisplayNameIfNeeded(string $uid, string $authorId, string $displayName): void {

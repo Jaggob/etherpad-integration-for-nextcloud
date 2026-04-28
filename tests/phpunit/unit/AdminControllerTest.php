@@ -150,6 +150,70 @@ class AdminControllerTest extends TestCase {
 		$this->assertSame('https://pad-api.internal/api/1.3.0/listAllPads', $data['target']);
 	}
 
+	public function testSaveSettingsPersistsHttpsOriginAllowlistEntriesWithPorts(): void {
+		$request = $this->createMock(IRequest::class);
+		$request->method('getParams')->willReturn([
+			'etherpad_host' => 'https://pad.example.test',
+			'etherpad_api_host' => 'https://pad-api.example.test',
+			'etherpad_cookie_domain' => '.example.test',
+			'etherpad_api_key' => 'new-api-key',
+			'etherpad_api_version' => '1.3.0',
+			'sync_interval_seconds' => 120,
+			'delete_on_trash' => true,
+			'allow_external_pads' => true,
+			'external_pad_allowlist' => "pad.portal.fzs.de\nhttps://etherpad.example.org:8443",
+			'trusted_embed_origins' => '',
+		]);
+
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('admin');
+		$userSession = $this->createMock(IUserSession::class);
+		$userSession->method('getUser')->willReturn($user);
+
+		$groupManager = $this->createMock(IGroupManager::class);
+		$groupManager->method('isAdmin')->with('admin')->willReturn(true);
+
+		$saved = [];
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(
+			static function (string $appName, string $key, string $default = ''): string {
+				if ($appName === 'etherpad_nextcloud' && $key === 'etherpad_api_key') {
+					return 'existing-key';
+				}
+				return $default;
+			}
+		);
+		$config->method('setAppValue')->willReturnCallback(
+			static function (string $appName, string $key, string $value) use (&$saved): void {
+				if ($appName === 'etherpad_nextcloud') {
+					$saved[$key] = $value;
+				}
+			}
+		);
+
+		$appConfigService = $this->createMock(AppConfigService::class);
+		$appConfigService->method('normalizeTrustedEmbedOrigins')->with('')->willReturn('');
+
+		$controller = new AdminController(
+			'etherpad_nextcloud',
+			$request,
+			$config,
+			$userSession,
+			$groupManager,
+			$this->buildL10n(),
+			$appConfigService,
+			$this->createMock(EtherpadClient::class),
+			$this->createMock(PendingDeleteRetryService::class),
+			$this->createMock(ConsistencyCheckService::class),
+			$this->createMock(LoggerInterface::class),
+		);
+
+		$response = $controller->saveSettings();
+
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$this->assertSame("pad.portal.fzs.de\nhttps://etherpad.example.org:8443", $saved['external_pad_allowlist']);
+	}
+
 	private function buildL10n(): IL10N {
 		$l10n = $this->createMock(IL10N::class);
 		$l10n->method('t')->willReturnCallback(

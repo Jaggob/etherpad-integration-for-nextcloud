@@ -14,6 +14,7 @@
 		return '/index.php' + path
 	}
 	const ocRequestToken = () => String((window.OC && window.OC.requestToken) || '')
+	const translate = (text) => (typeof window.t === 'function' ? window.t(APP_ID, text) : text)
 
 	const parsePublicShareTokenFromLocation = () => {
 		const match = (window.location.pathname || '').match(/(?:\/index\.php)?\/s\/([^/]+)(?:\/.*)?$/)
@@ -38,6 +39,12 @@
 				iframeSrc: '',
 				isLoading: true,
 				loadError: '',
+				externalOpenUrl: '',
+				externalOpenMessage: '',
+				externalSnapshotText: '',
+				readonlySnapshotMode: false,
+				readonlySnapshotText: '',
+				readonlySnapshotHtml: '',
 				resolveGeneration: 0,
 				syncUrl: '',
 				syncIntervalMs: 120000,
@@ -131,7 +138,7 @@
 				if (!response.ok) {
 					throw new Error((data && data.message) || 'Pad open failed.')
 				}
-				if (!data || typeof data.url !== 'string' || data.url.trim() === '') {
+				if (!data || (data.is_readonly_snapshot !== true && (typeof data.url !== 'string' || data.url.trim() === ''))) {
 					throw new Error('Pad open API did not return a valid URL.')
 				}
 				return data
@@ -251,6 +258,12 @@
 				this.isLoading = true
 				this.loadError = ''
 				this.iframeSrc = ''
+				this.externalOpenUrl = ''
+				this.externalOpenMessage = ''
+				this.externalSnapshotText = ''
+				this.readonlySnapshotMode = false
+				this.readonlySnapshotText = ''
+				this.readonlySnapshotHtml = ''
 				this.syncUrl = ''
 				this.syncInFlight = false
 				this.stopSyncLoop()
@@ -324,7 +337,6 @@
 						if (!isCurrent()) return
 					}
 
-					this.iframeSrc = data.url
 					this.syncUrl = (data && typeof data.sync_url === 'string') ? data.sync_url : ''
 
 					const intervalSeconds = Number(data && data.sync_interval_seconds)
@@ -336,6 +348,25 @@
 					if (this.syncUrl) {
 						this.startSyncLoop()
 					}
+
+					if (data && data.is_readonly_snapshot === true) {
+						this.readonlySnapshotMode = true
+						this.readonlySnapshotText = (typeof data.snapshot_text === 'string') ? data.snapshot_text : ''
+						this.readonlySnapshotHtml = (typeof data.snapshot_html === 'string') ? data.snapshot_html : ''
+						this.markLoaded()
+						return
+					}
+
+					if (data && data.is_external === true && typeof data.url === 'string' && data.url.trim() !== '') {
+						const targetUrl = data.url.trim()
+						this.externalOpenUrl = targetUrl
+						this.externalOpenMessage = translate('This view shows the last synced snapshot stored in the .pad file. It is read-only here. To edit the pad, open the original pad in a new tab.')
+						this.externalSnapshotText = (data && typeof data.snapshot_text === 'string') ? data.snapshot_text : ''
+						this.markLoaded()
+						return
+					}
+
+					this.iframeSrc = data.url
 					this.markLoaded()
 				} catch (error) {
 					if (!isCurrent()) return
@@ -365,6 +396,41 @@
 					createElement('div', { class: 'epnc-native-error-card' }, [
 						createElement('div', { class: 'epnc-native-error-title' }, 'Unable to open pad'),
 						createElement('div', { class: 'epnc-native-error-message' }, this.loadError),
+					]),
+				])
+			}
+			if (this.externalOpenUrl) {
+				return createElement('div', { class: 'epnc-native-status' }, [
+					createElement('div', { class: 'epnc-native-error-card' }, [
+						createElement('div', { class: 'epnc-native-error-title' }, translate('Pad from another server')),
+						createElement('div', { class: 'epnc-native-error-message' }, this.externalOpenMessage),
+						createElement('pre', { class: 'epnc-native-preview' }, this.externalSnapshotText.trim() !== ''
+							? this.externalSnapshotText
+							: translate('No synced snapshot is stored in this .pad file yet.')),
+						createElement('a', {
+							class: 'button primary',
+							attrs: {
+								href: this.externalOpenUrl,
+								target: '_blank',
+								rel: 'noopener noreferrer',
+							},
+						}, translate('Open original pad in new tab')),
+					]),
+				])
+			}
+			if (this.readonlySnapshotMode) {
+				return createElement('div', { class: 'epnc-native-snapshot' }, [
+					createElement('div', { class: 'epnc-native-snapshot__inner' }, [
+						createElement('div', { class: 'epnc-native-snapshot__title' }, translate('Read-only snapshot')),
+						createElement('div', { class: 'epnc-native-snapshot__message' }, translate('This share shows the last synced snapshot stored in the .pad file.')),
+						this.readonlySnapshotHtml.trim() !== ''
+							? createElement('div', {
+								class: 'epnc-native-snapshot__text epnc-native-snapshot__text--html',
+								domProps: { innerHTML: this.readonlySnapshotHtml },
+							})
+							: createElement('pre', { class: 'epnc-native-snapshot__text' }, this.readonlySnapshotText.trim() !== ''
+								? this.readonlySnapshotText
+								: translate('No synced snapshot is stored in this .pad file yet.')),
 					]),
 				])
 			}

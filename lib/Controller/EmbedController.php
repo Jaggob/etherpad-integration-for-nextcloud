@@ -73,6 +73,10 @@ class EmbedController extends Controller {
 			'l10n' => [
 				'loading' => $this->l10n->t('Loading pad...'),
 				'error_title' => $this->l10n->t('Unable to open pad'),
+				'external_title' => $this->l10n->t('Pad from another server'),
+				'external_message' => $this->l10n->t('This view shows the last synced snapshot stored in the .pad file. It is read-only here. To edit the pad, open the original pad in a new tab.'),
+				'external_empty' => $this->l10n->t('No synced snapshot is stored in this .pad file yet.'),
+				'external_link' => $this->l10n->t('Open original pad in new tab'),
 			],
 		]);
 	}

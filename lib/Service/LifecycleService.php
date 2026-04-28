@@ -400,7 +400,7 @@ class LifecycleService {
 			return false;
 		}
 		$active = trim((string)$this->config->getAppValue('etherpad_nextcloud', 'test_fault', ''));
-		return $active !== '' && hash_equals($fault, $active);
+		return $active !== '' && hash_equals($active, $fault);
 	}
 
 }

@@ -108,14 +108,19 @@ Regression safety check:
 ## Read-only Behavior
 
 - Read-only URL is built via `getReadOnlyID`.
-- Protected GroupPads still require a session.
-- Therefore protected/read-only first sets session, then opens read-only URL.
+- Authenticated protected GroupPad opens still require a session.
+- Public read-only shares of protected GroupPads do not create an Etherpad session.
+  - They render the last synced snapshot stored in the `.pad` file.
+  - If an HTML snapshot is stored, only a small tag whitelist is rendered (`p`, lists, headings, basic inline formatting, block/code tags); attributes and dangerous tags are stripped.
+  - If no HTML snapshot is stored, the viewer falls back to the text snapshot.
+  - This prevents the public share response from setting a session cookie that could also open the writable GroupPad URL.
 
 ## Share Permission Mapping
 
 `PublicViewerController` maps Nextcloud share permissions:
 
-- share without update permission -> Etherpad read-only
+- protected share without update permission -> local `.pad` text snapshot, no Etherpad cookie
+- public pad share without update permission -> Etherpad read-only URL
 - share with update permission -> Etherpad editable
 
 ## Error Handling

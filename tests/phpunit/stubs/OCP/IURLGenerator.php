@@ -9,6 +9,8 @@ if (!interface_exists(IURLGenerator::class)) {
 		/** @param array<string,mixed> $parameters */
 		public function linkToRoute(string $route, array $parameters = []): string;
 
+		public function getBaseUrl(): string;
+
 		public function getWebroot(): string;
 	}
 }

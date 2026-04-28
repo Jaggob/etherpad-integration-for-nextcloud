@@ -18,9 +18,9 @@ use OCA\EtherpadNextcloud\Service\EtherpadClient;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadSessionService;
 use OCA\EtherpadNextcloud\Util\PathNormalizer;
-use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\AppFramework\Http;
+use OCP\AppFramework\PublicShareController;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\Constants;
@@ -28,11 +28,15 @@ use OCP\Files\File;
 use OCP\Files\Folder;
 use OCP\Files\NotFoundException;
 use OCP\IRequest;
+use OCP\ISession;
 use OCP\IURLGenerator;
 use OCP\Share\Exceptions\ShareNotFound;
 use OCP\Share\IManager;
+use OCP\Share\IShare;
 
-class PublicViewerController extends Controller {
+class PublicViewerController extends PublicShareController {
+	private ?IShare $share = null;
+
 	public function __construct(
 		string $appName,
 		IRequest $request,
@@ -43,8 +47,27 @@ class PublicViewerController extends Controller {
 		private EtherpadClient $etherpadClient,
 		private PadSessionService $padSessionService,
 		private IURLGenerator $urlGenerator,
+		ISession $session,
 	) {
-		parent::__construct($appName, $request);
+		parent::__construct($appName, $request, $session);
+	}
+
+	public function isValidToken(): bool {
+		try {
+			$this->share = $this->shareManager->getShareByToken($this->getToken());
+		} catch (ShareNotFound) {
+			return false;
+		}
+
+		return true;
+	}
+
+	protected function isPasswordProtected(): bool {
+		return $this->share !== null && $this->share->getPassword() !== null;
+	}
+
+	protected function getPasswordHash(): ?string {
+		return $this->share?->getPassword();
 	}
 
 	#[\OCP\AppFramework\Http\Attribute\PublicPage]
@@ -73,6 +96,9 @@ class PublicViewerController extends Controller {
 			'title' => $context['title'],
 			'url' => $context['url'],
 			'is_external' => $context['is_external'],
+			'is_readonly_snapshot' => $context['is_readonly_snapshot'],
+			'snapshot_text' => $context['snapshot_text'],
+			'snapshot_html' => $context['snapshot_html'],
 			'original_pad_url' => $context['original_pad_url'],
 		]);
 		if (($context['cookie_header'] ?? '') !== '') {
@@ -82,10 +108,21 @@ class PublicViewerController extends Controller {
 	}
 
 	private function resolvePublicPadContext(string $token, mixed $fileParam): array {
-		try {
-			$share = $this->shareManager->getShareByToken($token);
-		} catch (ShareNotFound) {
+		$share = $this->share;
+		if ($share === null) {
+			try {
+				$share = $this->shareManager->getShareByToken($token);
+			} catch (ShareNotFound) {
+				$this->publicFail('This share link is invalid or has expired.', Http::STATUS_NOT_FOUND);
+			}
+		}
+
+		if (!$share instanceof IShare) {
 			$this->publicFail('This share link is invalid or has expired.', Http::STATUS_NOT_FOUND);
+		}
+
+		if ((((int)$share->getPermissions()) & Constants::PERMISSION_READ) === 0) {
+			$this->publicFail('This share link does not allow reading files.', Http::STATUS_FORBIDDEN);
 		}
 
 		try {
@@ -127,14 +164,15 @@ class PublicViewerController extends Controller {
 
 		try {
 			$parsed = $this->padFileService->parsePadFile($content);
-			$meta = $parsed['frontmatter'];
-			$padId = (string)$meta['pad_id'];
-			$accessMode = (string)$meta['access_mode'];
-			$padUrl = isset($meta['pad_url']) ? trim((string)$meta['pad_url']) : '';
-			$isExternal = $this->padFileService->isExternalFrontmatter($meta, $padId);
+			$frontmatter = $parsed['frontmatter'];
+			$meta = $this->padFileService->extractPadMetadata($frontmatter);
+			$padId = $meta['pad_id'];
+			$accessMode = $meta['access_mode'];
+			$padUrl = $meta['pad_url'];
+			$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
 
 			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
-			$openTarget = $this->resolvePublicOpenTarget($padId, $accessMode, $readOnly, $token, $isExternal, $padUrl);
+			$openTarget = $this->resolvePublicOpenTarget($padId, $accessMode, $readOnly, $token, $isExternal, $content, $padUrl);
 		} catch (PadFileFormatException|BindingException|EtherpadClientException $e) {
 			$this->publicFail($this->mapPublicOpenError($e), Http::STATUS_BAD_REQUEST);
 		}
@@ -143,6 +181,9 @@ class PublicViewerController extends Controller {
 			'title' => $node->getName(),
 			'url' => $openTarget['url'],
 			'is_external' => $isExternal,
+			'is_readonly_snapshot' => $openTarget['is_readonly_snapshot'],
+			'snapshot_text' => $openTarget['snapshot_text'],
+			'snapshot_html' => $openTarget['snapshot_html'],
 			'is_public_pad' => $accessMode === BindingService::ACCESS_PUBLIC,
 			'open_new_tab_url' => $accessMode === BindingService::ACCESS_PUBLIC ? $openTarget['url'] : '',
 			'original_pad_url' => $openTarget['original_pad_url'],
@@ -254,31 +295,43 @@ class PublicViewerController extends Controller {
 		return $base . '?path=' . rawurlencode($dir) . '&files=' . rawurlencode($name);
 	}
 
-	/** @return array{url:string,original_pad_url:string,cookie_header:string} */
+	/** @return array{url:string,original_pad_url:string,cookie_header:string,is_readonly_snapshot:bool,snapshot_text:string,snapshot_html:string} */
 	private function resolvePublicOpenTarget(
 		string $padId,
 		string $accessMode,
 		bool $readOnly,
 		string $token,
 		bool $isExternal,
+		string $padFileContent,
 		string $padUrl = ''
 	): array {
+		if ($isExternal && $accessMode !== BindingService::ACCESS_PUBLIC) {
+			throw new EtherpadClientException('External pad metadata requires public access_mode.');
+		}
+
 		if ($accessMode === BindingService::ACCESS_PROTECTED) {
+			if ($readOnly) {
+				return [
+					'url' => '',
+					'original_pad_url' => '',
+					'cookie_header' => '',
+					'is_readonly_snapshot' => true,
+					'snapshot_text' => $this->padFileService->getTextSnapshotForRestore($padFileContent),
+					'snapshot_html' => $this->sanitizeSnapshotHtml($this->padFileService->getHtmlSnapshotForRestore($padFileContent)),
+				];
+			}
+
 			$authorUid = 'public-share:' . $token;
 			$authorName = 'Public share';
 			$openContext = $this->padSessionService->createProtectedOpenContext($authorUid, $authorName, $padId, 3600);
 			$cookieHeader = $this->padSessionService->buildSetCookieHeader($openContext['cookie']);
-			if ($readOnly) {
-				return [
-					'url' => $this->etherpadClient->getReadOnlyPadUrl($padId),
-					'original_pad_url' => '',
-					'cookie_header' => $cookieHeader,
-				];
-			}
 			return [
 				'url' => $openContext['url'],
 				'original_pad_url' => '',
 				'cookie_header' => $cookieHeader,
+				'is_readonly_snapshot' => false,
+				'snapshot_text' => '',
+				'snapshot_html' => '',
 			];
 		}
 
@@ -291,6 +344,9 @@ class PublicViewerController extends Controller {
 				'url' => $normalized['pad_url'],
 				'original_pad_url' => $normalized['pad_url'],
 				'cookie_header' => '',
+				'is_readonly_snapshot' => false,
+				'snapshot_text' => $this->padFileService->getTextSnapshotForRestore($padFileContent),
+				'snapshot_html' => '',
 			];
 		}
 
@@ -299,6 +355,9 @@ class PublicViewerController extends Controller {
 				'url' => $this->etherpadClient->getReadOnlyPadUrl($padId),
 				'original_pad_url' => '',
 				'cookie_header' => '',
+				'is_readonly_snapshot' => false,
+				'snapshot_text' => '',
+				'snapshot_html' => '',
 			];
 		}
 
@@ -306,7 +365,65 @@ class PublicViewerController extends Controller {
 			'url' => $this->etherpadClient->buildPadUrl($padId),
 			'original_pad_url' => '',
 			'cookie_header' => '',
+			'is_readonly_snapshot' => false,
+			'snapshot_text' => '',
+			'snapshot_html' => '',
 		];
+	}
+
+	private function sanitizeSnapshotHtml(string $html): string {
+		$trimmed = trim($html);
+		if ($trimmed === '') {
+			return '';
+		}
+
+		$previous = libxml_use_internal_errors(true);
+		$document = new \DOMDocument();
+		$loaded = $document->loadHTML(
+			'<?xml encoding="UTF-8">' . $trimmed,
+			LIBXML_HTML_NODEFDTD | LIBXML_NOERROR | LIBXML_NOWARNING
+		);
+		libxml_clear_errors();
+		libxml_use_internal_errors($previous);
+		if (!$loaded) {
+			return '';
+		}
+
+		$body = $document->getElementsByTagName('body')->item(0);
+		$root = $body instanceof \DOMNode ? $body : $document;
+		$output = '';
+		foreach ($root->childNodes as $child) {
+			$output .= $this->sanitizeSnapshotHtmlNode($child);
+		}
+		return trim($output);
+	}
+
+	private function sanitizeSnapshotHtmlNode(\DOMNode $node): string {
+		if ($node instanceof \DOMText || $node instanceof \DOMCdataSection) {
+			return htmlspecialchars($node->nodeValue ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+		}
+		if (!$node instanceof \DOMElement) {
+			return '';
+		}
+
+		$tag = strtolower($node->tagName);
+		if (in_array($tag, ['script', 'style', 'iframe', 'object', 'embed', 'svg', 'math', 'img', 'video', 'audio', 'source', 'link', 'meta'], true)) {
+			return '';
+		}
+
+		$content = '';
+		foreach ($node->childNodes as $child) {
+			$content .= $this->sanitizeSnapshotHtmlNode($child);
+		}
+
+		$allowed = ['p', 'br', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'b', 'em', 'i', 'u', 's', 'del', 'blockquote', 'pre', 'code'];
+		if (!in_array($tag, $allowed, true)) {
+			return $content;
+		}
+		if ($tag === 'br') {
+			return '<br>';
+		}
+		return '<' . $tag . '>' . $content . '</' . $tag . '>';
 	}
 
 }

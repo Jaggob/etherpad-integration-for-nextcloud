@@ -115,6 +115,11 @@ class PadControllerTest extends TestCase {
 					'access_mode' => BindingService::ACCESS_PUBLIC,
 				],
 			]);
+		$padFileService->method('extractPadMetadata')->willReturn([
+			'pad_id' => 'g.ABCDEFGHIJKLMNOP$pad-1',
+			'access_mode' => BindingService::ACCESS_PUBLIC,
+			'pad_url' => '',
+		]);
 		$padFileService->method('isExternalFrontmatter')->willReturn(false);
 
 		$bindingService = $this->createMock(BindingService::class);
@@ -190,6 +195,99 @@ class PadControllerTest extends TestCase {
 		$this->assertTrue($response->getData()['retryable']);
 	}
 
+	public function testOpenByIdReturnsExternalPadUrlForExternalPads(): void {
+		$user = $this->createConfiguredMock(IUser::class, [
+			'getUID' => 'alice',
+			'getDisplayName' => 'Alice',
+		]);
+		$userSession = $this->createConfiguredMock(IUserSession::class, ['getUser' => $user]);
+		$file = $this->buildPadFileNode();
+
+		$rootFolder = $this->createMock(IRootFolder::class);
+		$rootFolder->method('getById')->with(138)->willReturn([$file]);
+
+		$frontmatter = [
+			'pad_id' => 'ext.abc123',
+			'access_mode' => BindingService::ACCESS_PUBLIC,
+			'pad_url' => 'https://pad.portal.fzs.de/p/Test',
+			'pad_origin' => 'https://pad.portal.fzs.de',
+			'remote_pad_id' => 'Test',
+		];
+
+		$padFileService = $this->createMock(PadFileService::class);
+		$padFileService->expects($this->once())
+			->method('parsePadFile')
+			->with('frontmatter')
+			->willReturn(['frontmatter' => $frontmatter]);
+		$padFileService->expects($this->once())
+			->method('extractPadMetadata')
+			->with($frontmatter)
+			->willReturn([
+				'pad_id' => 'ext.abc123',
+				'access_mode' => BindingService::ACCESS_PUBLIC,
+				'pad_url' => 'https://pad.portal.fzs.de/p/Test',
+			]);
+		$padFileService->expects($this->once())
+			->method('isExternalFrontmatter')
+			->with($frontmatter, 'ext.abc123')
+			->willReturn(true);
+		$padFileService->expects($this->once())
+			->method('getTextSnapshotForRestore')
+			->with('frontmatter')
+			->willReturn("External snapshot\nSecond line");
+
+		$bindingService = $this->createMock(BindingService::class);
+		$bindingService->expects($this->once())
+			->method('assertConsistentMapping')
+			->with(138, 'ext.abc123', BindingService::ACCESS_PUBLIC);
+
+		$etherpadClient = $this->createMock(EtherpadClient::class);
+		$etherpadClient->expects($this->once())
+			->method('normalizeAndValidateExternalPublicPadUrl')
+			->with('https://pad.portal.fzs.de/p/Test')
+			->willReturn(['pad_url' => 'https://pad.portal.fzs.de/p/Test']);
+		$etherpadClient->expects($this->never())->method('buildPadUrl');
+
+		$appConfigService = $this->createMock(AppConfigService::class);
+		$appConfigService->expects($this->once())
+			->method('getSyncIntervalSeconds')
+			->willReturn(30);
+
+		$urlGenerator = $this->createMock(IURLGenerator::class);
+		$urlGenerator->method('linkToRoute')
+			->willReturnMap([
+				['etherpad_nextcloud.pad.syncById', ['fileId' => 138], '/sync/138'],
+				['etherpad_nextcloud.pad.syncStatusById', ['fileId' => 138], '/sync-status/138'],
+			]);
+
+		$controller = new PadController(
+			'etherpad_nextcloud',
+			$this->createMock(IRequest::class),
+			$urlGenerator,
+			$userSession,
+			$this->createMock(LoggerInterface::class),
+			new PathNormalizer(),
+			$padFileService,
+			$bindingService,
+			$etherpadClient,
+			$this->createMock(PadSessionService::class),
+			$this->createMock(PadBootstrapService::class),
+			$appConfigService,
+			$this->createMock(LifecycleService::class),
+			$rootFolder,
+			new UserNodeResolver($rootFolder),
+		);
+
+		$response = $controller->openById(138);
+
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$this->assertSame('https://pad.portal.fzs.de/p/Test', $response->getData()['url']);
+		$this->assertTrue($response->getData()['is_external']);
+		$this->assertSame('https://pad.portal.fzs.de/p/Test', $response->getData()['pad_url']);
+		$this->assertSame('https://pad.portal.fzs.de/p/Test', $response->getData()['original_pad_url']);
+		$this->assertSame("External snapshot\nSecond line", $response->getData()['snapshot_text']);
+	}
+
 	public function testMetaByIdRejectsInvalidFileId(): void {
 		$user = $this->createMock(IUser::class);
 		$userSession = $this->createMock(IUserSession::class);
@@ -263,6 +361,11 @@ class PadControllerTest extends TestCase {
 				'access_mode' => BindingService::ACCESS_PROTECTED,
 			],
 		]);
+		$padFileService->method('extractPadMetadata')->willReturn([
+			'pad_id' => 'g.ABCDEFGHIJKLMNOP$pad-1',
+			'access_mode' => BindingService::ACCESS_PROTECTED,
+			'pad_url' => '',
+		]);
 		$padFileService->method('isExternalFrontmatter')->willReturn(false);
 		$padFileService->method('getSnapshotRevision')->willReturn(4);
 		$padFileService->method('withExportSnapshot')->with("frontmatter", 'hello', '<p>hello</p>', 5)->willReturn('updated-content');
@@ -313,6 +416,11 @@ class PadControllerTest extends TestCase {
 				'access_mode' => BindingService::ACCESS_PROTECTED,
 			],
 		]);
+		$padFileService->method('extractPadMetadata')->willReturn([
+			'pad_id' => 'g.ABCDEFGHIJKLMNOP$pad-1',
+			'access_mode' => BindingService::ACCESS_PROTECTED,
+			'pad_url' => '',
+		]);
 		$padFileService->method('isExternalFrontmatter')->willReturn(false);
 		$padFileService->method('getSnapshotRevision')->willReturn(1);
 		$padFileService->method('withExportSnapshot')->with("frontmatter", 'hello', '<p>hello</p>', 5)->willReturn('updated-content');
@@ -356,6 +464,11 @@ class PadControllerTest extends TestCase {
 				'pad_id' => 'g.ABCDEFGHIJKLMNOP$pad-1',
 				'access_mode' => BindingService::ACCESS_PROTECTED,
 			],
+		]);
+		$padFileService->method('extractPadMetadata')->willReturn([
+			'pad_id' => 'g.ABCDEFGHIJKLMNOP$pad-1',
+			'access_mode' => BindingService::ACCESS_PROTECTED,
+			'pad_url' => '',
 		]);
 		$padFileService->method('isExternalFrontmatter')->willReturn(false);
 		$padFileService->method('getSnapshotRevision')->willReturn(5);
@@ -409,6 +522,11 @@ class PadControllerTest extends TestCase {
 				'remote_pad_id' => 'public-pad',
 				'pad_origin' => 'https://pad.example.test',
 			],
+		]);
+		$padFileService->method('extractPadMetadata')->willReturn([
+			'pad_id' => 'ext.remote-pad',
+			'access_mode' => BindingService::ACCESS_PUBLIC,
+			'pad_url' => 'https://pad.example.test/p/public-pad',
 		]);
 		$padFileService->method('isExternalFrontmatter')->willReturn(true);
 		$padFileService->method('getTextSnapshotForRestore')->willReturn('same text');

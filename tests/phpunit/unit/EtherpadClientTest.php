@@ -38,6 +38,23 @@ class EtherpadClientTest extends TestCase {
 		$this->assertSame('https://1.1.1.1/p/My%20Pad', $result['pad_url']);
 	}
 
+	public function testNormalizeAndValidateExternalPublicPadUrlAcceptsMatchingAllowlistedOriginWithPort(): void {
+		$client = new EtherpadClient($this->buildExternalEnabledConfig('https://1.1.1.1:8443'));
+
+		$result = $client->normalizeAndValidateExternalPublicPadUrl('https://1.1.1.1:8443/p/public-pad');
+
+		$this->assertSame('https://1.1.1.1:8443', $result['origin']);
+		$this->assertSame('https://1.1.1.1:8443/p/public-pad', $result['pad_url']);
+	}
+
+	public function testNormalizeAndValidateExternalPublicPadUrlRejectsNonMatchingAllowlistedOriginPort(): void {
+		$client = new EtherpadClient($this->buildExternalEnabledConfig('https://1.1.1.1:8443'));
+
+		$this->expectException(EtherpadClientException::class);
+		$this->expectExceptionMessage('External pad host is not in the allowlist.');
+		$client->normalizeAndValidateExternalPublicPadUrl('https://1.1.1.1:9443/p/public-pad');
+	}
+
 	public function testNormalizeAndValidateExternalPublicPadUrlRejectsProtectedPadIds(): void {
 		$client = new EtherpadClient($this->buildExternalEnabledConfig());
 
@@ -64,10 +81,10 @@ class EtherpadClientTest extends TestCase {
 		$client->normalizeAndValidateExternalPublicPadUrl('https://1.1.1.1/p/public-pad');
 	}
 
-	private function buildExternalEnabledConfig(): IConfig {
+	private function buildExternalEnabledConfig(string $externalPadAllowlist = ''): IConfig {
 		$config = $this->createMock(IConfig::class);
 		$config->method('getAppValue')->willReturnCallback(
-			static function (string $appName, string $key, string $default = ''): string {
+			static function (string $appName, string $key, string $default = '') use ($externalPadAllowlist): string {
 				if ($appName !== 'etherpad_nextcloud') {
 					return $default;
 				}
@@ -75,7 +92,7 @@ class EtherpadClientTest extends TestCase {
 					return 'yes';
 				}
 				if ($key === 'external_pad_allowlist') {
-					return '';
+					return $externalPadAllowlist;
 				}
 				return $default;
 			}

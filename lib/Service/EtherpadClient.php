@@ -300,7 +300,7 @@ class EtherpadClient {
 			'pad_url' => $parsed['pad_url'],
 			'host' => $parsed['host'],
 			'port' => $parsed['port'],
-			'resolved_ips' => $this->resolveAndValidateExternalHost($parsed['host']),
+			'resolved_ips' => $this->resolveAndValidateExternalHost($parsed['host'], $parsed['origin']),
 		];
 	}
 
@@ -446,11 +446,11 @@ class EtherpadClient {
 	}
 
 	/** @return list<string> */
-	private function resolveAndValidateExternalHost(string $host): array {
-		if ((string)$this->config->getAppValue('etherpad_nextcloud', 'allow_external_pads', 'yes') !== 'yes') {
+	private function resolveAndValidateExternalHost(string $host, string $origin): array {
+		if ((string)$this->config->getAppValue('etherpad_nextcloud', 'allow_external_pads', 'no') !== 'yes') {
 			throw new EtherpadClientException('External pad linking is disabled by admin settings.');
 		}
-		if (!$this->isAllowlistedExternalHost($host)) {
+		if (!$this->isAllowlistedExternalHost($host, $origin)) {
 			throw new EtherpadClientException('External pad host is not in the allowlist.');
 		}
 		if ($host === 'localhost' || str_ends_with($host, '.localhost') || str_ends_with($host, '.local')) {
@@ -495,7 +495,7 @@ class EtherpadClient {
 		return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false;
 	}
 
-	private function isAllowlistedExternalHost(string $host): bool {
+	private function isAllowlistedExternalHost(string $host, string $origin): bool {
 		$raw = trim((string)$this->config->getAppValue('etherpad_nextcloud', 'external_pad_allowlist', ''));
 		if ($raw === '') {
 			return true;
@@ -503,17 +503,38 @@ class EtherpadClient {
 
 		$entries = preg_split('/[\s,;]+/', $raw) ?: [];
 		$hostLower = strtolower($host);
+		$originLower = strtolower($origin);
 		foreach ($entries as $entry) {
 			$normalized = strtolower(trim($entry));
 			if ($normalized === '') {
 				continue;
 			}
-			if ($normalized === $hostLower) {
+			if (preg_match('#^https?://#i', $normalized) === 1) {
+				if ($this->normalizeAllowlistOrigin($normalized) === $originLower) {
+					return true;
+				}
+				continue;
+			}
+			if (trim($normalized, ". \t\n\r\0\x0B") === $hostLower) {
 				return true;
 			}
 		}
 
 		return false;
+	}
+
+	private function normalizeAllowlistOrigin(string $entry): string {
+		$parts = parse_url($entry);
+		if (!is_array($parts)) {
+			return '';
+		}
+		$scheme = strtolower((string)($parts['scheme'] ?? ''));
+		$host = strtolower((string)($parts['host'] ?? ''));
+		$port = isset($parts['port']) ? (int)$parts['port'] : 443;
+		if ($scheme !== 'https' || $host === '' || $port <= 0 || $port > 65535) {
+			return '';
+		}
+		return $port === 443 ? 'https://' . $host : 'https://' . $host . ':' . $port;
 	}
 
 	/** @return array{origin:string,pad_id:string,pad_url:string,host:string,port:int} */
