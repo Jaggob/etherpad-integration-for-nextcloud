@@ -36,6 +36,9 @@ class PadOpenService {
 	 */
 	public function openByPath(string $uid, string $displayName, string $file): array {
 		$path = $this->padPaths->normalizeViewerFilePath($file);
+		if ($path === '') {
+			throw new \InvalidArgumentException('Invalid file path.');
+		}
 		$node = $this->userNodeResolver->resolveUserFileNodeByPath($uid, $path);
 		$absolutePath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
 		return $this->openNode($uid, $displayName, $node, $absolutePath);

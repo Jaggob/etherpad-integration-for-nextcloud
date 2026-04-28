@@ -53,7 +53,7 @@ class PadControllerErrorMapper {
 			$configuredMessage = isset($options['invalid_argument'])
 				? (string)$options['invalid_argument']
 				: '';
-			$exceptionMessage = $e->getMessage();
+			$exceptionMessage = trim($e->getMessage());
 			$message = $configuredMessage !== ''
 				? $configuredMessage
 				: ($exceptionMessage !== '' ? $exceptionMessage : 'Invalid input.');

@@ -34,7 +34,7 @@ class PadControllerErrorMapperTest extends TestCase {
 
 	public function testRunMapsInvalidArgumentWithDefaultMessageWhenMessagesAreEmpty(): void {
 		$response = $this->buildMapper()->run(
-			static fn(): array => throw new \InvalidArgumentException(''),
+			static fn(): array => throw new \InvalidArgumentException(" \t\n"),
 			static fn(array $result): DataResponse => new DataResponse($result),
 			['invalid_argument' => ''],
 		);
