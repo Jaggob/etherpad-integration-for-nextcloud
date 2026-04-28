@@ -472,32 +472,43 @@ class AdminController extends Controller {
 			if (preg_match('#^https?://#i', $entry) === 1) {
 				$parts = parse_url($entry);
 				$scheme = strtolower((string)($parts['scheme'] ?? ''));
-				if ($scheme !== 'https') {
+				$host = strtolower((string)($parts['host'] ?? ''));
+				$port = isset($parts['port']) ? (int)$parts['port'] : 443;
+				$path = (string)($parts['path'] ?? '');
+				if ($scheme !== 'https' || $host === '' || $port <= 0 || $port > 65535 || ($path !== '' && $path !== '/')
+					|| isset($parts['user']) || isset($parts['pass']) || isset($parts['query']) || isset($parts['fragment'])
+				) {
 					throw new AdminValidationException(
 						'external_pad_allowlist',
 						$this->l10n->t('External allowlist URL must use https: {host}', ['host' => $token])
 					);
 				}
-				$entry = (string)($parts['host'] ?? '');
+				$entry = $this->normalizeAllowlistHost($host, $token);
+				$normalized[($port === 443 ? 'https://' . $entry : 'https://' . $entry . ':' . $port)] = true;
+				continue;
 			}
 
-			$entry = strtolower(trim($entry, ". \t\n\r\0\x0B"));
-			if ($entry === '' || str_contains($entry, '..') || str_starts_with($entry, '-') || str_ends_with($entry, '-')) {
-				throw new AdminValidationException(
-					'external_pad_allowlist',
-					$this->l10n->t('External allowlist contains invalid host: {host}', ['host' => $token])
-				);
-			}
-			if (preg_match('/^[a-z0-9.-]+$/', $entry) !== 1) {
-				throw new AdminValidationException(
-					'external_pad_allowlist',
-					$this->l10n->t('External allowlist contains invalid host: {host}', ['host' => $token])
-				);
-			}
-			$normalized[$entry] = true;
+			$normalized[$this->normalizeAllowlistHost($entry, $token)] = true;
 		}
 
 		return implode("\n", array_keys($normalized));
+	}
+
+	private function normalizeAllowlistHost(string $rawHost, string $sourceToken): string {
+		$host = strtolower(trim($rawHost, ". \t\n\r\0\x0B"));
+		if ($host === '' || str_contains($host, '..') || str_starts_with($host, '-') || str_ends_with($host, '-')) {
+			throw new AdminValidationException(
+				'external_pad_allowlist',
+				$this->l10n->t('External allowlist contains invalid host: {host}', ['host' => $sourceToken])
+			);
+		}
+		if (preg_match('/^[a-z0-9.-]+$/', $host) !== 1) {
+			throw new AdminValidationException(
+				'external_pad_allowlist',
+				$this->l10n->t('External allowlist contains invalid host: {host}', ['host' => $sourceToken])
+			);
+		}
+		return $host;
 	}
 
 	private function toBool(mixed $value): bool {

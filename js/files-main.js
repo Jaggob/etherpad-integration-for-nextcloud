@@ -1507,10 +1507,9 @@
 
 		let path = navigation.path || ''
 		let fileId = navigation.fileId ?? null
-		let resolvedPad = null
 		if (!path && navigation.fileId !== null && navigation.fileId !== undefined) {
 			try {
-				resolvedPad = await apiResolvePadByFileId(navigation.fileId)
+				const resolvedPad = await apiResolvePadByFileId(navigation.fileId)
 				path = (resolvedPad && typeof resolvedPad.path === 'string') ? resolvedPad.path : ''
 				fileId = (resolvedPad && Number.isFinite(Number(resolvedPad.file_id))) ? Number(resolvedPad.file_id) : fileId
 			} catch (e) {
@@ -1524,7 +1523,7 @@
 		}
 		if ((!fileId || !Number.isFinite(Number(fileId))) && path && !inPublicShareRoute) {
 			try {
-				resolvedPad = await apiResolvePadByPath(path)
+				const resolvedPad = await apiResolvePadByPath(path)
 				fileId = (resolvedPad && Number.isFinite(Number(resolvedPad.file_id))) ? Number(resolvedPad.file_id) : fileId
 			} catch (e) {
 				// resolve failure is handled by route fallback below
@@ -1534,17 +1533,6 @@
 			const routeFileId = parseFileIdFromCurrentLocation()
 			if (routeFileId) {
 				fileId = routeFileId
-			}
-		}
-		if (!resolvedPad) {
-			try {
-				if (fileId && Number.isFinite(Number(fileId))) {
-					resolvedPad = await apiResolvePadByFileId(Number(fileId))
-				} else if (path && !inPublicShareRoute) {
-					resolvedPad = await apiResolvePadByPath(path)
-				}
-			} catch (e) {
-				resolvedPad = null
 			}
 		}
 		if (isFilesAppRoute()) {
