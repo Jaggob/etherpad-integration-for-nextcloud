@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\EtherpadNextcloud\Service;
 
+use OCA\EtherpadNextcloud\Exception\PadFileLockRetryExhaustedException;
 use OCP\Files\File;
 use OCP\Lock\LockedException;
 
@@ -46,18 +47,24 @@ class PadFileLockRetryService {
 		return (string)$node->getContent();
 	}
 
-	public function putContentWithSyncLockRetry(File $node, string $content, int &$lockRetries): void {
+	public function putContentWithSyncLockRetry(File $node, string $content): int {
+		$lockRetries = 0;
 		foreach (self::SYNC_LOCK_RETRY_DELAYS_US as $delay) {
 			try {
 				$node->putContent($content);
-				return;
+				return $lockRetries;
 			} catch (LockedException) {
 				$this->sleep($delay);
 				$lockRetries++;
 			}
 		}
 
-		$node->putContent($content);
+		try {
+			$node->putContent($content);
+			return $lockRetries;
+		} catch (LockedException $e) {
+			throw new PadFileLockRetryExhaustedException($lockRetries, $e);
+		}
 	}
 
 	private function sleep(int $delay): void {

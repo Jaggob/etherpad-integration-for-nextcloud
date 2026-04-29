@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace OCA\EtherpadNextcloud\Controller;
 
+use OCA\EtherpadNextcloud\Exception\ControllerBadRequestException;
+use OCA\EtherpadNextcloud\Exception\UnauthorizedRequestException;
 use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\PadCreationService;
 use OCA\EtherpadNextcloud\Service\PadInitializationService;
@@ -45,16 +47,8 @@ class PadController extends Controller {
 
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	public function create(string $file, string $accessMode = BindingService::ACCESS_PROTECTED): DataResponse {
-		$user = $this->requireUser();
-		if ($user instanceof DataResponse) {
-			return $user;
-		}
-		if (!$this->isValidAccessMode($accessMode)) {
-			return $this->invalidAccessModeResponse();
-		}
-
-		return $this->errors->run(
-			fn(): array => $this->padCreationService->create($user->getUID(), $file, $accessMode),
+		return $this->runForUser(
+			fn(IUser $user): array => $this->padCreationService->create($user->getUID(), $file, $this->requireAccessMode($accessMode)),
 			fn(array $result): DataResponse => new DataResponse($this->padResponses->withViewerUrl($result)),
 			[
 				'invalid_argument' => 'Invalid file path.',
@@ -67,20 +61,13 @@ class PadController extends Controller {
 
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	public function createByParent(int $parentFolderId, string $name, string $accessMode = BindingService::ACCESS_PROTECTED): DataResponse {
-		$user = $this->requireUser();
-		if ($user instanceof DataResponse) {
-			return $user;
-		}
-		$fileIdError = $this->requirePositiveInt($parentFolderId, 'Invalid parentFolderId.');
-		if ($fileIdError instanceof DataResponse) {
-			return $fileIdError;
-		}
-		if (!$this->isValidAccessMode($accessMode)) {
-			return $this->invalidAccessModeResponse();
-		}
-
-		return $this->errors->run(
-			fn(): array => $this->padCreationService->createInParent($user->getUID(), $parentFolderId, $name, $accessMode),
+		return $this->runForUser(
+			fn(IUser $user): array => $this->padCreationService->createInParent(
+				$user->getUID(),
+				$this->requirePositiveInt($parentFolderId, 'Invalid parentFolderId.'),
+				$name,
+				$this->requireAccessMode($accessMode),
+			),
 			fn(array $result): DataResponse => new DataResponse($this->padResponses->withViewerAndEmbedUrls($result)),
 			[
 				'invalid_argument' => 'Invalid pad name.',
@@ -94,13 +81,8 @@ class PadController extends Controller {
 
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	public function createFromUrl(string $file, string $padUrl): DataResponse {
-		$user = $this->requireUser();
-		if ($user instanceof DataResponse) {
-			return $user;
-		}
-
-		return $this->errors->run(
-			fn(): array => $this->padCreationService->createFromUrl($user->getUID(), $file, $padUrl),
+		return $this->runForUser(
+			fn(IUser $user): array => $this->padCreationService->createFromUrl($user->getUID(), $file, $padUrl),
 			fn(array $result): DataResponse => new DataResponse($this->padResponses->withViewerUrl($result)),
 			[
 				'invalid_argument' => 'Invalid input.',
@@ -113,13 +95,8 @@ class PadController extends Controller {
 
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	public function open(string $file): DataResponse {
-		$user = $this->requireUser();
-		if ($user instanceof DataResponse) {
-			return $user;
-		}
-
-		return $this->errors->run(
-			fn(): array => $this->padOpenService->openByPath($user->getUID(), $user->getDisplayName(), $file),
+		return $this->runForUser(
+			fn(IUser $user): array => $this->padOpenService->openByPath($user->getUID(), $user->getDisplayName(), $file),
 			fn(array $result): DataResponse => $this->padResponses->openResponse($result),
 			[
 				'invalid_argument' => 'Invalid file path.',
@@ -131,17 +108,8 @@ class PadController extends Controller {
 
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	public function openById(int $fileId): DataResponse {
-		$user = $this->requireUser();
-		if ($user instanceof DataResponse) {
-			return $user;
-		}
-		$fileIdError = $this->requireFileId($fileId);
-		if ($fileIdError instanceof DataResponse) {
-			return $fileIdError;
-		}
-
-		return $this->errors->run(
-			fn(): array => $this->padOpenService->openById($user->getUID(), $user->getDisplayName(), $fileId),
+		return $this->runForUser(
+			fn(IUser $user): array => $this->padOpenService->openById($user->getUID(), $user->getDisplayName(), $this->requireFileId($fileId)),
 			fn(array $result): DataResponse => $this->padResponses->openResponse($result),
 			[
 				'not_found' => 'Cannot open selected .pad file.',
@@ -152,19 +120,14 @@ class PadController extends Controller {
 
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	public function initialize(string $file): DataResponse {
-		$user = $this->requireUser();
-		if ($user instanceof DataResponse) {
-			return $user;
-		}
-
-		return $this->errors->run(
-			fn(): array => $this->padInitializationService->initializeByPath($user->getUID(), $file),
+		return $this->runForUser(
+			fn(IUser $user): array => $this->padInitializationService->initializeByPath($user->getUID(), $file),
 			fn(array $result): DataResponse => new DataResponse($result),
 			[
 				'invalid_argument' => 'Invalid file path.',
 				'not_found' => 'Cannot open selected .pad file.',
 				'generic' => 'Pad initialization failed.',
-					'on_throwable' => fn(\Throwable $e) => $this->logError('Pad frontmatter initialization failed in API initialize', [
+				'on_throwable' => fn(\Throwable $e) => $this->logError('Pad frontmatter initialization failed in API initialize', [
 					'file' => $file,
 					'exception' => $e,
 				]),
@@ -174,22 +137,13 @@ class PadController extends Controller {
 
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	public function initializeById(int $fileId): DataResponse {
-		$user = $this->requireUser();
-		if ($user instanceof DataResponse) {
-			return $user;
-		}
-		$fileIdError = $this->requireFileId($fileId);
-		if ($fileIdError instanceof DataResponse) {
-			return $fileIdError;
-		}
-
-		return $this->errors->run(
-			fn(): array => $this->padInitializationService->initializeById($user->getUID(), $fileId),
+		return $this->runForUser(
+			fn(IUser $user): array => $this->padInitializationService->initializeById($user->getUID(), $this->requireFileId($fileId)),
 			fn(array $result): DataResponse => new DataResponse($result),
 			[
 				'not_found' => 'Cannot open selected .pad file.',
 				'generic' => 'Pad initialization failed.',
-					'on_throwable' => fn(\Throwable $e) => $this->logError('Pad frontmatter initialization failed in API initialize-by-id', [
+				'on_throwable' => fn(\Throwable $e) => $this->logError('Pad frontmatter initialization failed in API initialize-by-id', [
 					'fileId' => $fileId,
 					'exception' => $e,
 				]),
@@ -200,17 +154,8 @@ class PadController extends Controller {
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	#[\OCP\AppFramework\Http\Attribute\NoCSRFRequired]
 	public function metaById(int $fileId): DataResponse {
-		$user = $this->requireUser();
-		if ($user instanceof DataResponse) {
-			return $user;
-		}
-		$fileIdError = $this->requireFileId($fileId);
-		if ($fileIdError instanceof DataResponse) {
-			return $fileIdError;
-		}
-
-		return $this->errors->run(
-			fn(): array => $this->padMetadataService->metaById($user->getUID(), $fileId),
+		return $this->runForUser(
+			fn(IUser $user): array => $this->padMetadataService->metaById($user->getUID(), $this->requireFileId($fileId)),
 			fn(array $data): DataResponse => new DataResponse(
 				($data['is_pad'] ?? false) === true
 					? $this->padResponses->withViewerAndEmbedUrls($data)
@@ -226,13 +171,8 @@ class PadController extends Controller {
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	#[\OCP\AppFramework\Http\Attribute\NoCSRFRequired]
 	public function resolveById(int $fileId = 0, string $file = ''): DataResponse {
-		$user = $this->requireUser();
-		if ($user instanceof DataResponse) {
-			return $user;
-		}
-
-		return $this->errors->run(
-			fn(): array => $this->padMetadataService->resolve($user->getUID(), $fileId, $file),
+		return $this->runForUser(
+			fn(IUser $user): array => $this->padMetadataService->resolve($user->getUID(), $fileId, $file),
 			fn(array $data): DataResponse => new DataResponse(
 				($data['is_pad'] ?? false) === true
 					? $this->padResponses->withViewerUrl($data)
@@ -247,20 +187,11 @@ class PadController extends Controller {
 
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	public function syncById(int $fileId): DataResponse {
-		$user = $this->requireUser();
-		if ($user instanceof DataResponse) {
-			return $user;
-		}
-		$fileIdError = $this->requireFileId($fileId);
-		if ($fileIdError instanceof DataResponse) {
-			return $fileIdError;
-		}
-
 		$forceParam = (string)$this->request->getParam('force', '0');
 		$force = in_array(strtolower($forceParam), ['1', 'true', 'yes'], true);
 
-		return $this->errors->run(
-			fn(): array => $this->padSyncService->syncById($user->getUID(), $fileId, $force),
+		return $this->runForUser(
+			fn(IUser $user): array => $this->padSyncService->syncById($user->getUID(), $this->requireFileId($fileId), $force),
 			fn(array $result): DataResponse => new DataResponse($result),
 			[
 				'not_found' => 'Cannot resolve file path for file ID.',
@@ -272,17 +203,8 @@ class PadController extends Controller {
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	#[\OCP\AppFramework\Http\Attribute\NoCSRFRequired]
 	public function syncStatusById(int $fileId): DataResponse {
-		$user = $this->requireUser();
-		if ($user instanceof DataResponse) {
-			return $user;
-		}
-		$fileIdError = $this->requireFileId($fileId);
-		if ($fileIdError instanceof DataResponse) {
-			return $fileIdError;
-		}
-
-		return $this->errors->run(
-			fn(): array => $this->padSyncService->syncStatusById($user->getUID(), $fileId),
+		return $this->runForUser(
+			fn(IUser $user): array => $this->padSyncService->syncStatusById($user->getUID(), $this->requireFileId($fileId)),
 			fn(array $result): DataResponse => new DataResponse($result),
 			[
 				'not_found' => 'Cannot read selected .pad file.',
@@ -293,19 +215,14 @@ class PadController extends Controller {
 
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	public function trash(string $file): DataResponse {
-		$user = $this->requireUser();
-		if ($user instanceof DataResponse) {
-			return $user;
-		}
-
-		return $this->errors->run(
-			fn(): array => $this->padLifecycleOperations->trashByPath($user->getUID(), $file),
+		return $this->runForUser(
+			fn(IUser $user): array => $this->padLifecycleOperations->trashByPath($user->getUID(), $file),
 			fn(array $result): DataResponse => $this->padResponses->lifecycleResponse($result),
 			[
 				'invalid_argument' => 'Invalid file path.',
 				'not_found' => 'Pad file not found.',
 				'generic' => 'Trash failed.',
-					'on_throwable' => fn(\Throwable $e) => $this->logError('Pad trash API failed', [
+				'on_throwable' => fn(\Throwable $e) => $this->logError('Pad trash API failed', [
 					'file' => $file,
 					'exception' => $e,
 				]),
@@ -315,19 +232,14 @@ class PadController extends Controller {
 
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	public function restore(string $file): DataResponse {
-		$user = $this->requireUser();
-		if ($user instanceof DataResponse) {
-			return $user;
-		}
-
-		return $this->errors->run(
-			fn(): array => $this->padLifecycleOperations->restoreByPath($user->getUID(), $file),
+		return $this->runForUser(
+			fn(IUser $user): array => $this->padLifecycleOperations->restoreByPath($user->getUID(), $file),
 			fn(array $result): DataResponse => $this->padResponses->lifecycleResponse($result),
 			[
 				'invalid_argument' => 'Invalid file path.',
 				'not_found' => 'Pad file not found.',
 				'generic' => 'Restore failed.',
-					'on_throwable' => fn(\Throwable $e) => $this->logError('Pad restore API failed', [
+				'on_throwable' => fn(\Throwable $e) => $this->logError('Pad restore API failed', [
 					'file' => $file,
 					'exception' => $e,
 				]),
@@ -335,31 +247,43 @@ class PadController extends Controller {
 		);
 	}
 
-	private function requireUser(): IUser|DataResponse {
+	/**
+	 * @param callable(IUser): mixed $action
+	 * @param callable(mixed): DataResponse $success
+	 * @param array<string,mixed> $options
+	 */
+	private function runForUser(callable $action, callable $success, array $options = []): DataResponse {
+		return $this->errors->run(
+			fn(): mixed => $action($this->requireUser()),
+			$success,
+			$options,
+		);
+	}
+
+	private function requireUser(): IUser {
 		$user = $this->userSession->getUser();
 		if ($user === null) {
-			return new DataResponse(['message' => 'Authentication required.'], Http::STATUS_UNAUTHORIZED);
+			throw new UnauthorizedRequestException('Authentication required.');
 		}
 		return $user;
 	}
 
-	private function requireFileId(int $fileId): ?DataResponse {
+	private function requireFileId(int $fileId): int {
 		return $this->requirePositiveInt($fileId, 'Invalid file ID.');
 	}
 
-	private function requirePositiveInt(int $value, string $message): ?DataResponse {
+	private function requirePositiveInt(int $value, string $message): int {
 		if ($value <= 0) {
-			return new DataResponse(['message' => $message], Http::STATUS_BAD_REQUEST);
+			throw new ControllerBadRequestException($message);
 		}
-		return null;
+		return $value;
 	}
 
-	private function isValidAccessMode(string $accessMode): bool {
-		return in_array($accessMode, [BindingService::ACCESS_PUBLIC, BindingService::ACCESS_PROTECTED], true);
-	}
-
-	private function invalidAccessModeResponse(): DataResponse {
-		return new DataResponse(['message' => 'Invalid accessMode. Use public or protected.'], Http::STATUS_BAD_REQUEST);
+	private function requireAccessMode(string $accessMode): string {
+		if (!in_array($accessMode, [BindingService::ACCESS_PUBLIC, BindingService::ACCESS_PROTECTED], true)) {
+			throw new ControllerBadRequestException('Invalid accessMode. Use public or protected.');
+		}
+		return $accessMode;
 	}
 
 	/** @param array<string,mixed> $context */

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OCA\EtherpadNextcloud\Tests\Unit;
 
+use OCA\EtherpadNextcloud\Exception\PadFileLockRetryExhaustedException;
 use OCA\EtherpadNextcloud\Service\PadFileLockRetryService;
 use OCP\Files\File;
 use OCP\Lock\LockedException;
@@ -50,10 +51,31 @@ class PadFileLockRetryServiceTest extends TestCase {
 				}
 			});
 
-		$lockRetries = 0;
-		$service->putContentWithSyncLockRetry($file, 'content', $lockRetries);
+		$lockRetries = $service->putContentWithSyncLockRetry($file, 'content');
 
 		$this->assertSame(3, $lockRetries);
 		$this->assertSame([150000, 300000, 600000], $sleeps);
+	}
+
+	public function testPutContentThrowsRetryExhaustedWithRetryCount(): void {
+		$sleeps = [];
+		$service = new PadFileLockRetryService(static function (int $delay) use (&$sleeps): void {
+			$sleeps[] = $delay;
+		});
+
+		$file = $this->createMock(File::class);
+		$file->expects($this->exactly(4))
+			->method('putContent')
+			->with('content')
+			->willThrowException(new LockedException('locked'));
+
+		try {
+			$service->putContentWithSyncLockRetry($file, 'content');
+			$this->fail('Expected lock retry exhaustion.');
+		} catch (PadFileLockRetryExhaustedException $e) {
+			$this->assertSame(3, $e->getRetryAttempts());
+			$this->assertSame('locked', $e->getLockedException()->getMessage());
+			$this->assertSame([150000, 300000, 600000], $sleeps);
+		}
 	}
 }

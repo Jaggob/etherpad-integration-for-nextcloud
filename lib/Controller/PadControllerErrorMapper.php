@@ -10,10 +10,12 @@ declare(strict_types=1);
 namespace OCA\EtherpadNextcloud\Controller;
 
 use OCA\EtherpadNextcloud\Exception\BindingException;
+use OCA\EtherpadNextcloud\Exception\ControllerBadRequestException;
 use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
 use OCA\EtherpadNextcloud\Exception\PadFileAlreadyExistsException;
 use OCA\EtherpadNextcloud\Exception\PadFileFormatException;
 use OCA\EtherpadNextcloud\Exception\PadParentFolderNotWritableException;
+use OCA\EtherpadNextcloud\Exception\UnauthorizedRequestException;
 use OCA\EtherpadNextcloud\Service\PadResponseService;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\DataResponse;
@@ -49,6 +51,14 @@ class PadControllerErrorMapper {
 	public function run(callable $action, callable $success, array $options = []): DataResponse {
 		try {
 			return $success($action());
+		} catch (UnauthorizedRequestException $e) {
+			return new DataResponse([
+				'message' => $e->getMessage() !== '' ? $e->getMessage() : 'Authentication required.',
+			], Http::STATUS_UNAUTHORIZED);
+		} catch (ControllerBadRequestException $e) {
+			return new DataResponse([
+				'message' => $e->getMessage() !== '' ? $e->getMessage() : 'Invalid input.',
+			], Http::STATUS_BAD_REQUEST);
 		} catch (\InvalidArgumentException $e) {
 			$configuredMessage = isset($options['invalid_argument'])
 				? (string)$options['invalid_argument']

@@ -11,6 +11,7 @@ namespace OCA\EtherpadNextcloud\Service;
 
 use OCA\EtherpadNextcloud\Exception\BindingException;
 use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
+use OCA\EtherpadNextcloud\Exception\PadFileLockRetryExhaustedException;
 use OCA\EtherpadNextcloud\Exception\PadFileFormatException;
 use OCP\Files\File;
 use OCP\Files\NotFoundException;
@@ -63,31 +64,15 @@ class PadSyncService {
 			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
 
 			if ($isExternal) {
-				return $this->syncExternalPad($node, $fileId, $padId, $padUrl, (string)$currentContent, $force, $lockRetries);
+				return $this->syncExternalPad($node, $fileId, $padId, $padUrl, (string)$currentContent, $force);
 			}
 
-			return $this->syncInternalPad($node, $fileId, $padId, (string)$currentContent, $force, $lockRetries);
+			return $this->syncInternalPad($node, $fileId, $padId, (string)$currentContent, $force);
+		} catch (PadFileLockRetryExhaustedException $e) {
+			$lockRetries = $e->getRetryAttempts();
+			return $this->lockedSyncResponse($e->getLockedException(), $fileId, $absolutePath, $padId, $accessMode, $isExternal, $force, $lockRetries);
 		} catch (LockedException $e) {
-			$this->logger->info('Pad sync deferred because .pad file is locked', [
-				'app' => 'etherpad_nextcloud',
-				'fileId' => $fileId,
-				'path' => $absolutePath,
-				'padId' => $padId,
-				'accessMode' => $accessMode,
-				'external' => $isExternal,
-				'force' => $force,
-				'lockRetryAttempts' => $lockRetries,
-				'exception' => $e,
-			]);
-			return [
-				'status' => self::STATUS_LOCKED,
-				'file_id' => $fileId,
-				'pad_id' => $padId,
-				'external' => $isExternal,
-				'forced' => $force,
-				'lock_retries' => $lockRetries,
-				'retryable' => true,
-			];
+			return $this->lockedSyncResponse($e, $fileId, $absolutePath, $padId, $accessMode, $isExternal, $force, $lockRetries);
 		} catch (BindingException|PadFileFormatException|EtherpadClientException $e) {
 			throw $e;
 		} catch (\Throwable $e) {
@@ -157,7 +142,6 @@ class PadSyncService {
 		string $padUrl,
 		string $currentContent,
 		bool $force,
-		int &$lockRetries,
 	): array {
 		if ($padUrl === '') {
 			throw new EtherpadClientException('External pad URL metadata is missing or invalid.');
@@ -182,7 +166,7 @@ class PadSyncService {
 		$previousRev = $this->padFileService->getSnapshotRevision($currentContent);
 		$nextRev = max(0, $previousRev + 1);
 		$updatedContent = $this->padFileService->withExportSnapshot($currentContent, $text, '', $nextRev, false);
-		$this->lockRetryService->putContentWithSyncLockRetry($node, $updatedContent, $lockRetries);
+		$lockRetries = $this->lockRetryService->putContentWithSyncLockRetry($node, $updatedContent);
 
 		return [
 			'status' => self::STATUS_UPDATED,
@@ -202,7 +186,6 @@ class PadSyncService {
 		string $padId,
 		string $currentContent,
 		bool $force,
-		int &$lockRetries,
 	): array {
 		$currentRev = $this->etherpadClient->getRevisionsCount($padId);
 		$snapshotRev = $this->padFileService->getSnapshotRevision($currentContent);
@@ -238,7 +221,7 @@ class PadSyncService {
 		}
 
 		$updatedContent = $this->padFileService->withExportSnapshot($currentContent, $text, $html, $currentRev);
-		$this->lockRetryService->putContentWithSyncLockRetry($node, $updatedContent, $lockRetries);
+		$lockRetries = $this->lockRetryService->putContentWithSyncLockRetry($node, $updatedContent);
 
 		return [
 			'status' => self::STATUS_UPDATED,
@@ -248,6 +231,40 @@ class PadSyncService {
 			'forced' => $force,
 			'snapshot_rev' => $currentRev,
 			'lock_retries' => $lockRetries,
+		];
+	}
+
+	/** @return array<string,mixed> */
+	private function lockedSyncResponse(
+		LockedException $e,
+		int $fileId,
+		string $absolutePath,
+		string $padId,
+		string $accessMode,
+		bool $isExternal,
+		bool $force,
+		int $lockRetries,
+	): array {
+		$this->logger->info('Pad sync deferred because .pad file is locked', [
+			'app' => 'etherpad_nextcloud',
+			'fileId' => $fileId,
+			'path' => $absolutePath,
+			'padId' => $padId,
+			'accessMode' => $accessMode,
+			'external' => $isExternal,
+			'force' => $force,
+			'lockRetryAttempts' => $lockRetries,
+			'exception' => $e,
+		]);
+
+		return [
+			'status' => self::STATUS_LOCKED,
+			'file_id' => $fileId,
+			'pad_id' => $padId,
+			'external' => $isExternal,
+			'forced' => $force,
+			'lock_retries' => $lockRetries,
+			'retryable' => true,
 		];
 	}
 }

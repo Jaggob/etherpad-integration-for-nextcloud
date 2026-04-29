@@ -37,57 +37,64 @@ class PadCreationService {
 		$padId = '';
 		$fileCreated = false;
 
-		try {
-			$fileNode = $this->padFileCreator->createUserFile($uid, $path);
-			$fileCreated = true;
-			$fileId = (int)$fileNode->getId();
-			if ($fileId <= 0) {
-				throw new \RuntimeException('Could not resolve new file ID.');
-			}
-			$padId = $this->padBootstrapService->provisionPadId($accessMode);
-			$padUrl = $this->etherpadClient->buildPadUrl($padId);
+		return $this->withCreateRollback(
+			function () use ($uid, $path, $accessMode, &$padId, &$fileCreated): array {
+				$fileNode = $this->padFileCreator->createUserFile($uid, $path);
+				$fileCreated = true;
+				$fileId = (int)$fileNode->getId();
+				if ($fileId <= 0) {
+					throw new \RuntimeException('Could not resolve new file ID.');
+				}
+				$padId = $this->padBootstrapService->provisionPadId($accessMode);
+				$padUrl = $this->etherpadClient->buildPadUrl($padId);
 
-			$content = $this->padFileService->buildInitialDocument(
-				$fileId,
-				$padId,
-				$accessMode,
-				'',
-				$padUrl
-			);
-			$fileNode->putContent($content);
+				$content = $this->padFileService->buildInitialDocument(
+					$fileId,
+					$padId,
+					$accessMode,
+					'',
+					$padUrl
+				);
+				$fileNode->putContent($content);
 
-			$this->bindingService->createBinding($fileId, $padId, $accessMode);
+				$this->bindingService->createBinding($fileId, $padId, $accessMode);
 
-			return [
-				'file' => $path,
-				'file_id' => $fileId,
-				'pad_id' => $padId,
-				'access_mode' => $accessMode,
-				'pad_url' => $padUrl,
-			];
-		} catch (BindingException $e) {
-			$this->logger->warning('Pad create hit existing binding', [
-				'app' => 'etherpad_nextcloud',
-				'file' => $path,
-				'accessMode' => $accessMode,
-				'padId' => $padId,
-				'exception' => $e,
-			]);
-			$this->rollbackService->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
-			throw $e;
-		} catch (\Throwable $e) {
-			if (!($e instanceof PadFileAlreadyExistsException)) {
-				$this->logger->error('Pad creation failed', [
-					'app' => 'etherpad_nextcloud',
+				return [
 					'file' => $path,
-					'accessMode' => $accessMode,
-					'padId' => $padId,
-					'exception' => $e,
-				]);
-			}
-			$this->rollbackService->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
-			throw $e;
-		}
+					'file_id' => $fileId,
+					'pad_id' => $padId,
+					'access_mode' => $accessMode,
+					'pad_url' => $padUrl,
+				];
+			},
+			function () use ($uid, $path, &$padId, &$fileCreated): void {
+				$this->rollbackService->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
+			},
+			function (\Throwable $e) use ($path, $accessMode, &$padId): ?array {
+				if ($e instanceof BindingException) {
+					return [
+						'message' => 'Pad create hit existing binding',
+						'context' => [
+							'file' => $path,
+							'accessMode' => $accessMode,
+							'padId' => $padId,
+						],
+					];
+				}
+
+				return null;
+			},
+			function () use ($path, $accessMode, &$padId): array {
+				return [
+					'message' => 'Pad creation failed',
+					'context' => [
+						'file' => $path,
+						'accessMode' => $accessMode,
+						'padId' => $padId,
+					],
+				];
+			},
+		);
 	}
 
 	/**
@@ -104,62 +111,69 @@ class PadCreationService {
 		$fileCreated = false;
 		$path = '';
 
-		try {
-			$fileNode = $this->padFileCreator->createUserFileInFolder($parentFolder, $fileName);
-			$fileCreated = true;
-			$path = $this->userNodeResolver->toUserAbsolutePath($uid, $fileNode);
-			$fileId = (int)$fileNode->getId();
-			if ($fileId <= 0) {
-				throw new \RuntimeException('Could not resolve new file ID.');
-			}
+		return $this->withCreateRollback(
+			function () use ($uid, $parentFolder, $parentFolderId, $fileName, $accessMode, &$path, &$padId, &$fileCreated): array {
+				$fileNode = $this->padFileCreator->createUserFileInFolder($parentFolder, $fileName);
+				$fileCreated = true;
+				$path = $this->userNodeResolver->toUserAbsolutePath($uid, $fileNode);
+				$fileId = (int)$fileNode->getId();
+				if ($fileId <= 0) {
+					throw new \RuntimeException('Could not resolve new file ID.');
+				}
 
-			$padId = $this->padBootstrapService->provisionPadId($accessMode);
-			$padUrl = $this->etherpadClient->buildPadUrl($padId);
-			$content = $this->padFileService->buildInitialDocument(
-				$fileId,
-				$padId,
-				$accessMode,
-				'',
-				$padUrl
-			);
-			$fileNode->putContent($content);
-			$this->bindingService->createBinding($fileId, $padId, $accessMode);
+				$padId = $this->padBootstrapService->provisionPadId($accessMode);
+				$padUrl = $this->etherpadClient->buildPadUrl($padId);
+				$content = $this->padFileService->buildInitialDocument(
+					$fileId,
+					$padId,
+					$accessMode,
+					'',
+					$padUrl
+				);
+				$fileNode->putContent($content);
+				$this->bindingService->createBinding($fileId, $padId, $accessMode);
 
-			return [
-				'file' => $path,
-				'file_id' => $fileId,
-				'parent_folder_id' => $parentFolderId,
-				'pad_id' => $padId,
-				'access_mode' => $accessMode,
-				'pad_url' => $padUrl,
-			];
-		} catch (BindingException $e) {
-			$this->logger->warning('Pad creation by parent hit existing binding', [
-				'app' => 'etherpad_nextcloud',
-				'parentFolderId' => $parentFolderId,
-				'padName' => $name,
-				'path' => $path,
-				'accessMode' => $accessMode,
-				'padId' => $padId,
-				'exception' => $e,
-			]);
-			$this->rollbackService->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
-			throw $e;
-		} catch (\Throwable $e) {
-			if (!($e instanceof PadFileAlreadyExistsException)) {
-				$this->logger->error('Pad creation by parent failed', [
-					'app' => 'etherpad_nextcloud',
-					'parentFolderId' => $parentFolderId,
-					'padName' => $name,
-					'path' => $path,
-					'accessMode' => $accessMode,
-					'padId' => $padId,
-					'exception' => $e,
-				]);
-			}
-			$this->rollbackService->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
-			throw $e;
-		}
+				return [
+					'file' => $path,
+					'file_id' => $fileId,
+					'parent_folder_id' => $parentFolderId,
+					'pad_id' => $padId,
+					'access_mode' => $accessMode,
+					'pad_url' => $padUrl,
+				];
+			},
+			function () use ($uid, &$path, &$padId, &$fileCreated): void {
+				$this->rollbackService->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
+			},
+			function (\Throwable $e) use ($parentFolderId, $name, $accessMode, &$path, &$padId): ?array {
+				if ($e instanceof BindingException) {
+					return [
+						'message' => 'Pad creation by parent hit existing binding',
+						'context' => [
+							'parentFolderId' => $parentFolderId,
+							'padName' => $name,
+							'path' => $path,
+							'accessMode' => $accessMode,
+							'padId' => $padId,
+						],
+					];
+				}
+
+				return null;
+			},
+			function () use ($parentFolderId, $name, $accessMode, &$path, &$padId): array {
+				return [
+					'message' => 'Pad creation by parent failed',
+					'context' => [
+						'parentFolderId' => $parentFolderId,
+						'padName' => $name,
+						'path' => $path,
+						'accessMode' => $accessMode,
+						'padId' => $padId,
+					],
+				];
+			},
+		);
 	}
 
 	/**
@@ -170,67 +184,113 @@ class PadCreationService {
 		$external = $this->etherpadClient->normalizeAndValidateExternalPublicPadUrl($padUrl);
 		$fileCreated = false;
 
-		try {
-			$fileNode = $this->padFileCreator->createUserFile($uid, $path);
-			$fileCreated = true;
-			$fileId = (int)$fileNode->getId();
-			if ($fileId <= 0) {
-				throw new \RuntimeException('Could not resolve new file ID.');
-			}
+		return $this->withCreateRollback(
+			function () use ($uid, $path, $external, &$fileCreated): array {
+				$fileNode = $this->padFileCreator->createUserFile($uid, $path);
+				$fileCreated = true;
+				$fileId = (int)$fileNode->getId();
+				if ($fileId <= 0) {
+					throw new \RuntimeException('Could not resolve new file ID.');
+				}
 
-			$bindingPadId = $this->rollbackService->buildExternalBindingPadId($external['origin'], $external['pad_id'], $fileId);
-			$this->etherpadClient->assertPublicPadAvailable($external['pad_url']);
-			$content = $this->padFileService->buildInitialDocument(
-				$fileId,
-				$bindingPadId,
-				BindingService::ACCESS_PUBLIC,
-				'',
-				$external['pad_url'],
-				[
-					'pad_origin' => $external['origin'],
-					'remote_pad_id' => $external['pad_id'],
-				]
-			);
-			$fileNode->putContent($content);
+				$bindingPadId = $this->rollbackService->buildExternalBindingPadId($external['origin'], $external['pad_id'], $fileId);
+				$this->etherpadClient->assertPublicPadAvailable($external['pad_url']);
+				$content = $this->padFileService->buildInitialDocument(
+					$fileId,
+					$bindingPadId,
+					BindingService::ACCESS_PUBLIC,
+					'',
+					$external['pad_url'],
+					[
+						'pad_origin' => $external['origin'],
+						'remote_pad_id' => $external['pad_id'],
+					]
+				);
+				$fileNode->putContent($content);
 
-			$this->bindingService->createBinding($fileId, $bindingPadId, BindingService::ACCESS_PUBLIC);
+				$this->bindingService->createBinding($fileId, $bindingPadId, BindingService::ACCESS_PUBLIC);
 
-			return [
-				'file' => $path,
-				'file_id' => $fileId,
-				'pad_id' => $bindingPadId,
-				'access_mode' => BindingService::ACCESS_PUBLIC,
-				'pad_url' => $external['pad_url'],
-			];
-		} catch (BindingException $e) {
-			$this->logger->warning('External pad URL already linked', [
-				'app' => 'etherpad_nextcloud',
-				'file' => $path,
-				'origin' => $external['origin'],
-				'remotePadId' => $external['pad_id'],
-				'exception' => $e,
-			]);
-			$this->rollbackService->rollbackExternalCreate($uid, $path, $fileCreated);
-			throw $e;
-		} catch (EtherpadClientException $e) {
-			$this->logger->warning('External pad URL validation failed', [
-				'app' => 'etherpad_nextcloud',
-				'file' => $path,
-				'padUrl' => $padUrl,
-				'exception' => $e,
-			]);
-			$this->rollbackService->rollbackExternalCreate($uid, $path, $fileCreated);
-			throw $e;
-		} catch (\Throwable $e) {
-			if (!($e instanceof PadFileAlreadyExistsException)) {
-				$this->logger->error('External pad create failed', [
-					'app' => 'etherpad_nextcloud',
+				return [
 					'file' => $path,
-					'padUrl' => $padUrl,
-					'exception' => $e,
-				]);
+					'file_id' => $fileId,
+					'pad_id' => $bindingPadId,
+					'access_mode' => BindingService::ACCESS_PUBLIC,
+					'pad_url' => $external['pad_url'],
+				];
+			},
+			function () use ($uid, $path, &$fileCreated): void {
+				$this->rollbackService->rollbackExternalCreate($uid, $path, $fileCreated);
+			},
+			function (\Throwable $e) use ($path, $padUrl, $external): ?array {
+				if ($e instanceof BindingException) {
+					return [
+						'message' => 'External pad URL already linked',
+						'context' => [
+							'file' => $path,
+							'origin' => $external['origin'],
+							'remotePadId' => $external['pad_id'],
+						],
+					];
+				}
+
+				if ($e instanceof EtherpadClientException) {
+					return [
+						'message' => 'External pad URL validation failed',
+						'context' => [
+							'file' => $path,
+							'padUrl' => $padUrl,
+						],
+					];
+				}
+
+				return null;
+			},
+			function () use ($path, $padUrl): array {
+				return [
+					'message' => 'External pad create failed',
+					'context' => [
+						'file' => $path,
+						'padUrl' => $padUrl,
+					],
+				];
+			},
+		);
+	}
+
+	/**
+	 * @template T
+	 * @param callable():T $action
+	 * @param callable():void $rollback
+	 * @param callable(\Throwable):?array{message:string,context:array<string,mixed>} $warningFor
+	 * @param callable():array{message:string,context:array<string,mixed>} $errorFor
+	 * @return T
+	 */
+	private function withCreateRollback(
+		callable $action,
+		callable $rollback,
+		callable $warningFor,
+		callable $errorFor,
+	): mixed {
+		try {
+			return $action();
+		} catch (\Throwable $e) {
+			$warning = $warningFor($e);
+			if ($warning !== null) {
+				$this->logger->warning($warning['message'], array_merge(
+					['app' => 'etherpad_nextcloud'],
+					$warning['context'],
+					['exception' => $e],
+				));
+			} elseif (!($e instanceof PadFileAlreadyExistsException)) {
+				$error = $errorFor();
+				$this->logger->error($error['message'], array_merge(
+					['app' => 'etherpad_nextcloud'],
+					$error['context'],
+					['exception' => $e],
+				));
 			}
-			$this->rollbackService->rollbackExternalCreate($uid, $path, $fileCreated);
+
+			$rollback();
 			throw $e;
 		}
 	}
