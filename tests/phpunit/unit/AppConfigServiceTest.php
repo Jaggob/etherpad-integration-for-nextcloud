@@ -6,6 +6,7 @@ namespace OCA\EtherpadNextcloud\Tests\Unit;
 
 use OCA\EtherpadNextcloud\Exception\AdminValidationException;
 use OCA\EtherpadNextcloud\Service\AppConfigService;
+use OCA\EtherpadNextcloud\Service\TrustedEmbedOriginsNormalizer;
 use OCP\IConfig;
 use OCP\IL10N;
 use PHPUnit\Framework\TestCase;
@@ -14,7 +15,7 @@ class AppConfigServiceTest extends TestCase {
 	public function testNormalizeTrustedEmbedOriginsRejectsInvalidTcpPortZero(): void {
 		$service = new AppConfigService(
 			$this->createMock(IConfig::class),
-			$this->buildL10n(),
+			new TrustedEmbedOriginsNormalizer($this->buildL10n()),
 		);
 
 		$this->expectException(AdminValidationException::class);
@@ -26,7 +27,7 @@ class AppConfigServiceTest extends TestCase {
 	public function testNormalizeTrustedEmbedOriginsAcceptsUpperTcpPortBoundary(): void {
 		$service = new AppConfigService(
 			$this->createMock(IConfig::class),
-			$this->buildL10n(),
+			new TrustedEmbedOriginsNormalizer($this->buildL10n()),
 		);
 
 		$this->assertSame(
@@ -38,7 +39,7 @@ class AppConfigServiceTest extends TestCase {
 	public function testNormalizeTrustedEmbedOriginsPreservesIpv6Brackets(): void {
 		$service = new AppConfigService(
 			$this->createMock(IConfig::class),
-			$this->buildL10n(),
+			new TrustedEmbedOriginsNormalizer($this->buildL10n()),
 		);
 
 		$this->assertSame(

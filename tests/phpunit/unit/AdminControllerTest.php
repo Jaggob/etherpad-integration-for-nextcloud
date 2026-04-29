@@ -5,10 +5,15 @@ declare(strict_types=1);
 namespace OCA\EtherpadNextcloud\Tests\Unit;
 
 use OCA\EtherpadNextcloud\Controller\AdminController;
-use OCA\EtherpadNextcloud\Service\AppConfigService;
+use OCA\EtherpadNextcloud\Controller\AdminControllerErrorMapper;
+use OCA\EtherpadNextcloud\Service\AdminSettingsRepository;
+use OCA\EtherpadNextcloud\Service\AdminSettingsValidator;
 use OCA\EtherpadNextcloud\Service\ConsistencyCheckService;
-use OCA\EtherpadNextcloud\Service\EtherpadClient;
+use OCA\EtherpadNextcloud\Service\EtherpadHealthCheckService;
+use OCA\EtherpadNextcloud\Service\HealthCheckResult;
 use OCA\EtherpadNextcloud\Service\PendingDeleteRetryService;
+use OCA\EtherpadNextcloud\Service\StoredAdminSettings;
+use OCA\EtherpadNextcloud\Service\ValidatedAdminSettings;
 use OCP\AppFramework\Http;
 use OCP\IConfig;
 use OCP\IGroupManager;
@@ -21,125 +26,73 @@ use Psr\Log\LoggerInterface;
 
 class AdminControllerTest extends TestCase {
 	public function testSaveSettingsReturnsUnauthorizedWhenNoUserSession(): void {
-		$request = $this->createMock(IRequest::class);
-		$request->method('getParams')->willReturn([]);
+		$response = $this->buildController(userSession: $this->userSession(null))->saveSettings();
 
-		$userSession = $this->createMock(IUserSession::class);
-		$userSession->method('getUser')->willReturn(null);
-
-		$controller = new AdminController(
-			'etherpad_nextcloud',
-			$request,
-			$this->createMock(IConfig::class),
-			$userSession,
-			$this->createMock(IGroupManager::class),
-			$this->buildL10n(),
-			$this->createMock(AppConfigService::class),
-			$this->createMock(EtherpadClient::class),
-			$this->createMock(PendingDeleteRetryService::class),
-			$this->createMock(ConsistencyCheckService::class),
-			$this->createMock(LoggerInterface::class),
-		);
-
-		$response = $controller->saveSettings();
 		$this->assertSame(Http::STATUS_UNAUTHORIZED, $response->getStatus());
 		$this->assertFalse((bool)$response->getData()['ok']);
 	}
 
 	public function testSaveSettingsReturnsForbiddenForNonAdminUser(): void {
-		$request = $this->createMock(IRequest::class);
-		$request->method('getParams')->willReturn([]);
+		$response = $this->buildController(groupManager: $this->adminGroup(false))->saveSettings();
 
-		$user = $this->createMock(IUser::class);
-		$user->method('getUID')->willReturn('editor');
-
-		$userSession = $this->createMock(IUserSession::class);
-		$userSession->method('getUser')->willReturn($user);
-
-		$groupManager = $this->createMock(IGroupManager::class);
-		$groupManager->expects($this->once())->method('isAdmin')->with('editor')->willReturn(false);
-
-		$controller = new AdminController(
-			'etherpad_nextcloud',
-			$request,
-			$this->createMock(IConfig::class),
-			$userSession,
-			$groupManager,
-			$this->buildL10n(),
-			$this->createMock(AppConfigService::class),
-			$this->createMock(EtherpadClient::class),
-			$this->createMock(PendingDeleteRetryService::class),
-			$this->createMock(ConsistencyCheckService::class),
-			$this->createMock(LoggerInterface::class),
-		);
-
-		$response = $controller->saveSettings();
 		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
 		$this->assertFalse((bool)$response->getData()['ok']);
 	}
 
+	public function testSaveSettingsPersistsValidatedSettings(): void {
+		$request = $this->request(['etherpad_host' => 'https://pad.example.test']);
+		$stored = new StoredAdminSettings('old-key', '', true, false, '');
+		$validated = $this->validatedSettings();
+
+		$repository = $this->createMock(AdminSettingsRepository::class);
+		$repository->method('getStoredSettings')->willReturn($stored);
+		$repository->expects($this->once())->method('persist')->with($validated);
+		$repository->method('hasApiKey')->willReturn(true);
+
+		$validator = $this->createMock(AdminSettingsValidator::class);
+		$validator->expects($this->once())
+			->method('validateForSave')
+			->with(['etherpad_host' => 'https://pad.example.test'], $stored)
+			->willReturn($validated);
+
+		$response = $this->buildController($request, validator: $validator, repository: $repository)->saveSettings();
+
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$this->assertTrue((bool)$response->getData()['ok']);
+		$this->assertSame('1.3.0', $response->getData()['api_version']);
+		$this->assertTrue((bool)$response->getData()['has_api_key']);
+	}
+
 	public function testHealthCheckReturnsApiAndPendingDeleteMetrics(): void {
-		$request = $this->createMock(IRequest::class);
-		$request->method('getParams')->willReturn([
-			'etherpad_host' => 'https://pad.example.test',
-			'etherpad_api_host' => 'https://pad-api.internal',
-			'etherpad_api_key' => 'new-api-key',
-			'etherpad_api_version' => '1.3.0',
-			'sync_interval_seconds' => 120,
-			'delete_on_trash' => true,
-			'allow_external_pads' => true,
-			'external_pad_allowlist' => '',
-		]);
+		$request = $this->request(['etherpad_host' => 'https://pad.example.test']);
+		$stored = new StoredAdminSettings('existing-key', '', true, false, '');
+		$validated = $this->validatedSettings();
 
-		$user = $this->createMock(IUser::class);
-		$user->method('getUID')->willReturn('admin');
-		$userSession = $this->createMock(IUserSession::class);
-		$userSession->method('getUser')->willReturn($user);
+		$repository = $this->createMock(AdminSettingsRepository::class);
+		$repository->method('getStoredSettings')->willReturn($stored);
 
-		$groupManager = $this->createMock(IGroupManager::class);
-		$groupManager->method('isAdmin')->with('admin')->willReturn(true);
+		$validator = $this->createMock(AdminSettingsValidator::class);
+		$validator->expects($this->once())
+			->method('validateForHealthCheck')
+			->with(['etherpad_host' => 'https://pad.example.test'], $stored)
+			->willReturn($validated);
 
-		$config = $this->createMock(IConfig::class);
-		$config->method('getAppValue')->willReturnCallback(
-			static function (string $appName, string $key, string $default = ''): string {
-				if ($appName === 'etherpad_nextcloud' && $key === 'delete_on_trash') {
-					return 'yes';
-				}
-				if ($appName === 'etherpad_nextcloud' && $key === 'allow_external_pads') {
-					return 'yes';
-				}
-				if ($appName === 'etherpad_nextcloud' && $key === 'etherpad_api_key') {
-					return 'existing-key';
-				}
-				return $default;
-			}
-		);
+		$health = $this->createMock(EtherpadHealthCheckService::class);
+		$health->expects($this->once())
+			->method('check')
+			->with($validated)
+			->willReturn(new HealthCheckResult(
+				'https://pad.example.test',
+				'https://pad-api.internal',
+				'1.3.0',
+				72,
+				123,
+				'https://pad-api.internal/api/1.3.0/listAllPads',
+				3,
+				1,
+			));
 
-		$etherpad = $this->createMock(EtherpadClient::class);
-		$etherpad->expects($this->once())
-			->method('healthCheck')
-			->with('https://pad-api.internal', 'new-api-key', '1.3.0')
-			->willReturn(['pad_count' => 72]);
-
-		$pendingDeleteRetry = $this->createMock(PendingDeleteRetryService::class);
-		$pendingDeleteRetry->method('countPendingDeletes')->willReturn(3);
-		$pendingDeleteRetry->method('countTrashedWithoutFile')->willReturn(1);
-
-		$controller = new AdminController(
-			'etherpad_nextcloud',
-			$request,
-			$config,
-			$userSession,
-			$groupManager,
-			$this->buildL10n(),
-			$this->createMock(AppConfigService::class),
-			$etherpad,
-			$pendingDeleteRetry,
-			$this->createMock(ConsistencyCheckService::class),
-			$this->createMock(LoggerInterface::class),
-		);
-
-		$response = $controller->healthCheck();
+		$response = $this->buildController($request, validator: $validator, repository: $repository, healthCheck: $health)->healthCheck();
 		$data = $response->getData();
 
 		$this->assertSame(Http::STATUS_OK, $response->getStatus());
@@ -150,68 +103,73 @@ class AdminControllerTest extends TestCase {
 		$this->assertSame('https://pad-api.internal/api/1.3.0/listAllPads', $data['target']);
 	}
 
-	public function testSaveSettingsPersistsHttpsOriginAllowlistEntriesWithPorts(): void {
-		$request = $this->createMock(IRequest::class);
-		$request->method('getParams')->willReturn([
-			'etherpad_host' => 'https://pad.example.test',
-			'etherpad_api_host' => 'https://pad-api.example.test',
-			'etherpad_cookie_domain' => '.example.test',
-			'etherpad_api_key' => 'new-api-key',
-			'etherpad_api_version' => '1.3.0',
-			'sync_interval_seconds' => 120,
-			'delete_on_trash' => true,
-			'allow_external_pads' => true,
-			'external_pad_allowlist' => "pad.portal.fzs.de\nhttps://etherpad.example.org:8443",
-			'trusted_embed_origins' => '',
-		]);
-
-		$user = $this->createMock(IUser::class);
-		$user->method('getUID')->willReturn('admin');
-		$userSession = $this->createMock(IUserSession::class);
-		$userSession->method('getUser')->willReturn($user);
-
-		$groupManager = $this->createMock(IGroupManager::class);
-		$groupManager->method('isAdmin')->with('admin')->willReturn(true);
-
-		$saved = [];
-		$config = $this->createMock(IConfig::class);
-		$config->method('getAppValue')->willReturnCallback(
-			static function (string $appName, string $key, string $default = ''): string {
-				if ($appName === 'etherpad_nextcloud' && $key === 'etherpad_api_key') {
-					return 'existing-key';
-				}
-				return $default;
-			}
-		);
-		$config->method('setAppValue')->willReturnCallback(
-			static function (string $appName, string $key, string $value) use (&$saved): void {
-				if ($appName === 'etherpad_nextcloud') {
-					$saved[$key] = $value;
-				}
-			}
-		);
-
-		$appConfigService = $this->createMock(AppConfigService::class);
-		$appConfigService->method('normalizeTrustedEmbedOrigins')->with('')->willReturn('');
-
-		$controller = new AdminController(
+	private function buildController(
+		?IRequest $request = null,
+		?IConfig $config = null,
+		?IUserSession $userSession = null,
+		?IGroupManager $groupManager = null,
+		?AdminSettingsValidator $validator = null,
+		?AdminSettingsRepository $repository = null,
+		?EtherpadHealthCheckService $healthCheck = null,
+	): AdminController {
+		$l10n = $this->buildL10n();
+		$logger = $this->createMock(LoggerInterface::class);
+		return new AdminController(
 			'etherpad_nextcloud',
-			$request,
-			$config,
-			$userSession,
-			$groupManager,
-			$this->buildL10n(),
-			$appConfigService,
-			$this->createMock(EtherpadClient::class),
+			$request ?? $this->request([]),
+			$config ?? $this->createMock(IConfig::class),
+			$userSession ?? $this->userSession('admin'),
+			$groupManager ?? $this->adminGroup(true),
+			$l10n,
+			$validator ?? $this->createMock(AdminSettingsValidator::class),
+			$repository ?? $this->createMock(AdminSettingsRepository::class),
+			$healthCheck ?? $this->createMock(EtherpadHealthCheckService::class),
 			$this->createMock(PendingDeleteRetryService::class),
 			$this->createMock(ConsistencyCheckService::class),
-			$this->createMock(LoggerInterface::class),
+			new AdminControllerErrorMapper($l10n, $logger),
 		);
+	}
 
-		$response = $controller->saveSettings();
+	/** @param array<string,mixed> $payload */
+	private function request(array $payload): IRequest {
+		$request = $this->createMock(IRequest::class);
+		$request->method('getParams')->willReturn($payload);
+		return $request;
+	}
 
-		$this->assertSame(Http::STATUS_OK, $response->getStatus());
-		$this->assertSame("pad.portal.fzs.de\nhttps://etherpad.example.org:8443", $saved['external_pad_allowlist']);
+	private function userSession(?string $uid): IUserSession {
+		$userSession = $this->createMock(IUserSession::class);
+		if ($uid === null) {
+			$userSession->method('getUser')->willReturn(null);
+			return $userSession;
+		}
+
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn($uid);
+		$userSession->method('getUser')->willReturn($user);
+		return $userSession;
+	}
+
+	private function adminGroup(bool $isAdmin): IGroupManager {
+		$groupManager = $this->createMock(IGroupManager::class);
+		$groupManager->method('isAdmin')->willReturn($isAdmin);
+		return $groupManager;
+	}
+
+	private function validatedSettings(): ValidatedAdminSettings {
+		return new ValidatedAdminSettings(
+			'https://pad.example.test',
+			'https://pad-api.internal',
+			'.example.test',
+			'new-api-key',
+			'new-api-key',
+			'1.3.0',
+			120,
+			true,
+			true,
+			'pad.example.test',
+			'',
+		);
 	}
 
 	private function buildL10n(): IL10N {
