@@ -18,6 +18,13 @@ use OCP\Lock\LockedException;
 use Psr\Log\LoggerInterface;
 
 class PadSyncService {
+	public const STATUS_UNCHANGED = 'unchanged';
+	public const STATUS_UPDATED = 'updated';
+	public const STATUS_LOCKED = 'locked';
+	public const STATUS_SYNCED = 'synced';
+	public const STATUS_OUT_OF_SYNC = 'out_of_sync';
+	public const STATUS_UNAVAILABLE = 'unavailable';
+
 	public function __construct(
 		private PadFileService $padFileService,
 		private UserNodeResolver $userNodeResolver,
@@ -61,7 +68,7 @@ class PadSyncService {
 
 			return $this->syncInternalPad($node, $fileId, $padId, (string)$currentContent, $force, $lockRetries);
 		} catch (LockedException $e) {
-			$this->logger->warning('Pad sync deferred because .pad file is locked', [
+			$this->logger->info('Pad sync deferred because .pad file is locked', [
 				'app' => 'etherpad_nextcloud',
 				'fileId' => $fileId,
 				'path' => $absolutePath,
@@ -73,7 +80,7 @@ class PadSyncService {
 				'exception' => $e,
 			]);
 			return [
-				'status' => 'locked',
+				'status' => self::STATUS_LOCKED,
 				'file_id' => $fileId,
 				'pad_id' => $padId,
 				'external' => $isExternal,
@@ -114,7 +121,7 @@ class PadSyncService {
 			$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
 			if ($isExternal) {
 				return [
-					'status' => 'unavailable',
+					'status' => self::STATUS_UNAVAILABLE,
 					'in_sync' => null,
 					'reason' => 'external_no_revision',
 				];
@@ -125,7 +132,7 @@ class PadSyncService {
 			$inSync = $snapshotRev >= $currentRev;
 
 			return [
-				'status' => $inSync ? 'synced' : 'out_of_sync',
+				'status' => $inSync ? self::STATUS_SYNCED : self::STATUS_OUT_OF_SYNC,
 				'in_sync' => $inSync,
 				'snapshot_rev' => $snapshotRev,
 				'current_rev' => $currentRev,
@@ -164,7 +171,7 @@ class PadSyncService {
 		$existingText = $this->padFileService->getTextSnapshotForRestore($currentContent);
 		if ($existingText === $text) {
 			return [
-				'status' => 'unchanged',
+				'status' => self::STATUS_UNCHANGED,
 				'file_id' => $fileId,
 				'pad_id' => $padId,
 				'external' => true,
@@ -178,7 +185,7 @@ class PadSyncService {
 		$this->lockRetryService->putContentWithSyncLockRetry($node, $updatedContent, $lockRetries);
 
 		return [
-			'status' => 'updated',
+			'status' => self::STATUS_UPDATED,
 			'file_id' => $fileId,
 			'pad_id' => $padId,
 			'external' => true,
@@ -201,7 +208,7 @@ class PadSyncService {
 		$snapshotRev = $this->padFileService->getSnapshotRevision($currentContent);
 		if (!$force && $snapshotRev >= $currentRev) {
 			return [
-				'status' => 'unchanged',
+				'status' => self::STATUS_UNCHANGED,
 				'file_id' => $fileId,
 				'pad_id' => $padId,
 				'external' => false,
@@ -219,7 +226,7 @@ class PadSyncService {
 			$existingHtml = $this->padFileService->getHtmlSnapshotForRestore($currentContent);
 			if ($existingText === $text && $existingHtml === $html) {
 				return [
-					'status' => 'unchanged',
+					'status' => self::STATUS_UNCHANGED,
 					'file_id' => $fileId,
 					'pad_id' => $padId,
 					'external' => false,
@@ -234,7 +241,7 @@ class PadSyncService {
 		$this->lockRetryService->putContentWithSyncLockRetry($node, $updatedContent, $lockRetries);
 
 		return [
-			'status' => 'updated',
+			'status' => self::STATUS_UPDATED,
 			'file_id' => $fileId,
 			'pad_id' => $padId,
 			'external' => false,

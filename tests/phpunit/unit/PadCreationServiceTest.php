@@ -127,9 +127,8 @@ class PadCreationServiceTest extends TestCase {
 				'pad_id' => 'RemotePad',
 			]);
 		$etherpadClient->expects($this->once())
-			->method('getPublicTextFromPadUrl')
-			->with('https://pad.remote.test/p/RemotePad')
-			->willReturn('Remote text');
+			->method('assertPublicPadAvailable')
+			->with('https://pad.remote.test/p/RemotePad');
 
 		$padFileService = $this->createMock(PadFileService::class);
 		$padFileService->expects($this->once())

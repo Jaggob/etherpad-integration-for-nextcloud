@@ -179,8 +179,7 @@ class PadCreationService {
 			}
 
 			$bindingPadId = $this->rollbackService->buildExternalBindingPadId($external['origin'], $external['pad_id'], $fileId);
-			// Validate that the target behaves like a public Etherpad pad before persisting binding.
-			$this->etherpadClient->getPublicTextFromPadUrl($external['pad_url']);
+			$this->etherpadClient->assertPublicPadAvailable($external['pad_url']);
 			$content = $this->padFileService->buildInitialDocument(
 				$fileId,
 				$bindingPadId,

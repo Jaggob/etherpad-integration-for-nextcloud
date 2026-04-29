@@ -12,8 +12,6 @@ namespace OCA\EtherpadNextcloud\Service;
 use OCP\Files\NotFoundException;
 
 class PadLifecycleOperationService {
-	public const RESULT_SKIPPED = LifecycleService::RESULT_SKIPPED;
-
 	public function __construct(
 		private PadPathService $padPaths,
 		private UserNodeResolver $userNodeResolver,

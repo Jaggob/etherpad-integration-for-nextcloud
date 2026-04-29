@@ -440,7 +440,7 @@ class PadControllerTest extends TestCase {
 		);
 		$response = $controller->syncById(138);
 
-		$this->assertSame('updated', $response->getData()['status']);
+		$this->assertSame(PadSyncService::STATUS_UPDATED, $response->getData()['status']);
 		$this->assertFalse($response->getData()['external']);
 		$this->assertSame(2, $response->getData()['lock_retries']);
 		$this->assertSame(5, $response->getData()['snapshot_rev']);
@@ -493,7 +493,7 @@ class PadControllerTest extends TestCase {
 		);
 		$response = $controller->syncById(138);
 
-		$this->assertSame('locked', $response->getData()['status']);
+		$this->assertSame(PadSyncService::STATUS_LOCKED, $response->getData()['status']);
 		$this->assertTrue($response->getData()['retryable']);
 		$this->assertSame(3, $response->getData()['lock_retries']);
 	}
@@ -546,7 +546,7 @@ class PadControllerTest extends TestCase {
 		);
 		$response = $controller->syncById(138);
 
-		$this->assertSame('unchanged', $response->getData()['status']);
+		$this->assertSame(PadSyncService::STATUS_UNCHANGED, $response->getData()['status']);
 		$this->assertFalse($response->getData()['external']);
 		$this->assertTrue($response->getData()['forced']);
 		$this->assertSame(5, $response->getData()['snapshot_rev']);
@@ -604,7 +604,7 @@ class PadControllerTest extends TestCase {
 		);
 		$response = $controller->syncById(138);
 
-		$this->assertSame('unchanged', $response->getData()['status']);
+		$this->assertSame(PadSyncService::STATUS_UNCHANGED, $response->getData()['status']);
 		$this->assertTrue($response->getData()['external']);
 		$this->assertTrue($response->getData()['forced']);
 	}

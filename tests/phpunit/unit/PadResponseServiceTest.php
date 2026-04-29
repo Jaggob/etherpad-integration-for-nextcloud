@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace OCA\EtherpadNextcloud\Tests\Unit;
 
-use OCA\EtherpadNextcloud\Exception\BindingException;
+use OCA\EtherpadNextcloud\Exception\MissingBindingException;
 use OCA\EtherpadNextcloud\Service\AppConfigService;
-use OCA\EtherpadNextcloud\Service\PadLifecycleOperationService;
+use OCA\EtherpadNextcloud\Service\LifecycleService;
 use OCA\EtherpadNextcloud\Service\PadResponseService;
 use OCP\AppFramework\Http;
 use OCP\IURLGenerator;
@@ -61,7 +61,7 @@ class PadResponseServiceTest extends TestCase {
 			$this->createMock(IURLGenerator::class),
 			$this->createMock(AppConfigService::class),
 		))->lifecycleResponse([
-			'status' => PadLifecycleOperationService::RESULT_SKIPPED,
+			'status' => LifecycleService::RESULT_SKIPPED,
 			'reason' => 'binding_not_active',
 		]);
 
@@ -72,7 +72,7 @@ class PadResponseServiceTest extends TestCase {
 		$message = (new PadResponseService(
 			$this->createMock(IURLGenerator::class),
 			$this->createMock(AppConfigService::class),
-		))->bindingErrorMessage(new BindingException('No binding exists for this file.'));
+		))->bindingErrorMessage(new MissingBindingException('No binding exists for this file.'));
 
 		$this->assertSame('This .pad file is not linked to a managed pad. It looks like a copied .pad file. Open the original .pad file or create a new pad.', $message);
 	}

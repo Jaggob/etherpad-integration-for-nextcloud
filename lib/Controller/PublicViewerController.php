@@ -12,6 +12,7 @@ namespace OCA\EtherpadNextcloud\Controller;
 
 use OCA\EtherpadNextcloud\Exception\BindingException;
 use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
+use OCA\EtherpadNextcloud\Exception\MissingBindingException;
 use OCA\EtherpadNextcloud\Exception\PadFileFormatException;
 use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
@@ -221,7 +222,7 @@ class PublicViewerController extends PublicShareController {
 			return 'The selected .pad file has an invalid format.';
 		}
 		if ($error instanceof BindingException) {
-			if (trim($message) === 'No binding exists for this file.') {
+			if ($error instanceof MissingBindingException) {
 				return 'The selected .pad file is a copied file without an active pad binding. Please open the original shared .pad file.';
 			}
 			return 'Pad binding is inconsistent. Please contact the share owner.';

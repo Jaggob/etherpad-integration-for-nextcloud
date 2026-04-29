@@ -91,7 +91,7 @@ class PadOpenService {
 				$snapshotText
 			);
 		} catch (LockedException $e) {
-			$this->logger->warning('Pad open deferred because .pad file is locked', [
+			$this->logger->info('Pad open deferred because .pad file is locked', [
 				'app' => 'etherpad_nextcloud',
 				'fileId' => (int)$node->getId(),
 				'path' => $absolutePath,

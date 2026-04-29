@@ -45,7 +45,7 @@ class PadSyncServiceTest extends TestCase {
 			->syncStatusById('alice', 138);
 
 		$this->assertSame([
-			'status' => 'unavailable',
+			'status' => PadSyncService::STATUS_UNAVAILABLE,
 			'in_sync' => null,
 			'reason' => 'external_no_revision',
 		], $result);
@@ -88,7 +88,7 @@ class PadSyncServiceTest extends TestCase {
 			->syncStatusById('alice', 138);
 
 		$this->assertSame([
-			'status' => 'out_of_sync',
+			'status' => PadSyncService::STATUS_OUT_OF_SYNC,
 			'in_sync' => false,
 			'snapshot_rev' => 3,
 			'current_rev' => 5,
