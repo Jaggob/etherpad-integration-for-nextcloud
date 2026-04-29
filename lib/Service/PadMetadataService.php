@@ -26,7 +26,7 @@ class PadMetadataService {
 	}
 
 	/**
-	 * @return array<string,mixed>
+	 * @return array{is_pad:false,file_id:int,name:string,path:string}|array{is_pad:true,is_pad_mime:bool,file_id:int,name:string,path:string,access_mode:string,is_external:bool,pad_id:string,pad_url:string,public_open_url:string}
 	 * @throws NotFoundException
 	 * @throws LockedException
 	 */
@@ -36,7 +36,7 @@ class PadMetadataService {
 		return $this->buildMeta($node, $absolutePath);
 	}
 
-	/** @return array<string,mixed> */
+	/** @return array{is_pad:false,file_id?:int,path?:string}|array{is_pad:true,is_pad_mime:bool,file_id:int,path:string,access_mode:string,is_external:bool,public_open_url:string} */
 	public function resolve(string $uid, int $fileId = 0, string $file = ''): array {
 		$resolvedFileId = $fileId;
 		if ($resolvedFileId > 0) {
@@ -73,7 +73,7 @@ class PadMetadataService {
 	}
 
 	/**
-	 * @return array<string,mixed>
+	 * @return array{is_pad:false,file_id:int,name:string,path:string}|array{is_pad:true,is_pad_mime:bool,file_id:int,name:string,path:string,access_mode:string,is_external:bool,pad_id:string,pad_url:string,public_open_url:string}
 	 * @throws LockedException
 	 */
 	private function buildMeta(File $node, string $absolutePath): array {
@@ -107,7 +107,7 @@ class PadMetadataService {
 		];
 	}
 
-	/** @return array<string,mixed> */
+	/** @return array{is_pad:true,is_pad_mime:bool,file_id:int,path:string,access_mode:string,is_external:bool,public_open_url:string} */
 	private function buildResolve(File $node, int $fileId, string $absolutePath): array {
 		$metadata = $this->readPadMetadata($node, $fileId, $absolutePath, false, 'Pad resolve metadata parse skipped');
 

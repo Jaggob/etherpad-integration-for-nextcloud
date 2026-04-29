@@ -11,6 +11,7 @@ namespace OCA\EtherpadNextcloud\Service;
 
 use OCA\EtherpadNextcloud\Exception\BindingException;
 use OCA\EtherpadNextcloud\Exception\BindingStateConflictException;
+use OCA\EtherpadNextcloud\Exception\MissingBindingException;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 use Psr\Log\LoggerInterface;
@@ -175,7 +176,7 @@ class BindingService {
 		$this->assertAccessMode($accessMode);
 		$binding = $this->findByFileId($fileId);
 		if ($binding === null) {
-			throw new BindingException('No binding exists for this file.');
+			throw new MissingBindingException('No binding exists for this file.');
 		}
 		if ((string)$binding['pad_id'] !== $padId) {
 			throw new BindingException('Binding pad ID mismatch.');

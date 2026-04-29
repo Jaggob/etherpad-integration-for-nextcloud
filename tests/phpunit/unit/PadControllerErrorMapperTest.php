@@ -6,10 +6,12 @@ namespace OCA\EtherpadNextcloud\Tests\Unit;
 
 use OCA\EtherpadNextcloud\Controller\PadControllerErrorMapper;
 use OCA\EtherpadNextcloud\Exception\BindingException;
+use OCA\EtherpadNextcloud\Exception\ControllerBadRequestException;
 use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
 use OCA\EtherpadNextcloud\Exception\PadFileAlreadyExistsException;
 use OCA\EtherpadNextcloud\Exception\PadFileFormatException;
 use OCA\EtherpadNextcloud\Exception\PadParentFolderNotWritableException;
+use OCA\EtherpadNextcloud\Exception\UnauthorizedRequestException;
 use OCA\EtherpadNextcloud\Service\AppConfigService;
 use OCA\EtherpadNextcloud\Service\PadResponseService;
 use OCP\AppFramework\Http;
@@ -30,6 +32,27 @@ class PadControllerErrorMapperTest extends TestCase {
 
 		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
 		$this->assertSame('Invalid file path.', $response->getData()['message']);
+	}
+
+	public function testRunMapsUnauthorizedRequest(): void {
+		$response = $this->buildMapper()->run(
+			static fn(): array => throw new UnauthorizedRequestException('Authentication required.'),
+			static fn(array $result): DataResponse => new DataResponse($result),
+		);
+
+		$this->assertSame(Http::STATUS_UNAUTHORIZED, $response->getStatus());
+		$this->assertSame('Authentication required.', $response->getData()['message']);
+	}
+
+	public function testRunMapsControllerBadRequestWithoutOverridingMessage(): void {
+		$response = $this->buildMapper()->run(
+			static fn(): array => throw new ControllerBadRequestException('Invalid file ID.'),
+			static fn(array $result): DataResponse => new DataResponse($result),
+			['invalid_argument' => 'Invalid file path.'],
+		);
+
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame('Invalid file ID.', $response->getData()['message']);
 	}
 
 	public function testRunMapsInvalidArgumentWithDefaultMessageWhenMessagesAreEmpty(): void {

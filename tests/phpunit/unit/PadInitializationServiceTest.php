@@ -50,7 +50,7 @@ class PadInitializationServiceTest extends TestCase {
 		$result = (new PadInitializationService($padFileService, $padPaths, $userNodeResolver, $bootstrap))
 			->initializeByPath('alice', '/Existing.pad');
 
-		$this->assertSame('already_initialized', $result['status']);
+		$this->assertSame(PadInitializationService::STATUS_ALREADY_INITIALIZED, $result['status']);
 		$this->assertSame('/Existing.pad', $result['file']);
 		$this->assertSame(42, $result['file_id']);
 	}
@@ -85,7 +85,7 @@ class PadInitializationServiceTest extends TestCase {
 		$result = (new PadInitializationService($padFileService, $this->createMock(PadPathService::class), $userNodeResolver, $bootstrap))
 			->initializeById('alice', 42);
 
-		$this->assertSame('already_initialized', $result['status']);
+		$this->assertSame(PadInitializationService::STATUS_ALREADY_INITIALIZED, $result['status']);
 		$this->assertSame('/Existing.pad', $result['file']);
 		$this->assertSame(42, $result['file_id']);
 	}
@@ -131,7 +131,7 @@ class PadInitializationServiceTest extends TestCase {
 			->initialize('alice', $file, 'content');
 
 		$this->assertSame([
-			'status' => 'already_initialized',
+			'status' => PadInitializationService::STATUS_ALREADY_INITIALIZED,
 			'file' => '/Existing.pad',
 			'file_id' => 42,
 			'pad_id' => 'g.ABC$pad',
@@ -174,7 +174,7 @@ class PadInitializationServiceTest extends TestCase {
 			->initialize('alice', $file, 'legacy-content');
 
 		$this->assertSame([
-			'status' => 'initialized',
+			'status' => PadInitializationService::STATUS_INITIALIZED,
 			'file' => '/Legacy.pad',
 			'file_id' => 42,
 			'pad_id' => 'g.XYZ$pad',

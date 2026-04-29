@@ -29,7 +29,7 @@ class PadSessionService {
 		$validUntil = time() + $safeTtlSeconds;
 		$authorId = $this->resolveCachedAuthorId($uid);
 		if ($authorId !== '') {
-			$this->syncAuthorDisplayNameIfNeeded($uid, $authorId, $effectiveDisplayName);
+			$authorId = $this->syncAuthorMapping($uid, $authorId, $effectiveDisplayName);
 			try {
 				$sessionId = $this->etherpadClient->createSession($groupId, $authorId, $validUntil);
 				return [
@@ -43,7 +43,7 @@ class PadSessionService {
 
 		$authorId = $this->etherpadClient->createAuthorIfNotExistsFor('nc:' . $uid, $effectiveDisplayName);
 		$this->rememberAuthorId($uid, $authorId);
-		$this->syncAuthorDisplayNameIfNeeded($uid, $authorId, $effectiveDisplayName);
+		$this->rememberAuthorName($uid, $effectiveDisplayName);
 		$sessionId = $this->etherpadClient->createSession($groupId, $authorId, $validUntil);
 		return [
 			'url' => $this->etherpadClient->buildPadUrl($padId),
@@ -148,28 +148,33 @@ class PadSessionService {
 		return $host;
 	}
 
-	private function syncAuthorDisplayNameIfNeeded(string $uid, string $authorId, string $displayName): void {
+	private function syncAuthorMapping(string $uid, string $authorId, string $displayName): string {
 		$trimmedName = trim($displayName);
 		if ($trimmedName === '') {
-			return;
+			return $authorId;
 		}
 
+		try {
+			$syncedAuthorId = $this->etherpadClient->createAuthorIfNotExistsFor('nc:' . $uid, $trimmedName);
+		} catch (\Throwable) {
+			// Do not fail pad open if author name syncing is temporarily unavailable.
+			return $authorId;
+		}
+
+		if ($syncedAuthorId !== '' && $syncedAuthorId !== $authorId) {
+			$this->rememberAuthorId($uid, $syncedAuthorId);
+			$authorId = $syncedAuthorId;
+		}
 		$lastSyncedName = trim((string)$this->config->getUserValue(
 			$uid,
 			'etherpad_nextcloud',
 			self::USER_CONFIG_AUTHOR_NAME_KEY,
 			''
 		));
-		if ($lastSyncedName === $trimmedName) {
-			return;
-		}
-
-		try {
-			$this->etherpadClient->setAuthorName($authorId, $trimmedName);
+		if ($lastSyncedName !== $trimmedName) {
 			$this->rememberAuthorName($uid, $trimmedName);
-		} catch (\Throwable) {
-			// Do not fail pad open if author renaming is unavailable.
 		}
+		return $authorId;
 	}
 
 	private function resolveCachedAuthorId(string $uid): string {

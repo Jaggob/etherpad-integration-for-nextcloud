@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\EtherpadNextcloud\Tests\Unit;
 
 use OCA\EtherpadNextcloud\Exception\BindingException;
+use OCA\EtherpadNextcloud\Exception\MissingBindingException;
 use OCA\EtherpadNextcloud\Service\BindingService;
 use OCP\IDBConnection;
 use PHPUnit\Framework\TestCase;
@@ -34,6 +35,15 @@ class BindingServiceTest extends TestCase {
 		$this->expectException(BindingException::class);
 		$this->expectExceptionMessage('Binding pad ID mismatch.');
 		$service->assertConsistentMapping(11, 'pad-b', BindingService::ACCESS_PROTECTED);
+	}
+
+	public function testAssertConsistentMappingRejectsMissingBindingWithSpecificException(): void {
+		$service = $this->buildServiceWithBinding(null);
+
+		$this->expectException(MissingBindingException::class);
+		$this->expectExceptionMessage('No binding exists for this file.');
+
+		$service->assertConsistentMapping(10, 'pad-123', BindingService::ACCESS_PUBLIC);
 	}
 
 	public function testAssertConsistentMappingRejectsUnsupportedAccessMode(): void {

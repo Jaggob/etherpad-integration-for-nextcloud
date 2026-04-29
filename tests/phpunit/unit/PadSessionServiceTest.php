@@ -152,7 +152,7 @@ class PadSessionServiceTest extends TestCase {
 		$this->assertStringNotContainsString("\r", $header);
 	}
 
-	public function testCreateProtectedOpenContextUsesCachedAuthorWithoutRecreatingAuthor(): void {
+	public function testCreateProtectedOpenContextRefreshesCachedAuthorMapping(): void {
 		$uid = 'alice';
 		$displayName = 'Alice Example';
 		$padId = 'g.ABCDEFGHIJKLMNOP$pad-1';
@@ -162,8 +162,10 @@ class PadSessionServiceTest extends TestCase {
 		$padUrl = 'https://pad.example.test/p/' . rawurlencode($padId);
 
 		$etherpadClient = $this->createMock(EtherpadClient::class);
-		$etherpadClient->expects($this->never())->method('createAuthorIfNotExistsFor');
-		$etherpadClient->expects($this->never())->method('setAuthorName');
+		$etherpadClient->expects($this->once())
+			->method('createAuthorIfNotExistsFor')
+			->with('nc:' . $uid, $displayName)
+			->willReturn($authorId);
 		$etherpadClient->expects($this->once())
 			->method('createSession')
 			->with($groupId, $authorId, $this->isType('int'))
@@ -205,8 +207,9 @@ class PadSessionServiceTest extends TestCase {
 
 		$etherpadClient = $this->createMock(EtherpadClient::class);
 		$etherpadClient->expects($this->once())
-			->method('setAuthorName')
-			->with($authorId, $displayName);
+			->method('createAuthorIfNotExistsFor')
+			->with('nc:' . $uid, $displayName)
+			->willReturn($authorId);
 		$etherpadClient->expects($this->once())
 			->method('createSession')
 			->with($groupId, $authorId, $this->isType('int'))
@@ -243,10 +246,15 @@ class PadSessionServiceTest extends TestCase {
 		$sessionId = 's.fresh';
 
 		$etherpadClient = $this->createMock(EtherpadClient::class);
-		$etherpadClient->expects($this->once())
+		$etherpadClient->expects($this->exactly(2))
 			->method('createAuthorIfNotExistsFor')
-			->with('nc:' . $uid, $displayName)
-			->willReturn($freshAuthorId);
+			->willReturnCallback(static function (string $authorMapper, string $name) use ($uid, $displayName, $cachedAuthorId, $freshAuthorId): string {
+				static $call = 0;
+				$call++;
+				TestCase::assertSame('nc:' . $uid, $authorMapper);
+				TestCase::assertSame($displayName, $name);
+				return $call === 1 ? $cachedAuthorId : $freshAuthorId;
+			});
 		$etherpadClient->expects($this->exactly(2))
 			->method('createSession')
 			->willReturnCallback(static function (string $actualGroupId, string $actualAuthorId, int $validUntil) use ($groupId, $cachedAuthorId, $freshAuthorId, $sessionId): string {
@@ -292,9 +300,22 @@ class PadSessionServiceTest extends TestCase {
 
 				TestCase::assertSame('etherpad_author_display_name', $key);
 			});
-		$config->expects($this->once())
+		$config->expects($this->exactly(2))
 			->method('setUserValue')
-			->with($uid, 'etherpad_nextcloud', 'etherpad_author_id', $freshAuthorId);
+			->willReturnCallback(static function (string $actualUid, string $appName, string $key, string $value) use ($uid, $freshAuthorId, $displayName): void {
+				static $call = 0;
+				$call++;
+				TestCase::assertSame($uid, $actualUid);
+				TestCase::assertSame('etherpad_nextcloud', $appName);
+				if ($call === 1) {
+					TestCase::assertSame('etherpad_author_id', $key);
+					TestCase::assertSame($freshAuthorId, $value);
+					return;
+				}
+
+				TestCase::assertSame('etherpad_author_display_name', $key);
+				TestCase::assertSame($displayName, $value);
+			});
 
 		$service = new PadSessionService($etherpadClient, $config);
 		$result = $service->createProtectedOpenContext($uid, $displayName, $padId);
@@ -315,9 +336,6 @@ class PadSessionServiceTest extends TestCase {
 			->with('nc:' . $uid, $displayName)
 			->willReturn($authorId);
 		$etherpadClient->expects($this->once())
-			->method('setAuthorName')
-			->with($authorId, $displayName);
-		$etherpadClient->expects($this->once())
 			->method('createSession')
 			->willReturn($sessionId);
 		$etherpadClient->method('buildPadUrl')->willReturn('https://pad.example.test/p/' . rawurlencode($padId));
@@ -329,10 +347,6 @@ class PadSessionServiceTest extends TestCase {
 				['etherpad_nextcloud', 'etherpad_cookie_domain_configured', 'no', 'no'],
 				['etherpad_nextcloud', 'etherpad_host', '', 'https://pad.example.test'],
 			]);
-		$config->expects($this->once())
-			->method('getUserValue')
-			->with($uid, 'etherpad_nextcloud', 'etherpad_author_display_name', '')
-			->willReturn('');
 		$config->expects($this->never())->method('setUserValue');
 		$config->expects($this->never())->method('deleteUserValue');
 

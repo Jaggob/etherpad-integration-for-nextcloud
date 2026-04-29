@@ -15,6 +15,9 @@ use OCP\Files\File;
 use OCP\Files\NotFoundException;
 
 class PadInitializationService {
+	public const STATUS_ALREADY_INITIALIZED = 'already_initialized';
+	public const STATUS_INITIALIZED = 'initialized';
+
 	public function __construct(
 		private PadFileService $padFileService,
 		private PadPathService $padPaths,
@@ -64,7 +67,7 @@ class PadInitializationService {
 			$parsed = $this->padFileService->parsePadFile($content);
 			$meta = $parsed['frontmatter'];
 			return [
-				'status' => 'already_initialized',
+				'status' => self::STATUS_ALREADY_INITIALIZED,
 				'file' => $path,
 				'file_id' => $fileId,
 				'pad_id' => (string)$meta['pad_id'],
@@ -82,7 +85,7 @@ class PadInitializationService {
 		$meta = $parsed['frontmatter'];
 
 		return [
-			'status' => 'initialized',
+			'status' => self::STATUS_INITIALIZED,
 			'file' => $path,
 			'file_id' => $fileId,
 			'pad_id' => (string)$meta['pad_id'],

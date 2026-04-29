@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OCA\EtherpadNextcloud\Service;
 
 use OCA\EtherpadNextcloud\Exception\BindingException;
+use OCA\EtherpadNextcloud\Exception\MissingBindingException;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\IURLGenerator;
@@ -42,7 +43,7 @@ class PadResponseService {
 
 	/** @param array<string,mixed> $data */
 	public function lifecycleResponse(array $data): DataResponse {
-		$status = ($data['status'] ?? '') === PadLifecycleOperationService::RESULT_SKIPPED
+		$status = ($data['status'] ?? '') === LifecycleService::RESULT_SKIPPED
 			? Http::STATUS_CONFLICT
 			: Http::STATUS_OK;
 		return new DataResponse($data, $status);
@@ -67,12 +68,7 @@ class PadResponseService {
 
 	public function bindingErrorMessage(BindingException $e): string {
 		$message = trim($e->getMessage());
-		if ($message === 'No binding exists for this file.') {
-			/*
-			 * Usually means a .pad file was copied without its DB binding. Keep
-			 * this string in sync with BindingService and translate it to
-			 * user-facing guidance here.
-			 */
+		if ($e instanceof MissingBindingException) {
 			return 'This .pad file is not linked to a managed pad. It looks like a copied .pad file. Open the original .pad file or create a new pad.';
 		}
 		return $message;
