@@ -64,7 +64,7 @@ class PadController extends Controller {
 		return $this->runForUser(
 			fn(IUser $user): array => $this->padCreationService->createInParent(
 				$user->getUID(),
-				$this->requirePositiveInt($parentFolderId, 'Invalid parentFolderId.'),
+				$this->requireParentFolderId($parentFolderId),
 				$name,
 				$this->requireAccessMode($accessMode),
 			),
@@ -270,6 +270,10 @@ class PadController extends Controller {
 
 	private function requireFileId(int $fileId): int {
 		return $this->requirePositiveInt($fileId, 'Invalid file ID.');
+	}
+
+	private function requireParentFolderId(int $parentFolderId): int {
+		return $this->requirePositiveInt($parentFolderId, 'Invalid parentFolderId.');
 	}
 
 	private function requirePositiveInt(int $value, string $message): int {

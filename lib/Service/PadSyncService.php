@@ -88,7 +88,7 @@ class PadSyncService {
 	}
 
 	/**
-	 * @return array<string,mixed>
+	 * @return array{status:string,in_sync:null,reason:string}|array{status:string,in_sync:bool,snapshot_rev:int,current_rev:int}
 	 * @throws NotFoundException
 	 */
 	public function syncStatusById(string $uid, int $fileId): array {
@@ -134,7 +134,7 @@ class PadSyncService {
 		}
 	}
 
-	/** @return array<string,mixed> */
+	/** @return array{status:string,file_id:int,pad_id:string,external:true,forced:bool}|array{status:string,file_id:int,pad_id:string,external:true,forced:bool,snapshot_rev:int,lock_retries:int} */
 	private function syncExternalPad(
 		File $node,
 		int $fileId,
@@ -179,7 +179,7 @@ class PadSyncService {
 		];
 	}
 
-	/** @return array<string,mixed> */
+	/** @return array{status:string,file_id:int,pad_id:string,external:false,forced:bool,snapshot_rev:int,current_rev:int}|array{status:string,file_id:int,pad_id:string,external:false,forced:bool,snapshot_rev:int,lock_retries:int} */
 	private function syncInternalPad(
 		File $node,
 		int $fileId,
@@ -234,7 +234,7 @@ class PadSyncService {
 		];
 	}
 
-	/** @return array<string,mixed> */
+	/** @return array{status:string,file_id:int,pad_id:string,external:bool,forced:bool,lock_retries:int,retryable:true} */
 	private function lockedSyncResponse(
 		LockedException $e,
 		int $fileId,

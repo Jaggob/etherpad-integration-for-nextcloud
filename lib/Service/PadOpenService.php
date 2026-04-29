@@ -31,7 +31,7 @@ class PadOpenService {
 	}
 
 	/**
-	 * @return array<string,mixed>
+	 * @return array{file:string,file_id:int,pad_id:string,access_mode:string,pad_url:string,is_external:bool,original_pad_url:string,snapshot_text:string,url:string,cookie_header:string}
 	 * @throws NotFoundException
 	 */
 	public function openByPath(string $uid, string $displayName, string $file): array {
@@ -45,7 +45,7 @@ class PadOpenService {
 	}
 
 	/**
-	 * @return array<string,mixed>
+	 * @return array{file:string,file_id:int,pad_id:string,access_mode:string,pad_url:string,is_external:bool,original_pad_url:string,snapshot_text:string,url:string,cookie_header:string}
 	 * @throws NotFoundException
 	 */
 	public function openById(string $uid, string $displayName, int $fileId): array {
@@ -55,7 +55,7 @@ class PadOpenService {
 	}
 
 	/**
-	 * @return array<string,mixed>
+	 * @return array{file:string,file_id:int,pad_id:string,access_mode:string,pad_url:string,is_external:bool,original_pad_url:string,snapshot_text:string,url:string,cookie_header:string}
 	 * @throws BindingException
 	 * @throws EtherpadClientException
 	 * @throws LockedException
@@ -101,7 +101,7 @@ class PadOpenService {
 		}
 	}
 
-	/** @return array<string,mixed> */
+	/** @return array{file:string,file_id:int,pad_id:string,access_mode:string,pad_url:string,is_external:bool,original_pad_url:string,snapshot_text:string,url:string,cookie_header:string} */
 	private function buildOpenContext(
 		string $uid,
 		string $displayName,
@@ -137,6 +137,8 @@ class PadOpenService {
 			$url = $openContext['url'];
 			$cookieHeader = $this->padSessionService->buildSetCookieHeader($openContext['cookie']);
 		} else {
+			// Public pads intentionally open without an Etherpad session so
+			// Nextcloud user identity is not shared unless protected access needs it.
 			$url = $effectivePadUrl;
 		}
 
