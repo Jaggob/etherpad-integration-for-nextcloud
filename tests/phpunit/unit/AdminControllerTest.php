@@ -6,8 +6,12 @@ namespace OCA\EtherpadNextcloud\Tests\Unit;
 
 use OCA\EtherpadNextcloud\Controller\AdminController;
 use OCA\EtherpadNextcloud\Controller\AdminControllerErrorMapper;
+use OCA\EtherpadNextcloud\Exception\AdminDebugModeRequiredException;
+use OCA\EtherpadNextcloud\Exception\UnsupportedTestFaultException;
+use OCA\EtherpadNextcloud\Service\AdminConsistencyCheckResponseBuilder;
 use OCA\EtherpadNextcloud\Service\AdminSettingsRepository;
 use OCA\EtherpadNextcloud\Service\AdminSettingsValidator;
+use OCA\EtherpadNextcloud\Service\AdminTestFaultService;
 use OCA\EtherpadNextcloud\Service\ConsistencyCheckService;
 use OCA\EtherpadNextcloud\Service\EtherpadHealthCheckService;
 use OCA\EtherpadNextcloud\Service\HealthCheckResult;
@@ -15,7 +19,6 @@ use OCA\EtherpadNextcloud\Service\PendingDeleteRetryService;
 use OCA\EtherpadNextcloud\Service\StoredAdminSettings;
 use OCA\EtherpadNextcloud\Service\ValidatedAdminSettings;
 use OCP\AppFramework\Http;
-use OCP\IConfig;
 use OCP\IGroupManager;
 use OCP\IL10N;
 use OCP\IRequest;
@@ -103,23 +106,48 @@ class AdminControllerTest extends TestCase {
 		$this->assertSame('https://pad-api.internal/api/1.3.0/listAllPads', $data['target']);
 	}
 
-	public function testSetTestFaultRequiresDebugMode(): void {
-		$config = $this->createMock(IConfig::class);
-		$config->method('getSystemValueBool')->with('debug', false)->willReturn(false);
+	public function testRetryPendingDeletesUsesConfiguredBatchSize(): void {
+		$pendingDeletes = $this->createMock(PendingDeleteRetryService::class);
+		$pendingDeletes->expects($this->once())
+			->method('retry')
+			->with(500)
+			->willReturn([
+				'attempted' => 1,
+				'resolved' => 1,
+				'failed' => 0,
+				'remaining' => 0,
+				'trashed_attempted' => 0,
+				'trashed_resolved' => 0,
+				'trashed_failed' => 0,
+				'trashed_without_file_remaining' => 0,
+			]);
 
-		$response = $this->buildController(config: $config)->setTestFault();
+		$response = $this->buildController(pendingDeletes: $pendingDeletes)->retryPendingDeletes();
+
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$this->assertSame(1, $response->getData()['attempted']);
+	}
+
+	public function testSetTestFaultRequiresDebugMode(): void {
+		$testFaults = $this->createMock(AdminTestFaultService::class);
+		$testFaults->method('setFault')->willThrowException(new AdminDebugModeRequiredException());
+
+		$response = $this->buildController(testFaults: $testFaults)->setTestFault();
 
 		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
 		$this->assertFalse((bool)$response->getData()['ok']);
 	}
 
 	public function testSetTestFaultRejectsUnsupportedFault(): void {
-		$config = $this->createMock(IConfig::class);
-		$config->method('getSystemValueBool')->with('debug', false)->willReturn(true);
+		$testFaults = $this->createMock(AdminTestFaultService::class);
+		$testFaults->expects($this->once())
+			->method('setFault')
+			->with('unknown_fault')
+			->willThrowException(new UnsupportedTestFaultException(['trash_read_lock']));
 
 		$response = $this->buildController(
 			$this->request(['fault' => 'unknown_fault']),
-			config: $config,
+			testFaults: $testFaults,
 		)->setTestFault();
 
 		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
@@ -128,15 +156,15 @@ class AdminControllerTest extends TestCase {
 	}
 
 	public function testSetTestFaultPersistsSupportedFault(): void {
-		$config = $this->createMock(IConfig::class);
-		$config->method('getSystemValueBool')->with('debug', false)->willReturn(true);
-		$config->expects($this->once())
-			->method('setAppValue')
-			->with('etherpad_nextcloud', 'test_fault', 'trash_read_lock');
+		$testFaults = $this->createMock(AdminTestFaultService::class);
+		$testFaults->expects($this->once())
+			->method('setFault')
+			->with('trash_read_lock')
+			->willReturn('trash_read_lock');
 
 		$response = $this->buildController(
 			$this->request(['fault' => 'trash_read_lock']),
-			config: $config,
+			testFaults: $testFaults,
 		)->setTestFault();
 
 		$this->assertSame(Http::STATUS_OK, $response->getStatus());
@@ -146,27 +174,31 @@ class AdminControllerTest extends TestCase {
 
 	private function buildController(
 		?IRequest $request = null,
-		?IConfig $config = null,
 		?IUserSession $userSession = null,
 		?IGroupManager $groupManager = null,
 		?AdminSettingsValidator $validator = null,
 		?AdminSettingsRepository $repository = null,
 		?EtherpadHealthCheckService $healthCheck = null,
+		?PendingDeleteRetryService $pendingDeletes = null,
+		?ConsistencyCheckService $consistencyCheck = null,
+		?AdminConsistencyCheckResponseBuilder $consistencyResponses = null,
+		?AdminTestFaultService $testFaults = null,
 	): AdminController {
 		$l10n = $this->buildL10n();
 		$logger = $this->createMock(LoggerInterface::class);
 		return new AdminController(
 			'etherpad_nextcloud',
 			$request ?? $this->request([]),
-			$config ?? $this->createMock(IConfig::class),
 			$userSession ?? $this->userSession('admin'),
 			$groupManager ?? $this->adminGroup(true),
 			$l10n,
 			$validator ?? $this->createMock(AdminSettingsValidator::class),
 			$repository ?? $this->createMock(AdminSettingsRepository::class),
 			$healthCheck ?? $this->createMock(EtherpadHealthCheckService::class),
-			$this->createMock(PendingDeleteRetryService::class),
-			$this->createMock(ConsistencyCheckService::class),
+			$pendingDeletes ?? $this->createMock(PendingDeleteRetryService::class),
+			$consistencyCheck ?? $this->createMock(ConsistencyCheckService::class),
+			$consistencyResponses ?? new AdminConsistencyCheckResponseBuilder($l10n),
+			$testFaults ?? $this->createMock(AdminTestFaultService::class),
 			new AdminControllerErrorMapper($l10n, $logger),
 		);
 	}

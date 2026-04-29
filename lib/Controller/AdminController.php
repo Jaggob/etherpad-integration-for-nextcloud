@@ -8,22 +8,19 @@ declare(strict_types=1);
 
 namespace OCA\EtherpadNextcloud\Controller;
 
-use OCA\EtherpadNextcloud\AppInfo\Application;
-use OCA\EtherpadNextcloud\Exception\AdminDebugModeRequiredException;
 use OCA\EtherpadNextcloud\Exception\AdminPermissionRequiredException;
-use OCA\EtherpadNextcloud\Exception\UnsupportedTestFaultException;
 use OCA\EtherpadNextcloud\Exception\UnauthorizedRequestException;
+use OCA\EtherpadNextcloud\Service\AdminConsistencyCheckResponseBuilder;
 use OCA\EtherpadNextcloud\Service\AdminSettingsRepository;
 use OCA\EtherpadNextcloud\Service\AdminSettingsValidator;
+use OCA\EtherpadNextcloud\Service\AdminTestFaultService;
 use OCA\EtherpadNextcloud\Service\ConsistencyCheckService;
 use OCA\EtherpadNextcloud\Service\EtherpadHealthCheckService;
 use OCA\EtherpadNextcloud\Service\HealthCheckResult;
-use OCA\EtherpadNextcloud\Service\LifecycleService;
 use OCA\EtherpadNextcloud\Service\PendingDeleteRetryService;
 use OCA\EtherpadNextcloud\Service\ValidatedAdminSettings;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\DataResponse;
-use OCP\IConfig;
 use OCP\IGroupManager;
 use OCP\IL10N;
 use OCP\IRequest;
@@ -34,11 +31,11 @@ class AdminController extends Controller {
 	private const CONSISTENCY_SAMPLE_LIMIT = 25;
 	private const CONSISTENCY_FRONTMATTER_CHUNK_SIZE = 200;
 	private const CONSISTENCY_FRONTMATTER_TIME_BUDGET_MS = 3000;
+	private const PENDING_DELETE_RETRY_BATCH_SIZE = 500;
 
 	public function __construct(
 		string $appName,
 		IRequest $request,
-		private IConfig $config,
 		private IUserSession $userSession,
 		private IGroupManager $groupManager,
 		private IL10N $l10n,
@@ -47,6 +44,8 @@ class AdminController extends Controller {
 		private EtherpadHealthCheckService $healthCheckService,
 		private PendingDeleteRetryService $pendingDeleteRetryService,
 		private ConsistencyCheckService $consistencyCheckService,
+		private AdminConsistencyCheckResponseBuilder $consistencyResponseBuilder,
+		private AdminTestFaultService $testFaultService,
 		private AdminControllerErrorMapper $errors,
 	) {
 		parent::__construct($appName, $request);
@@ -109,7 +108,7 @@ class AdminController extends Controller {
 		return $this->errors->run(
 			function (): array {
 				$this->requireAdmin();
-				return $this->pendingDeleteRetryService->retry(500);
+				return $this->pendingDeleteRetryService->retry(self::PENDING_DELETE_RETRY_BATCH_SIZE);
 			},
 			fn(array $result): DataResponse => new DataResponse([
 				'ok' => true,
@@ -141,35 +140,7 @@ class AdminController extends Controller {
 					self::CONSISTENCY_FRONTMATTER_TIME_BUDGET_MS,
 				);
 			},
-			function (array $result): DataResponse {
-				$issues = (int)$result['binding_without_file_count']
-					+ (int)$result['file_without_binding_count']
-					+ (int)$result['invalid_frontmatter_count'];
-				$timeBudgetExceeded = (bool)($result['frontmatter_time_budget_exceeded'] ?? false);
-				$scanLimitReached = (bool)($result['frontmatter_scan_limit_reached'] ?? false);
-				$isPartial = $timeBudgetExceeded || $scanLimitReached;
-				$message = $issues > 0
-					? $this->l10n->t('Consistency check finished with issues.')
-					: $this->l10n->t('Consistency check successful. No issues found.');
-				if ($isPartial) {
-					$message .= ' ' . $this->l10n->t('Frontmatter validation result is partial (scan limit/time budget reached).');
-				}
-
-				return new DataResponse([
-					'ok' => true,
-					'message' => $message,
-					'binding_without_file_count' => (int)$result['binding_without_file_count'],
-					'file_without_binding_count' => (int)$result['file_without_binding_count'],
-					'invalid_frontmatter_count' => (int)$result['invalid_frontmatter_count'],
-					'frontmatter_scanned' => (int)$result['frontmatter_scanned'],
-					'frontmatter_skipped' => (int)$result['frontmatter_skipped'],
-					'frontmatter_scan_limit_reached' => $scanLimitReached,
-					'frontmatter_time_budget_exceeded' => $timeBudgetExceeded,
-					'frontmatter_time_budget_ms' => (int)($result['frontmatter_time_budget_ms'] ?? 0),
-					'frontmatter_chunk_size' => (int)($result['frontmatter_chunk_size'] ?? 0),
-					'samples' => $result['samples'],
-				]);
-			},
+			fn(array $result): DataResponse => new DataResponse($this->consistencyResponseBuilder->build($result)),
 			[
 				'generic' => $this->l10n->t('Consistency check failed.'),
 				'log_message' => 'Consistency check failed',
@@ -181,19 +152,9 @@ class AdminController extends Controller {
 		return $this->errors->run(
 			function (): string {
 				$this->requireAdmin();
-				if (!$this->config->getSystemValueBool('debug', false)) {
-					throw new AdminDebugModeRequiredException();
-				}
-
 				$payload = $this->readJsonPayload();
 				$fault = trim((string)($payload['fault'] ?? ''));
-				$allowed = LifecycleService::getSupportedTestFaults();
-				if ($fault !== '' && !in_array($fault, $allowed, true)) {
-					throw new UnsupportedTestFaultException($allowed);
-				}
-
-				$this->config->setAppValue(Application::APP_ID, 'test_fault', $fault);
-				return $fault;
+				return $this->testFaultService->setFault($fault);
 			},
 			fn(string $fault): DataResponse => new DataResponse([
 				'ok' => true,
