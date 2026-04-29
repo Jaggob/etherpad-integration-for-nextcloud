@@ -9,7 +9,9 @@ declare(strict_types=1);
 namespace OCA\EtherpadNextcloud\Controller;
 
 use OCA\EtherpadNextcloud\AppInfo\Application;
+use OCA\EtherpadNextcloud\Exception\AdminDebugModeRequiredException;
 use OCA\EtherpadNextcloud\Exception\AdminPermissionRequiredException;
+use OCA\EtherpadNextcloud\Exception\UnsupportedTestFaultException;
 use OCA\EtherpadNextcloud\Exception\UnauthorizedRequestException;
 use OCA\EtherpadNextcloud\Service\AdminSettingsRepository;
 use OCA\EtherpadNextcloud\Service\AdminSettingsValidator;
@@ -20,7 +22,6 @@ use OCA\EtherpadNextcloud\Service\LifecycleService;
 use OCA\EtherpadNextcloud\Service\PendingDeleteRetryService;
 use OCA\EtherpadNextcloud\Service\ValidatedAdminSettings;
 use OCP\AppFramework\Controller;
-use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\IConfig;
 use OCP\IGroupManager;
@@ -29,6 +30,11 @@ use OCP\IRequest;
 use OCP\IUserSession;
 
 class AdminController extends Controller {
+	private const CONSISTENCY_FRONTMATTER_SCAN_LIMIT = 1500;
+	private const CONSISTENCY_SAMPLE_LIMIT = 25;
+	private const CONSISTENCY_FRONTMATTER_CHUNK_SIZE = 200;
+	private const CONSISTENCY_FRONTMATTER_TIME_BUDGET_MS = 3000;
+
 	public function __construct(
 		string $appName,
 		IRequest $request,
@@ -128,7 +134,12 @@ class AdminController extends Controller {
 		return $this->errors->run(
 			function (): array {
 				$this->requireAdmin();
-				return $this->consistencyCheckService->run(1500, 25, 200, 3000);
+				return $this->consistencyCheckService->run(
+					self::CONSISTENCY_FRONTMATTER_SCAN_LIMIT,
+					self::CONSISTENCY_SAMPLE_LIMIT,
+					self::CONSISTENCY_FRONTMATTER_CHUNK_SIZE,
+					self::CONSISTENCY_FRONTMATTER_TIME_BUDGET_MS,
+				);
 			},
 			function (array $result): DataResponse {
 				$issues = (int)$result['binding_without_file_count']
@@ -168,45 +179,29 @@ class AdminController extends Controller {
 
 	public function setTestFault(): DataResponse {
 		return $this->errors->run(
-			function (): array {
+			function (): string {
 				$this->requireAdmin();
 				if (!$this->config->getSystemValueBool('debug', false)) {
-					return [
-						'status' => Http::STATUS_FORBIDDEN,
-						'data' => [
-							'ok' => false,
-							'message' => $this->l10n->t('Test faults are available only when Nextcloud debug mode is enabled.'),
-						],
-					];
+					throw new AdminDebugModeRequiredException();
 				}
 
 				$payload = $this->readJsonPayload();
 				$fault = trim((string)($payload['fault'] ?? ''));
 				$allowed = LifecycleService::getSupportedTestFaults();
 				if ($fault !== '' && !in_array($fault, $allowed, true)) {
-					return [
-						'status' => Http::STATUS_BAD_REQUEST,
-						'data' => [
-							'ok' => false,
-							'message' => $this->l10n->t('Unsupported test fault.'),
-							'supported_faults' => $allowed,
-						],
-					];
+					throw new UnsupportedTestFaultException($allowed);
 				}
 
 				$this->config->setAppValue(Application::APP_ID, 'test_fault', $fault);
-				return [
-					'status' => Http::STATUS_OK,
-					'data' => [
-						'ok' => true,
-						'fault' => $fault,
-						'message' => $fault === ''
-							? $this->l10n->t('Test fault cleared.')
-							: $this->l10n->t('Test fault set: {fault}', ['fault' => $fault]),
-					],
-				];
+				return $fault;
 			},
-			fn(array $result): DataResponse => new DataResponse($result['data'], (int)$result['status']),
+			fn(string $fault): DataResponse => new DataResponse([
+				'ok' => true,
+				'fault' => $fault,
+				'message' => $fault === ''
+					? $this->l10n->t('Test fault cleared.')
+					: $this->l10n->t('Test fault set: {fault}', ['fault' => $fault]),
+			]),
 			[
 				'generic' => $this->l10n->t('Failed to update test fault.'),
 				'log_message' => 'Updating test fault failed',

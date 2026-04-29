@@ -22,7 +22,7 @@ class EtherpadHealthCheckService {
 	}
 
 	public function check(ValidatedAdminSettings $settings): HealthCheckResult {
-		$startedAt = microtime(true);
+		$startedAt = $this->now();
 		try {
 			$result = $this->etherpadClient->healthCheck(
 				$settings->etherpadApiHost,
@@ -46,7 +46,7 @@ class EtherpadHealthCheckService {
 			$settings->etherpadApiHost,
 			$settings->etherpadApiVersion,
 			(int)($result['pad_count'] ?? 0),
-			(int)round((microtime(true) - $startedAt) * 1000),
+			(int)round(($this->now() - $startedAt) * 1000),
 			rtrim($settings->etherpadApiHost, '/') . '/api/' . $settings->etherpadApiVersion . '/listAllPads',
 			$this->pendingDeleteRetryService->countPendingDeletes(),
 			$this->pendingDeleteRetryService->countTrashedWithoutFile(),
@@ -54,9 +54,15 @@ class EtherpadHealthCheckService {
 	}
 
 	private function isLikelyAuthMethodMismatch(EtherpadClientException $e): bool {
+		// Etherpad returns these strings for API auth failures in supported versions.
+		// If upstream wording changes, the health check still fails; only the hint drops.
 		$message = strtolower($e->getMessage());
 		return str_contains($message, 'no or wrong api key')
 			|| str_contains($message, 'wrong api key')
 			|| str_contains($message, 'invalid apikey');
+	}
+
+	protected function now(): float {
+		return microtime(true);
 	}
 }

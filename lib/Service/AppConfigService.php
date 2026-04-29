@@ -40,7 +40,4 @@ class AppConfigService {
 		return $this->trustedEmbedOriginsNormalizer->parse($this->getTrustedEmbedOriginsRaw());
 	}
 
-	public function normalizeTrustedEmbedOrigins(string $rawOrigins): string {
-		return $this->trustedEmbedOriginsNormalizer->normalize($rawOrigins);
-	}
 }

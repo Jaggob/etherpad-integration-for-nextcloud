@@ -24,13 +24,23 @@ class AdminSettingsValidator {
 	) {
 	}
 
-	/** @param array<string,mixed> $payload */
+	/**
+	 * Save and health-check currently share validation rules. The separate entry
+	 * points keep endpoint intent explicit if persistence-only rules return later.
+	 *
+	 * @param array<string,mixed> $payload
+	 */
 	public function validateForSave(array $payload, StoredAdminSettings $stored): ValidatedAdminSettings {
 		$apiKey = $this->resolveApiKey($payload, $stored);
 		return $this->validate($payload, $stored, $apiKey['to_store'], $apiKey['effective']);
 	}
 
-	/** @param array<string,mixed> $payload */
+	/**
+	 * See validateForSave(): health checks intentionally use the same normalized
+	 * values as saving, without persisting them.
+	 *
+	 * @param array<string,mixed> $payload
+	 */
 	public function validateForHealthCheck(array $payload, StoredAdminSettings $stored): ValidatedAdminSettings {
 		$apiKey = $this->resolveApiKey($payload, $stored);
 		return $this->validate($payload, $stored, $apiKey['to_store'], $apiKey['effective']);

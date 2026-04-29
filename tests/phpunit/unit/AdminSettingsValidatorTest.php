@@ -57,6 +57,25 @@ class AdminSettingsValidatorTest extends TestCase {
 		$this->assertSame('stored-key', $result->effectiveApiKey);
 	}
 
+	public function testValidateForSaveUsesStoredDefaultsForOptionalSettings(): void {
+		$result = $this->buildValidator()->validateForSave([
+			'etherpad_host' => 'https://pad.example.test',
+			'etherpad_api_key' => 'key',
+			'etherpad_api_version' => '1.3.0',
+		], $this->stored(
+			cookieDomain: '.stored.example.test',
+			deleteOnTrash: false,
+			allowExternalPads: true,
+			trustedEmbedOrigins: 'https://portal.example.test',
+		));
+
+		$this->assertSame('.stored.example.test', $result->etherpadCookieDomain);
+		$this->assertFalse($result->deleteOnTrash);
+		$this->assertTrue($result->allowExternalPads);
+		$this->assertSame('', $result->externalPadAllowlist);
+		$this->assertSame('https://portal.example.test', $result->trustedEmbedOrigins);
+	}
+
 	public function testValidateRejectsMissingApiKey(): void {
 		$this->expectException(AdminValidationException::class);
 		$this->expectExceptionMessage('Etherpad API key is required.');
@@ -76,6 +95,16 @@ class AdminSettingsValidatorTest extends TestCase {
 		], $this->stored());
 	}
 
+	public function testValidateRejectsInvalidPublicHost(): void {
+		$this->expectException(AdminValidationException::class);
+		$this->expectExceptionMessage('Invalid Etherpad Base URL.');
+
+		$this->buildValidator()->validateForSave([
+			'etherpad_host' => 'https://',
+			'etherpad_api_key' => 'key',
+		], $this->stored());
+	}
+
 	public function testValidateRejectsQueryInPublicHost(): void {
 		$this->expectException(AdminValidationException::class);
 		$this->expectExceptionMessage('Etherpad Base URL must not include query or fragment.');
@@ -86,7 +115,73 @@ class AdminSettingsValidatorTest extends TestCase {
 		], $this->stored());
 	}
 
-	public function testValidateRejectsInvalidSyncInterval(): void {
+	public function testValidateAllowsHttpApiHost(): void {
+		$result = $this->buildValidator()->validateForSave([
+			'etherpad_host' => 'https://pad.example.test',
+			'etherpad_api_host' => 'http://pad-api.internal:9001/',
+			'etherpad_api_key' => 'key',
+			'etherpad_api_version' => '1.3.0',
+		], $this->stored());
+
+		$this->assertSame('http://pad-api.internal:9001', $result->etherpadApiHost);
+	}
+
+	public function testValidateRejectsUnsupportedApiHostScheme(): void {
+		$this->expectException(AdminValidationException::class);
+		$this->expectExceptionMessage('Etherpad API URL must use http or https.');
+
+		$this->buildValidator()->validateForSave([
+			'etherpad_host' => 'https://pad.example.test',
+			'etherpad_api_host' => 'ftp://pad-api.example.test',
+			'etherpad_api_key' => 'key',
+		], $this->stored());
+	}
+
+	public function testValidateRejectsQueryInApiHost(): void {
+		$this->expectException(AdminValidationException::class);
+		$this->expectExceptionMessage('Etherpad API URL must not include query or fragment.');
+
+		$this->buildValidator()->validateForSave([
+			'etherpad_host' => 'https://pad.example.test',
+			'etherpad_api_host' => 'https://pad-api.example.test?bad=1',
+			'etherpad_api_key' => 'key',
+		], $this->stored());
+	}
+
+	public function testValidateRejectsCookieDomainUrl(): void {
+		$this->expectException(AdminValidationException::class);
+		$this->expectExceptionMessage('Cookie domain must be a hostname, not a URL.');
+
+		$this->buildValidator()->validateForSave([
+			'etherpad_host' => 'https://pad.example.test',
+			'etherpad_cookie_domain' => 'https://example.test',
+			'etherpad_api_key' => 'key',
+		], $this->stored());
+	}
+
+	public function testValidateRejectsCookieDomainIpAddress(): void {
+		$this->expectException(AdminValidationException::class);
+		$this->expectExceptionMessage('Cookie domain must be a valid shared hostname.');
+
+		$this->buildValidator()->validateForSave([
+			'etherpad_host' => 'https://pad.example.test',
+			'etherpad_cookie_domain' => '127.0.0.1',
+			'etherpad_api_key' => 'key',
+		], $this->stored());
+	}
+
+	public function testValidateRejectsInvalidCookieDomainLabel(): void {
+		$this->expectException(AdminValidationException::class);
+		$this->expectExceptionMessage('Cookie domain must be a valid shared hostname.');
+
+		$this->buildValidator()->validateForSave([
+			'etherpad_host' => 'https://pad.example.test',
+			'etherpad_cookie_domain' => '-bad.example.test',
+			'etherpad_api_key' => 'key',
+		], $this->stored());
+	}
+
+	public function testValidateRejectsTooLowSyncInterval(): void {
 		$this->expectException(AdminValidationException::class);
 		$this->expectExceptionMessage('Sync interval must be between 5 and 3600 seconds.');
 
@@ -94,6 +189,28 @@ class AdminSettingsValidatorTest extends TestCase {
 			'etherpad_host' => 'https://pad.example.test',
 			'etherpad_api_key' => 'key',
 			'sync_interval_seconds' => 2,
+		], $this->stored());
+	}
+
+	public function testValidateRejectsTooHighSyncInterval(): void {
+		$this->expectException(AdminValidationException::class);
+		$this->expectExceptionMessage('Sync interval must be between 5 and 3600 seconds.');
+
+		$this->buildValidator()->validateForSave([
+			'etherpad_host' => 'https://pad.example.test',
+			'etherpad_api_key' => 'key',
+			'sync_interval_seconds' => 3601,
+		], $this->stored());
+	}
+
+	public function testValidateRejectsInvalidApiVersionFormat(): void {
+		$this->expectException(AdminValidationException::class);
+		$this->expectExceptionMessage('Invalid Etherpad API version format.');
+
+		$this->buildValidator()->validateForSave([
+			'etherpad_host' => 'https://pad.example.test',
+			'etherpad_api_key' => 'key',
+			'etherpad_api_version' => '1.3',
 		], $this->stored());
 	}
 

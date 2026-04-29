@@ -103,6 +103,47 @@ class AdminControllerTest extends TestCase {
 		$this->assertSame('https://pad-api.internal/api/1.3.0/listAllPads', $data['target']);
 	}
 
+	public function testSetTestFaultRequiresDebugMode(): void {
+		$config = $this->createMock(IConfig::class);
+		$config->method('getSystemValueBool')->with('debug', false)->willReturn(false);
+
+		$response = $this->buildController(config: $config)->setTestFault();
+
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertFalse((bool)$response->getData()['ok']);
+	}
+
+	public function testSetTestFaultRejectsUnsupportedFault(): void {
+		$config = $this->createMock(IConfig::class);
+		$config->method('getSystemValueBool')->with('debug', false)->willReturn(true);
+
+		$response = $this->buildController(
+			$this->request(['fault' => 'unknown_fault']),
+			config: $config,
+		)->setTestFault();
+
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertFalse((bool)$response->getData()['ok']);
+		$this->assertNotEmpty($response->getData()['supported_faults']);
+	}
+
+	public function testSetTestFaultPersistsSupportedFault(): void {
+		$config = $this->createMock(IConfig::class);
+		$config->method('getSystemValueBool')->with('debug', false)->willReturn(true);
+		$config->expects($this->once())
+			->method('setAppValue')
+			->with('etherpad_nextcloud', 'test_fault', 'trash_read_lock');
+
+		$response = $this->buildController(
+			$this->request(['fault' => 'trash_read_lock']),
+			config: $config,
+		)->setTestFault();
+
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+		$this->assertTrue((bool)$response->getData()['ok']);
+		$this->assertSame('trash_read_lock', $response->getData()['fault']);
+	}
+
 	private function buildController(
 		?IRequest $request = null,
 		?IConfig $config = null,
