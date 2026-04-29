@@ -164,7 +164,7 @@ class PadController extends Controller {
 				'invalid_argument' => 'Invalid file path.',
 				'not_found' => 'Cannot open selected .pad file.',
 				'generic' => 'Pad initialization failed.',
-				'on_throwable' => fn(\Throwable $e): null => $this->logError('Pad frontmatter initialization failed in API initialize', [
+					'on_throwable' => fn(\Throwable $e) => $this->logError('Pad frontmatter initialization failed in API initialize', [
 					'file' => $file,
 					'exception' => $e,
 				]),
@@ -189,7 +189,7 @@ class PadController extends Controller {
 			[
 				'not_found' => 'Cannot open selected .pad file.',
 				'generic' => 'Pad initialization failed.',
-				'on_throwable' => fn(\Throwable $e): null => $this->logError('Pad frontmatter initialization failed in API initialize-by-id', [
+					'on_throwable' => fn(\Throwable $e) => $this->logError('Pad frontmatter initialization failed in API initialize-by-id', [
 					'fileId' => $fileId,
 					'exception' => $e,
 				]),
@@ -305,7 +305,7 @@ class PadController extends Controller {
 				'invalid_argument' => 'Invalid file path.',
 				'not_found' => 'Pad file not found.',
 				'generic' => 'Trash failed.',
-				'on_throwable' => fn(\Throwable $e): null => $this->logError('Pad trash API failed', [
+					'on_throwable' => fn(\Throwable $e) => $this->logError('Pad trash API failed', [
 					'file' => $file,
 					'exception' => $e,
 				]),
@@ -327,7 +327,7 @@ class PadController extends Controller {
 				'invalid_argument' => 'Invalid file path.',
 				'not_found' => 'Pad file not found.',
 				'generic' => 'Restore failed.',
-				'on_throwable' => fn(\Throwable $e): null => $this->logError('Pad restore API failed', [
+					'on_throwable' => fn(\Throwable $e) => $this->logError('Pad restore API failed', [
 					'file' => $file,
 					'exception' => $e,
 				]),
@@ -363,8 +363,7 @@ class PadController extends Controller {
 	}
 
 	/** @param array<string,mixed> $context */
-	private function logError(string $message, array $context): null {
+	private function logError(string $message, array $context): void {
 		$this->logger->error($message, ['app' => 'etherpad_nextcloud'] + $context);
-		return null;
 	}
 }

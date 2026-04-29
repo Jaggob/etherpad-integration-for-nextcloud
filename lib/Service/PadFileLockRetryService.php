@@ -25,12 +25,21 @@ class PadFileLockRetryService {
 	private const OPEN_LOCK_RETRY_DELAYS_US = [100000, 200000, 400000];
 	private const SYNC_LOCK_RETRY_DELAYS_US = [150000, 300000, 600000];
 
+	/** @var callable(int): void */
+	private $sleeper;
+
+	public function __construct(?callable $sleeper = null) {
+		$this->sleeper = $sleeper ?? static function (int $delay): void {
+			\usleep($delay);
+		};
+	}
+
 	public function readContentWithOpenLockRetry(File $node): string {
 		foreach (self::OPEN_LOCK_RETRY_DELAYS_US as $delay) {
 			try {
 				return (string)$node->getContent();
 			} catch (LockedException) {
-				\usleep($delay);
+				$this->sleep($delay);
 			}
 		}
 
@@ -43,11 +52,15 @@ class PadFileLockRetryService {
 				$node->putContent($content);
 				return;
 			} catch (LockedException) {
-				\usleep($delay);
+				$this->sleep($delay);
 				$lockRetries++;
 			}
 		}
 
 		$node->putContent($content);
+	}
+
+	private function sleep(int $delay): void {
+		($this->sleeper)($delay);
 	}
 }

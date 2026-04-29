@@ -156,7 +156,7 @@ class PadControllerTest extends TestCase {
 		$logger = $this->createMock(LoggerInterface::class);
 		$padPaths = new PadPathService(new PathNormalizer());
 		$userNodeResolver = new UserNodeResolver($rootFolder);
-		$lockRetryService = new PadFileLockRetryService();
+		$lockRetryService = $this->buildNoSleepLockRetryService();
 		$padOpenService = new PadOpenService(
 			$padFileService,
 			$padPaths,
@@ -283,7 +283,7 @@ class PadControllerTest extends TestCase {
 		$logger = $this->createMock(LoggerInterface::class);
 		$padPaths = new PadPathService(new PathNormalizer());
 		$userNodeResolver = new UserNodeResolver($rootFolder);
-		$lockRetryService = new PadFileLockRetryService();
+		$lockRetryService = $this->buildNoSleepLockRetryService();
 		$padOpenService = new PadOpenService(
 			$padFileService,
 			$padPaths,
@@ -624,7 +624,7 @@ class PadControllerTest extends TestCase {
 		$logger = $this->createMock(LoggerInterface::class);
 		$padPaths = new PadPathService(new PathNormalizer());
 		$userNodeResolver = new UserNodeResolver($resolvedRootFolder);
-		$lockRetryService = new PadFileLockRetryService();
+		$lockRetryService = $this->buildNoSleepLockRetryService();
 		$padMetadataService = new PadMetadataService($resolvedPadFileService, $padPaths, $userNodeResolver, $lockRetryService, $resolvedEtherpadClient, $logger);
 		$padOpenService = new PadOpenService(
 			$resolvedPadFileService,
@@ -664,5 +664,10 @@ class PadControllerTest extends TestCase {
 		$file->method('getPath')->willReturn('/alice/files/Test.pad');
 		$file->method('getContent')->willReturn('frontmatter');
 		return $file;
+	}
+
+	private function buildNoSleepLockRetryService(): PadFileLockRetryService {
+		return new PadFileLockRetryService(static function (int $delay): void {
+		});
 	}
 }
