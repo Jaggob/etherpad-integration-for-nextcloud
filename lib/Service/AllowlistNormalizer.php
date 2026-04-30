@@ -40,6 +40,13 @@ class AllowlistNormalizer {
 
 	private function normalizeUrlEntry(string $entry): string {
 		$parts = parse_url($entry);
+		if (!is_array($parts)) {
+			throw new AdminValidationException(
+				'external_pad_allowlist',
+				$this->l10n->t('External allowlist URL must use https: {host}', ['host' => $entry])
+			);
+		}
+
 		$scheme = strtolower((string)($parts['scheme'] ?? ''));
 		$host = strtolower((string)($parts['host'] ?? ''));
 		$port = isset($parts['port']) ? (int)$parts['port'] : 443;

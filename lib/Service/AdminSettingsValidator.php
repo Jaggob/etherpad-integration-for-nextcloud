@@ -139,7 +139,10 @@ class AdminSettingsValidator {
 		$port = isset($parts['port']) ? (int)$parts['port'] : 0;
 		$path = trim((string)($parts['path'] ?? ''));
 
-		$normalized = $scheme . '://' . $host;
+		$normalizedHost = filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false
+			? '[' . $host . ']'
+			: $host;
+		$normalized = $scheme . '://' . $normalizedHost;
 		if ($port > 0) {
 			$normalized .= ':' . $port;
 		}

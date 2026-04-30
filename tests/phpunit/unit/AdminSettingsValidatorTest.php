@@ -126,6 +126,28 @@ class AdminSettingsValidatorTest extends TestCase {
 		$this->assertSame('http://pad-api.internal:9001', $result->etherpadApiHost);
 	}
 
+	public function testValidateNormalizesIpv6PublicHost(): void {
+		$result = $this->buildValidator()->validateForSave([
+			'etherpad_host' => 'https://[::1]:9001/base/',
+			'etherpad_api_key' => 'key',
+			'etherpad_api_version' => '1.3.0',
+		], $this->stored());
+
+		$this->assertSame('https://[::1]:9001/base', $result->etherpadHost);
+		$this->assertSame('https://[::1]:9001/base', $result->etherpadApiHost);
+	}
+
+	public function testValidateNormalizesIpv6ApiHost(): void {
+		$result = $this->buildValidator()->validateForSave([
+			'etherpad_host' => 'https://pad.example.test',
+			'etherpad_api_host' => 'http://[::1]:9001/',
+			'etherpad_api_key' => 'key',
+			'etherpad_api_version' => '1.3.0',
+		], $this->stored());
+
+		$this->assertSame('http://[::1]:9001', $result->etherpadApiHost);
+	}
+
 	public function testValidateRejectsUnsupportedApiHostScheme(): void {
 		$this->expectException(AdminValidationException::class);
 		$this->expectExceptionMessage('Etherpad API URL must use http or https.');

@@ -47,6 +47,13 @@ class AllowlistNormalizerTest extends TestCase {
 		$this->buildNormalizer()->normalize('http://pad.example.test');
 	}
 
+	public function testRejectsMalformedUrlWithoutWarnings(): void {
+		$this->expectException(AdminValidationException::class);
+		$this->expectExceptionMessage('External allowlist URL must use https');
+
+		$this->buildNormalizer()->normalize('https://host:bad');
+	}
+
 	public function testRejectsUrlPath(): void {
 		$this->expectException(AdminValidationException::class);
 		$this->expectExceptionMessage('External allowlist URL must use https');
