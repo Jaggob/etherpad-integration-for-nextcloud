@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\EtherpadNextcloud\Tests\Unit;
 
 use OCA\EtherpadNextcloud\Controller\PublicViewerController;
+use OCA\EtherpadNextcloud\Controller\PublicViewerControllerErrorMapper;
 use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
 use OCA\EtherpadNextcloud\Service\PadFileService;
@@ -242,6 +243,7 @@ class PublicViewerControllerTest extends TestCase {
 
 		$urlGenerator = $this->createMock(IURLGenerator::class);
 		$urlGenerator->method('getWebroot')->willReturn('');
+		$shareUrlBuilder = new PublicShareUrlBuilder($urlGenerator, new PathNormalizer());
 
 		$controller = new PublicViewerController(
 			'etherpad_nextcloud',
@@ -250,7 +252,8 @@ class PublicViewerControllerTest extends TestCase {
 			$padFileService,
 			$bindingService,
 			new PublicPadOpenService($padFileService, $etherpadClient, $padSessionService, new SnapshotHtmlSanitizer()),
-			new PublicShareUrlBuilder($urlGenerator, new PathNormalizer()),
+			$shareUrlBuilder,
+			new PublicViewerControllerErrorMapper($shareUrlBuilder),
 			$this->createMock(ISession::class),
 		);
 
@@ -329,6 +332,7 @@ class PublicViewerControllerTest extends TestCase {
 	): PublicViewerController {
 		$urlGenerator = $this->createMock(IURLGenerator::class);
 		$urlGenerator->method('getWebroot')->willReturn('');
+		$shareUrlBuilder = new PublicShareUrlBuilder($urlGenerator, new PathNormalizer());
 		$padFileService ??= $this->createMock(PadFileService::class);
 		$etherpadClient ??= $this->createMock(EtherpadClient::class);
 		$padSessionService ??= $this->createMock(PadSessionService::class);
@@ -340,7 +344,8 @@ class PublicViewerControllerTest extends TestCase {
 			$padFileService,
 			$bindingService ?? $this->createMock(BindingService::class),
 			new PublicPadOpenService($padFileService, $etherpadClient, $padSessionService, new SnapshotHtmlSanitizer()),
-			new PublicShareUrlBuilder($urlGenerator, new PathNormalizer()),
+			$shareUrlBuilder,
+			new PublicViewerControllerErrorMapper($shareUrlBuilder),
 			$session ?? $this->createMock(ISession::class),
 		);
 	}
