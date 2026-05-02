@@ -10,6 +10,7 @@ use OCA\EtherpadNextcloud\Service\EtherpadClient;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadSessionService;
 use OCA\EtherpadNextcloud\Service\PublicPadOpenService;
+use OCA\EtherpadNextcloud\Service\PublicShareResolver;
 use OCA\EtherpadNextcloud\Service\PublicShareUrlBuilder;
 use OCA\EtherpadNextcloud\Service\SnapshotHtmlSanitizer;
 use OCA\EtherpadNextcloud\Util\PathNormalizer;
@@ -245,8 +246,7 @@ class PublicViewerControllerTest extends TestCase {
 		$controller = new PublicViewerController(
 			'etherpad_nextcloud',
 			$this->createMock(IRequest::class),
-			$shareManager,
-			new PathNormalizer(),
+			new PublicShareResolver($shareManager, new PathNormalizer()),
 			$padFileService,
 			$bindingService,
 			new PublicPadOpenService($padFileService, $etherpadClient, $padSessionService, new SnapshotHtmlSanitizer()),
@@ -336,8 +336,7 @@ class PublicViewerControllerTest extends TestCase {
 		return new PublicViewerController(
 			'etherpad_nextcloud',
 			$this->createMock(IRequest::class),
-			$shareManager,
-			new PathNormalizer(),
+			new PublicShareResolver($shareManager, new PathNormalizer()),
 			$padFileService,
 			$bindingService ?? $this->createMock(BindingService::class),
 			new PublicPadOpenService($padFileService, $etherpadClient, $padSessionService, new SnapshotHtmlSanitizer()),

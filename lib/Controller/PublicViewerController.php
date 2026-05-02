@@ -12,26 +12,27 @@ namespace OCA\EtherpadNextcloud\Controller;
 
 use OCA\EtherpadNextcloud\Exception\BindingException;
 use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
+use OCA\EtherpadNextcloud\Exception\InvalidShareFilePathException;
+use OCA\EtherpadNextcloud\Exception\InvalidShareTokenException;
 use OCA\EtherpadNextcloud\Exception\MissingBindingException;
+use OCA\EtherpadNextcloud\Exception\NoShareFileSelectedException;
+use OCA\EtherpadNextcloud\Exception\NotAPadFileException;
 use OCA\EtherpadNextcloud\Exception\PadFileFormatException;
+use OCA\EtherpadNextcloud\Exception\ShareFileNotInShareException;
+use OCA\EtherpadNextcloud\Exception\ShareItemUnavailableException;
+use OCA\EtherpadNextcloud\Exception\ShareReadForbiddenException;
 use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PublicPadOpenService;
+use OCA\EtherpadNextcloud\Service\PublicShareResolver;
 use OCA\EtherpadNextcloud\Service\PublicShareUrlBuilder;
-use OCA\EtherpadNextcloud\Util\PathNormalizer;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\PublicShareController;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\TemplateResponse;
-use OCP\Constants;
-use OCP\Files\File;
-use OCP\Files\Folder;
-use OCP\Files\NotFoundException;
 use OCP\IRequest;
 use OCP\ISession;
-use OCP\Share\Exceptions\ShareNotFound;
-use OCP\Share\IManager;
 use OCP\Share\IShare;
 
 class PublicViewerController extends PublicShareController {
@@ -40,8 +41,7 @@ class PublicViewerController extends PublicShareController {
 	public function __construct(
 		string $appName,
 		IRequest $request,
-		private IManager $shareManager,
-		private PathNormalizer $pathNormalizer,
+		private PublicShareResolver $shareResolver,
 		private PadFileService $padFileService,
 		private BindingService $bindingService,
 		private PublicPadOpenService $publicPadOpenService,
@@ -53,8 +53,8 @@ class PublicViewerController extends PublicShareController {
 
 	public function isValidToken(): bool {
 		try {
-			$this->share = $this->shareManager->getShareByToken($this->getToken());
-		} catch (ShareNotFound) {
+			$this->share = $this->shareResolver->resolveShare($this->getToken());
+		} catch (InvalidShareTokenException) {
 			return false;
 		}
 
@@ -87,8 +87,7 @@ class PublicViewerController extends PublicShareController {
 		try {
 			$context = $this->resolvePublicPadContext($token, $file);
 		} catch (\RuntimeException $e) {
-			$status = $e->getCode() > 0 ? $e->getCode() : Http::STATUS_BAD_REQUEST;
-			return new DataResponse(['message' => $e->getMessage()], $status);
+			return new DataResponse(['message' => $e->getMessage()], $this->mapPublicShareStatus($e));
 		}
 
 		$response = new DataResponse([
@@ -107,59 +106,12 @@ class PublicViewerController extends PublicShareController {
 	}
 
 	private function resolvePublicPadContext(string $token, mixed $fileParam): array {
-		$share = $this->share;
-		if ($share === null) {
-			try {
-				$share = $this->shareManager->getShareByToken($token);
-			} catch (ShareNotFound) {
-				$this->publicFail('This share link is invalid or has expired.', Http::STATUS_NOT_FOUND);
-			}
-		}
-
-		if (!$share instanceof IShare) {
-			$this->publicFail('This share link is invalid or has expired.', Http::STATUS_NOT_FOUND);
-		}
-
-		if ((((int)$share->getPermissions()) & Constants::PERMISSION_READ) === 0) {
-			$this->publicFail('This share link does not allow reading files.', Http::STATUS_FORBIDDEN);
-		}
-
-		try {
-			$node = $share->getNode();
-		} catch (NotFoundException) {
-			$this->publicFail('This shared item is no longer available.', Http::STATUS_NOT_FOUND);
-		}
-
-		$isFolderShare = $node instanceof Folder;
-		$selectedRelativePath = '';
-
-		if ($node instanceof Folder) {
-			try {
-				$normalized = $this->pathNormalizer->normalizePublicShareFilePath($fileParam, $token);
-			} catch (\Throwable) {
-				$this->publicFail('Invalid file path.', Http::STATUS_BAD_REQUEST);
-			}
-			if ($normalized === '') {
-				$this->publicFail('No .pad file selected. Open a .pad file from this shared folder.', Http::STATUS_BAD_REQUEST);
-			}
-			$selectedRelativePath = $normalized;
-			try {
-				$node = $node->get($normalized);
-			} catch (NotFoundException) {
-				$this->publicFail('The selected file does not exist in this share.', Http::STATUS_NOT_FOUND);
-			}
-		}
-
-		if (!$node instanceof File) {
-			$this->publicFail('The selected item is not a file.', Http::STATUS_NOT_FOUND);
-		}
-		if (!str_ends_with(strtolower($node->getName()), '.pad')) {
-			$this->publicFail('The selected file is not a .pad document.', Http::STATUS_BAD_REQUEST);
-		}
+		$share = $this->shareResolver->resolveShare($token, $this->share);
+		$resolved = $this->shareResolver->resolvePadFile($share, $fileParam, $token);
+		$node = $resolved->node;
 
 		$content = (string)$node->getContent();
 		$fileId = (int)$node->getId();
-		$readOnly = (((int)$share->getPermissions()) & Constants::PERMISSION_UPDATE) === 0;
 
 		try {
 			$parsed = $this->padFileService->parsePadFile($content);
@@ -171,13 +123,13 @@ class PublicViewerController extends PublicShareController {
 			$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
 
 			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
-			$openTarget = $this->publicPadOpenService->open($padId, $accessMode, $readOnly, $token, $isExternal, $content, $padUrl);
+			$openTarget = $this->publicPadOpenService->open($padId, $accessMode, $resolved->readOnly, $token, $isExternal, $content, $padUrl);
 		} catch (PadFileFormatException|BindingException|EtherpadClientException $e) {
 			$this->publicFail($this->mapPublicOpenError($e), Http::STATUS_BAD_REQUEST);
 		}
 
 		return [
-			'title' => $node->getName(),
+			'title' => $resolved->name,
 			'url' => $openTarget->url,
 			'is_external' => $isExternal,
 			'is_readonly_snapshot' => $openTarget->isReadOnlySnapshot,
@@ -188,7 +140,7 @@ class PublicViewerController extends PublicShareController {
 			'original_pad_url' => $openTarget->originalPadUrl,
 			'cookie_header' => $openTarget->cookieHeader,
 			'files_url' => $this->shareUrlBuilder->buildShareBaseUrl($token),
-			'download_url' => $this->shareUrlBuilder->buildDownloadUrl($token, $selectedRelativePath, $isFolderShare, $node->getName()),
+			'download_url' => $this->shareUrlBuilder->buildDownloadUrl($token, $resolved->selectedRelativePath, $resolved->isFolderShare, $resolved->name),
 		];
 	}
 
@@ -204,6 +156,19 @@ class PublicViewerController extends PublicShareController {
 		], 'blank');
 		$response->setStatus($status);
 		return $response;
+	}
+
+	private function mapPublicShareStatus(\RuntimeException $e): int {
+		return match (true) {
+			$e instanceof InvalidShareTokenException,
+			$e instanceof ShareItemUnavailableException,
+			$e instanceof ShareFileNotInShareException => Http::STATUS_NOT_FOUND,
+			$e instanceof ShareReadForbiddenException => Http::STATUS_FORBIDDEN,
+			$e instanceof InvalidShareFilePathException,
+			$e instanceof NoShareFileSelectedException,
+			$e instanceof NotAPadFileException => Http::STATUS_BAD_REQUEST,
+			default => $e->getCode() > 0 ? $e->getCode() : Http::STATUS_BAD_REQUEST,
+		};
 	}
 
 	private function mapPublicOpenError(\Throwable $error): string {
