@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\EtherpadNextcloud\Controller;
 
+use OCA\EtherpadNextcloud\AppInfo\Application;
 use OCA\EtherpadNextcloud\Exception\BindingException;
 use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
 use OCA\EtherpadNextcloud\Exception\InvalidShareFilePathException;
@@ -25,10 +26,12 @@ use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\TemplateResponse;
+use Psr\Log\LoggerInterface;
 
 class PublicViewerControllerErrorMapper {
 	public function __construct(
 		private PublicShareUrlBuilder $shareUrlBuilder,
+		private LoggerInterface $logger,
 	) {
 	}
 
@@ -40,6 +43,7 @@ class PublicViewerControllerErrorMapper {
 		try {
 			return $success($action());
 		} catch (\Throwable $e) {
+			$this->logUnexpected($e);
 			return new DataResponse(['message' => $this->messageFor($e)], $this->statusFor($e));
 		}
 	}
@@ -48,11 +52,12 @@ class PublicViewerControllerErrorMapper {
 	 * @param callable(): mixed $action
 	 * @param callable(mixed): RedirectResponse|TemplateResponse $success
 	 */
-	public function runForTemplate(callable $action, callable $success, string $appName, string $token): RedirectResponse|TemplateResponse {
+	public function runForTemplate(callable $action, callable $success, string $token): RedirectResponse|TemplateResponse {
 		try {
 			return $success($action());
 		} catch (\Throwable $e) {
-			$response = new TemplateResponse($appName, 'noviewer', [
+			$this->logUnexpected($e);
+			$response = new TemplateResponse(Application::APP_ID, 'noviewer', [
 				'error' => $this->messageFor($e),
 				'back_url' => $this->shareUrlBuilder->buildShareBaseUrl($token),
 				'back_label' => 'Back to shared files',
@@ -74,7 +79,7 @@ class PublicViewerControllerErrorMapper {
 			$e instanceof PadFileFormatException,
 			$e instanceof BindingException,
 			$e instanceof EtherpadClientException => Http::STATUS_BAD_REQUEST,
-			default => $e->getCode() > 0 ? $e->getCode() : Http::STATUS_BAD_REQUEST,
+			default => Http::STATUS_INTERNAL_SERVER_ERROR,
 		};
 	}
 
@@ -94,6 +99,33 @@ class PublicViewerControllerErrorMapper {
 		if ($e instanceof EtherpadClientException) {
 			return 'Etherpad is currently unavailable for this shared pad.';
 		}
-		return $e->getMessage();
+		if ($this->isExpectedPublicError($e)) {
+			return $e->getMessage();
+		}
+		return 'Unable to open pad.';
+	}
+
+	private function logUnexpected(\Throwable $e): void {
+		if ($this->isExpectedPublicError($e)) {
+			return;
+		}
+
+		$this->logger->error('Unhandled public viewer error', [
+			'app' => Application::APP_ID,
+			'exception' => $e,
+		]);
+	}
+
+	private function isExpectedPublicError(\Throwable $e): bool {
+		return $e instanceof InvalidShareTokenException
+			|| $e instanceof ShareItemUnavailableException
+			|| $e instanceof ShareFileNotInShareException
+			|| $e instanceof ShareReadForbiddenException
+			|| $e instanceof InvalidShareFilePathException
+			|| $e instanceof NoShareFileSelectedException
+			|| $e instanceof NotAPadFileException
+			|| $e instanceof PadFileFormatException
+			|| $e instanceof BindingException
+			|| $e instanceof EtherpadClientException;
 	}
 }

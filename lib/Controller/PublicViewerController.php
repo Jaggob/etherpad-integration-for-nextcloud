@@ -62,7 +62,6 @@ class PublicViewerController extends PublicShareController {
 		return $this->errors->runForTemplate(
 			fn(): string => $this->shareUrlBuilder->buildShareRedirectUrl($token, $this->request->getParam('file', '')),
 			static fn(string $target): RedirectResponse => new RedirectResponse($target),
-			$this->appName,
 			$token,
 		);
 	}

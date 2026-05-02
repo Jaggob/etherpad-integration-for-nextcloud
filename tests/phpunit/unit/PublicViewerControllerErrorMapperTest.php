@@ -21,6 +21,7 @@ use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IURLGenerator;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 
 class PublicViewerControllerErrorMapperTest extends TestCase {
 	public function testRunForDataReturnsSuccessResponse(): void {
@@ -118,7 +119,6 @@ class PublicViewerControllerErrorMapperTest extends TestCase {
 		$response = $this->buildMapper('/nc')->runForTemplate(
 			static fn(): string => '/nc/s/token?dir=%2F',
 			static fn(string $target): RedirectResponse => new RedirectResponse($target),
-			'etherpad_nextcloud',
 			'token',
 		);
 
@@ -130,7 +130,6 @@ class PublicViewerControllerErrorMapperTest extends TestCase {
 		$response = $this->buildMapper('/nc')->runForTemplate(
 			static fn(): string => throw new NotAPadFileException('The selected file is not a .pad document.'),
 			static fn(string $target): RedirectResponse => new RedirectResponse($target),
-			'etherpad_nextcloud',
 			'token',
 		);
 
@@ -142,9 +141,41 @@ class PublicViewerControllerErrorMapperTest extends TestCase {
 		$this->assertSame('Back to shared files', $response->getParams()['back_label']);
 	}
 
-	private function buildMapper(string $webroot = ''): PublicViewerControllerErrorMapper {
+	public function testRunForDataLogsAndMasksUnexpectedFailures(): void {
+		$logger = $this->createMock(LoggerInterface::class);
+		$logger->expects($this->once())->method('error')->with('Unhandled public viewer error');
+
+		$response = $this->buildMapper(logger: $logger)->runForData(
+			static fn(): array => throw new \RuntimeException('internal path /var/secret/file.pad'),
+			static fn(array $result): DataResponse => new DataResponse($result),
+		);
+
+		$this->assertSame(Http::STATUS_INTERNAL_SERVER_ERROR, $response->getStatus());
+		$this->assertSame('Unable to open pad.', $response->getData()['message']);
+	}
+
+	public function testRunForTemplateLogsAndMasksUnexpectedFailures(): void {
+		$logger = $this->createMock(LoggerInterface::class);
+		$logger->expects($this->once())->method('error')->with('Unhandled public viewer error');
+
+		$response = $this->buildMapper('/nc', $logger)->runForTemplate(
+			static fn(): string => throw new \RuntimeException('internal path /var/secret/file.pad'),
+			static fn(string $target): RedirectResponse => new RedirectResponse($target),
+			'token',
+		);
+
+		$this->assertInstanceOf(TemplateResponse::class, $response);
+		$this->assertSame(Http::STATUS_INTERNAL_SERVER_ERROR, $response->getStatus());
+		$this->assertSame('Unable to open pad.', $response->getParams()['error']);
+		$this->assertSame('/nc/s/token', $response->getParams()['back_url']);
+	}
+
+	private function buildMapper(string $webroot = '', ?LoggerInterface $logger = null): PublicViewerControllerErrorMapper {
 		$urlGenerator = $this->createMock(IURLGenerator::class);
 		$urlGenerator->method('getWebroot')->willReturn($webroot);
-		return new PublicViewerControllerErrorMapper(new PublicShareUrlBuilder($urlGenerator, new PathNormalizer()));
+		return new PublicViewerControllerErrorMapper(
+			new PublicShareUrlBuilder($urlGenerator, new PathNormalizer()),
+			$logger ?? $this->createMock(LoggerInterface::class),
+		);
 	}
 }

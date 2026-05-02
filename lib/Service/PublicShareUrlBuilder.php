@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace OCA\EtherpadNextcloud\Service;
 
+use OCA\EtherpadNextcloud\Exception\InvalidShareFilePathException;
+use OCA\EtherpadNextcloud\Exception\NotAPadFileException;
 use OCA\EtherpadNextcloud\Util\PathNormalizer;
 use OCP\IURLGenerator;
 
@@ -34,7 +36,7 @@ class PublicShareUrlBuilder {
 		try {
 			$normalized = $this->pathNormalizer->normalizePublicShareFilePath($fileParam, $token);
 		} catch (\Throwable) {
-			throw new \InvalidArgumentException('Invalid file path.');
+			throw new InvalidShareFilePathException('Invalid file path.');
 		}
 		if ($normalized === '') {
 			return $base . '?dir=' . rawurlencode('/');
@@ -53,7 +55,7 @@ class PublicShareUrlBuilder {
 		}
 		$fileName = basename($path);
 		if ($fileName === '' || !str_ends_with(strtolower($fileName), '.pad')) {
-			throw new \InvalidArgumentException('The selected file is not a .pad document.');
+			throw new NotAPadFileException('The selected file is not a .pad document.');
 		}
 
 		return $base . '?path=' . rawurlencode($dir) . '&files=' . rawurlencode($fileName);

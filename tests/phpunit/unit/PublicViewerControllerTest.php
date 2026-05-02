@@ -25,6 +25,7 @@ use OCP\IURLGenerator;
 use OCP\Share\IManager;
 use OCP\Share\IShare;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 
 class PublicViewerControllerTest extends TestCase {
 	public function testProtectedReadOnlyPublicShareReturnsSnapshotWithoutEtherpadSessionCookie(): void {
@@ -254,7 +255,7 @@ class PublicViewerControllerTest extends TestCase {
 			$shareResolver,
 			new PublicPadContextService($shareResolver, $padFileService, $bindingService, $publicPadOpenService),
 			$shareUrlBuilder,
-			new PublicViewerControllerErrorMapper($shareUrlBuilder),
+			new PublicViewerControllerErrorMapper($shareUrlBuilder, $this->createMock(LoggerInterface::class)),
 			$this->createMock(ISession::class),
 		);
 
@@ -347,7 +348,7 @@ class PublicViewerControllerTest extends TestCase {
 			$shareResolver,
 			new PublicPadContextService($shareResolver, $padFileService, $bindingService, $publicPadOpenService),
 			$shareUrlBuilder,
-			new PublicViewerControllerErrorMapper($shareUrlBuilder),
+			new PublicViewerControllerErrorMapper($shareUrlBuilder, $this->createMock(LoggerInterface::class)),
 			$session ?? $this->createMock(ISession::class),
 		);
 	}
