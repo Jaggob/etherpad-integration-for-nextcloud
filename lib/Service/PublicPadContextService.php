@@ -11,6 +11,12 @@ namespace OCA\EtherpadNextcloud\Service;
 
 use OCP\Share\IShare;
 
+/**
+ * Assembles all data needed by the public viewer API response for one .pad file.
+ *
+ * The service keeps the controller out of share/file metadata parsing and leaves
+ * final HTTP response shaping to the controller.
+ */
 class PublicPadContextService {
 	public function __construct(
 		private PublicShareResolver $shareResolver,

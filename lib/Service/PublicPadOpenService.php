@@ -11,6 +11,12 @@ namespace OCA\EtherpadNextcloud\Service;
 
 use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
 
+/**
+ * Applies public-share-specific open rules for internal, protected and external pads.
+ *
+ * Public protected write access uses an anonymous public-share Etherpad author;
+ * read-only protected access intentionally serves the stored snapshot instead.
+ */
 class PublicPadOpenService {
 	private const PUBLIC_SHARE_AUTHOR_NAME = 'Public share';
 	private const PUBLIC_SHARE_SESSION_TTL_SECONDS = 3600;

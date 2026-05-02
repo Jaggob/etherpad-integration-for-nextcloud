@@ -25,6 +25,12 @@ use OCP\Share\Exceptions\ShareNotFound;
 use OCP\Share\IManager;
 use OCP\Share\IShare;
 
+/**
+ * Resolves a public share token and optional folder-file parameter to a .pad file.
+ *
+ * Permission, existence and file-type failures are expressed as typed public
+ * share exceptions so controller-facing code can map them consistently.
+ */
 class PublicShareResolver {
 	public function __construct(
 		private IManager $shareManager,
@@ -61,8 +67,8 @@ class PublicShareResolver {
 		if ($node instanceof Folder) {
 			try {
 				$normalized = $this->pathNormalizer->normalizePublicShareFilePath($fileParam, $token);
-			} catch (\Throwable) {
-				throw new InvalidShareFilePathException('Invalid file path.');
+			} catch (\Throwable $e) {
+				throw new InvalidShareFilePathException('Invalid file path.', 0, $e);
 			}
 			if ($normalized === '') {
 				throw new NoShareFileSelectedException('No .pad file selected. Open a .pad file from this shared folder.');

@@ -14,6 +14,12 @@ use OCA\EtherpadNextcloud\Exception\NotAPadFileException;
 use OCA\EtherpadNextcloud\Util\PathNormalizer;
 use OCP\IURLGenerator;
 
+/**
+ * Builds URLs that point back into Nextcloud public shares.
+ *
+ * This is intentionally separate from the internal files-viewer URL builders:
+ * public shares use /s/{token} routes and folder-selection query parameters.
+ */
 class PublicShareUrlBuilder {
 	public function __construct(
 		private IURLGenerator $urlGenerator,
@@ -35,8 +41,8 @@ class PublicShareUrlBuilder {
 
 		try {
 			$normalized = $this->pathNormalizer->normalizePublicShareFilePath($fileParam, $token);
-		} catch (\Throwable) {
-			throw new InvalidShareFilePathException('Invalid file path.');
+		} catch (\Throwable $e) {
+			throw new InvalidShareFilePathException('Invalid file path.', 0, $e);
 		}
 		if ($normalized === '') {
 			return $base . '?dir=' . rawurlencode('/');

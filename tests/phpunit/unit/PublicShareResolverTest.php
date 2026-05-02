@@ -106,6 +106,17 @@ class PublicShareResolverTest extends TestCase {
 		$this->buildResolver()->resolvePadFile($share, '../Shared.pad', 'token');
 	}
 
+	public function testResolvePadFilePreservesInvalidPathPreviousException(): void {
+		$share = $this->share($this->createMock(Folder::class), Constants::PERMISSION_READ);
+
+		try {
+			$this->buildResolver()->resolvePadFile($share, '../Shared.pad', 'token');
+			$this->fail('Expected invalid share file path exception.');
+		} catch (InvalidShareFilePathException $e) {
+			$this->assertInstanceOf(\InvalidArgumentException::class, $e->getPrevious());
+		}
+	}
+
 	public function testResolvePadFileMapsMissingFolderFile(): void {
 		$folder = $this->createMock(Folder::class);
 		$folder->method('get')->willThrowException(new NotFoundException('missing'));

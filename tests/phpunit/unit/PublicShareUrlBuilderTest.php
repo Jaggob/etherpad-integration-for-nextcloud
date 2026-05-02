@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace OCA\EtherpadNextcloud\Tests\Unit;
 
+use OCA\EtherpadNextcloud\Exception\InvalidShareFilePathException;
+use OCA\EtherpadNextcloud\Exception\NotAPadFileException;
 use OCA\EtherpadNextcloud\Service\PublicShareUrlBuilder;
 use OCA\EtherpadNextcloud\Util\PathNormalizer;
 use OCP\IURLGenerator;
@@ -26,17 +28,26 @@ class PublicShareUrlBuilderTest extends TestCase {
 	}
 
 	public function testBuildShareRedirectUrlRejectsNonPadFile(): void {
-		$this->expectException(\InvalidArgumentException::class);
+		$this->expectException(NotAPadFileException::class);
 		$this->expectExceptionMessage('The selected file is not a .pad document.');
 
 		$this->buildBuilder()->buildShareRedirectUrl('share-token', '/Folder/Text.txt');
 	}
 
 	public function testBuildShareRedirectUrlRejectsInvalidPath(): void {
-		$this->expectException(\InvalidArgumentException::class);
+		$this->expectException(InvalidShareFilePathException::class);
 		$this->expectExceptionMessage('Invalid file path.');
 
 		$this->buildBuilder()->buildShareRedirectUrl('share-token', '../Shared.pad');
+	}
+
+	public function testBuildShareRedirectUrlPreservesInvalidPathPreviousException(): void {
+		try {
+			$this->buildBuilder()->buildShareRedirectUrl('share-token', '../Shared.pad');
+			$this->fail('Expected invalid share file path exception.');
+		} catch (InvalidShareFilePathException $e) {
+			$this->assertInstanceOf(\InvalidArgumentException::class, $e->getPrevious());
+		}
 	}
 
 	public function testBuildDownloadUrlForSingleFileShare(): void {
