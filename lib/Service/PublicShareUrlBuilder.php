@@ -41,7 +41,7 @@ class PublicShareUrlBuilder {
 
 		try {
 			$normalized = $this->pathNormalizer->normalizePublicShareFilePath($fileParam, $token);
-		} catch (\Throwable $e) {
+		} catch (\InvalidArgumentException $e) {
 			throw new InvalidShareFilePathException('Invalid file path.', 0, $e);
 		}
 		if ($normalized === '') {

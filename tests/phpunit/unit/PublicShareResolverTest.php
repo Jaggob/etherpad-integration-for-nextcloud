@@ -92,7 +92,7 @@ class PublicShareResolverTest extends TestCase {
 		$share = $this->share($this->createMock(Folder::class), Constants::PERMISSION_READ);
 
 		$this->expectException(NoShareFileSelectedException::class);
-		$this->expectExceptionMessage('No .pad file selected.');
+		$this->expectExceptionMessage('No .pad file selected. Open a .pad file from this shared folder.');
 
 		$this->buildResolver()->resolvePadFile($share, '', 'token');
 	}

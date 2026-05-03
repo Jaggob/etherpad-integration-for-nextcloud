@@ -143,7 +143,14 @@ class PublicViewerControllerErrorMapperTest extends TestCase {
 
 	public function testRunForDataLogsAndMasksUnexpectedFailures(): void {
 		$logger = $this->createMock(LoggerInterface::class);
-		$logger->expects($this->once())->method('error')->with('Unhandled public viewer error');
+		$logger->expects($this->once())->method('error')->with(
+			'Unhandled public viewer error',
+			$this->callback(static function ($context): bool {
+				return is_array($context)
+					&& ($context['app'] ?? '') === 'etherpad_nextcloud'
+					&& ($context['exception'] ?? null) instanceof \RuntimeException;
+			}),
+		);
 
 		$response = $this->buildMapper(logger: $logger)->runForData(
 			static fn(): array => throw new \RuntimeException('internal path /var/secret/file.pad'),
@@ -156,7 +163,14 @@ class PublicViewerControllerErrorMapperTest extends TestCase {
 
 	public function testRunForTemplateLogsAndMasksUnexpectedFailures(): void {
 		$logger = $this->createMock(LoggerInterface::class);
-		$logger->expects($this->once())->method('error')->with('Unhandled public viewer error');
+		$logger->expects($this->once())->method('error')->with(
+			'Unhandled public viewer error',
+			$this->callback(static function ($context): bool {
+				return is_array($context)
+					&& ($context['app'] ?? '') === 'etherpad_nextcloud'
+					&& ($context['exception'] ?? null) instanceof \RuntimeException;
+			}),
+		);
 
 		$response = $this->buildMapper('/nc', $logger)->runForTemplate(
 			static fn(): string => throw new \RuntimeException('internal path /var/secret/file.pad'),
