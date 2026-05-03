@@ -41,6 +41,13 @@ class PublicShareUrlBuilderTest extends TestCase {
 		$this->buildBuilder()->buildShareRedirectUrl('share-token', '../Shared.pad');
 	}
 
+	public function testBuildShareRedirectUrlRejectsNonStringFileParam(): void {
+		$this->expectException(InvalidShareFilePathException::class);
+		$this->expectExceptionMessage('Invalid file path.');
+
+		$this->buildBuilder()->buildShareRedirectUrl('share-token', 123);
+	}
+
 	public function testBuildShareRedirectUrlPreservesInvalidPathPreviousException(): void {
 		try {
 			$this->buildBuilder()->buildShareRedirectUrl('share-token', '../Shared.pad');

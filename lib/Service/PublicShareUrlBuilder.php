@@ -34,13 +34,17 @@ class PublicShareUrlBuilder {
 
 	public function buildShareRedirectUrl(string $token, mixed $fileParam): string {
 		$base = $this->buildShareBaseUrl($token);
-		$rawFile = is_scalar($fileParam) ? trim((string)$fileParam) : '';
+		if (!is_string($fileParam)) {
+			throw new InvalidShareFilePathException('Invalid file path.');
+		}
+
+		$rawFile = trim($fileParam);
 		if ($rawFile === '') {
 			return $base . '?dir=' . rawurlencode('/');
 		}
 
 		try {
-			$normalized = $this->pathNormalizer->normalizePublicShareFilePath($fileParam, $token);
+			$normalized = $this->pathNormalizer->normalizePublicShareFilePath($rawFile, $token);
 		} catch (\InvalidArgumentException $e) {
 			throw new InvalidShareFilePathException('Invalid file path.', 0, $e);
 		}
