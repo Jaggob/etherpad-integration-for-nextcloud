@@ -9,6 +9,7 @@ if (!class_exists(TemplateResponse::class)) {
 		/** @var array<string,mixed> */
 		private array $params;
 		private ?ContentSecurityPolicy $contentSecurityPolicy = null;
+		private int $status = 200;
 
 		/** @param array<string,mixed> $params */
 		public function __construct(
@@ -31,6 +32,14 @@ if (!class_exists(TemplateResponse::class)) {
 
 		public function getRenderAs(): string {
 			return $this->renderAs;
+		}
+
+		public function setStatus(int $status): void {
+			$this->status = $status;
+		}
+
+		public function getStatus(): int {
+			return $this->status;
 		}
 
 		public function setContentSecurityPolicy(ContentSecurityPolicy $contentSecurityPolicy): void {
