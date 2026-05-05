@@ -2,9 +2,18 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  * Copyright (c) 2026 Jacob Bühler
  */
+import { APP_ID, MIME } from './lib/constants.js'
+import {
+	nextcloudMajorVersion,
+	ocGenerateUrl,
+	ocImagePath,
+	ocPermissionCreate,
+	ocPermissionRead,
+	ocRequestToken,
+} from './lib/oc-compat.js'
+import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './lib/urls.js'
+
 (function () {
-	const APP_ID = 'etherpad_nextcloud'
-	const MIME = 'application/x-etherpad-nextcloud'
 	const OPEN_ACTION = 'etherpad_nextcloud_open'
 	const RESOLVE_CACHE = new Map()
 	let booted = false
@@ -35,52 +44,6 @@
 	const PAD_MENU_ORDER = 98
 	const PUBLIC_PAD_MENU_REGISTRATION_MAX_ATTEMPTS = 120
 	const PUBLIC_PAD_MENU_REGISTRATION_RETRY_MS = 500
-	const ocGenerateUrl = (path) => {
-		if (window.OC && typeof window.OC.generateUrl === 'function') {
-			return window.OC.generateUrl(path)
-		}
-		return '/index.php' + path
-	}
-	const ocImagePath = (app, asset) => {
-		if (window.OC && typeof window.OC.imagePath === 'function') {
-			return window.OC.imagePath(app, asset)
-		}
-		return ''
-	}
-	const ocRequestToken = () => String((window.OC && window.OC.requestToken) || '')
-	const ocPermissionRead = () => {
-		const value = window.OC && window.OC.PERMISSION_READ
-		const numeric = Number(value)
-		return Number.isFinite(numeric) && numeric > 0 ? numeric : 1
-	}
-	const ocPermissionCreate = () => {
-		const value = window.OC && window.OC.PERMISSION_CREATE
-		const numeric = Number(value)
-		return Number.isFinite(numeric) && numeric > 0 ? numeric : 4
-	}
-	const nextcloudMajorVersion = () => {
-		const candidates = [
-			window.OC && window.OC.config && window.OC.config.version,
-			window.OC && window.OC.config && window.OC.config.versionstring,
-			window.oc_appconfig && window.oc_appconfig.core && window.oc_appconfig.core.version,
-			document.documentElement && document.documentElement.getAttribute('data-version'),
-		]
-		for (const candidate of candidates) {
-			const value = String(candidate || '').trim()
-			if (value === '') {
-				continue
-			}
-			const match = value.match(/^(\d+)/)
-			if (!match) {
-				continue
-			}
-			const parsed = parseInt(match[1], 10)
-			if (Number.isFinite(parsed) && parsed > 0) {
-				return parsed
-			}
-		}
-		return null
-	}
 	const supportsInlineNewFileMenuSvg = () => {
 		const major = nextcloudMajorVersion()
 		return major !== null && major >= 33
@@ -106,32 +69,6 @@
 	}
 	const hasNativeViewer = () => USE_NATIVE_VIEWER && Boolean(window.OCA && window.OCA.Viewer && typeof window.OCA.Viewer.open === 'function')
 	const isFilesAppRoute = () => (window.location.pathname || '').includes('/apps/files')
-	const parsePadPathFromDavHref = (href) => {
-		if (!href || typeof href !== 'string') {
-			return null
-		}
-		let url
-		try {
-			url = new URL(href, window.location.origin)
-		} catch (error) {
-			return null
-		}
-		const pathname = decodeURIComponent(url.pathname || '')
-		if (!pathname.endsWith('.pad')) {
-			return null
-		}
-		const markers = ['/remote.php/dav/files/', '/public.php/dav/files/']
-		const marker = markers.find((candidate) => pathname.includes(candidate))
-		if (!marker) return null
-		const markerIndex = pathname.indexOf(marker)
-		const rest = pathname.substring(markerIndex + marker.length)
-		const firstSlash = rest.indexOf('/')
-		if (firstSlash === -1) {
-			return null
-		}
-		return '/' + rest.substring(firstSlash + 1)
-	}
-
 	const parseFileIdFromFilesHref = (href) => {
 		if (!href || typeof href !== 'string') {
 			return null
@@ -164,14 +101,6 @@
 		}
 		const id = parseInt(match[1], 10)
 		return Number.isFinite(id) && id > 0 ? id : null
-	}
-
-	const parsePublicShareTokenFromLocation = () => {
-		const match = (window.location.pathname || '').match(/(?:\/index\.php)?\/s\/([^/]+)(?:\/.*)?$/)
-		if (!match) {
-			return null
-		}
-		return match[1] || null
 	}
 
 	const viewerUrlForPublicShare = (token, path) => {

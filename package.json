@@ -8,7 +8,7 @@
 		"node": ">=20"
 	},
 	"scripts": {
-		"build": "vite build"
+		"build": "node scripts/clean-js-build.mjs && vite build"
 	},
 	"devDependencies": {
 		"@nextcloud/vite-config": "^2.5.0",
