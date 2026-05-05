@@ -71,10 +71,10 @@ Etherpad is the editing source of truth; the `.pad` file acts as binding storage
 
 Primary flow (native viewer):
 
-1. `js/files-main.js` opens `.pad` in Nextcloud Files viewer route (`/apps/files/files/{fileId}?openfile=true`).
+1. `src/files-main.js` opens `.pad` in Nextcloud Files viewer route (`/apps/files/files/{fileId}?openfile=true`).
    - on authenticated files routes, it now extracts the stable `fileId` directly from the Nextcloud file-action context whenever available
    - path-based resolve is only a fallback for contexts without a usable `fileId`
-2. `js/viewer-main.js` resolves Etherpad open data via API:
+2. `src/viewer-main.js` resolves Etherpad open data via API:
    - preferred: `POST /api/v1/pads/open-by-id` (`fileId`, CSRF `requesttoken`)
    - fallback: `POST /api/v1/pads/open` (`file`, CSRF `requesttoken`) if no stable `fileId` is available
 3. `PadController` validates frontmatter/binding and resolves secure open URL:
@@ -91,8 +91,8 @@ Primary flow (minimal blank embed page):
 2. `EmbedController::showById` validates:
    - logged-in Nextcloud user
    - accessible `.pad` file by stable `fileId`
-3. `templates/embed.php` loads `js/embed-main.js` explicitly because blank layouts do not rely on Nextcloud asset collector injection.
-4. `js/embed-main.js` calls `POST /api/v1/pads/open-by-id` same-origin with CSRF token baked into the template.
+3. `templates/embed.php` loads the Vite-built bundle for `src/embed-main.js` explicitly because blank layouts do not rely on Nextcloud asset collector injection.
+4. `src/embed-main.js` calls `POST /api/v1/pads/open-by-id` same-origin with CSRF token baked into the template.
    - because blank layout does not inject the normal `OC.requestToken` bootstrap
    - and this Nextcloud version exposes no public `OCP\...` CSRF-token service for that template use-case
    - `EmbedController` therefore passes the encrypted token manually from the internal CSRF token manager
@@ -103,7 +103,7 @@ Primary flow (minimal blank embed page):
 Trusted host integration details:
 
 - Embed routes use route-specific `frame-ancestors` from admin setting `trusted_embed_origins`.
-- `js/embed-main.js` accepts host messages only from:
+- `src/embed-main.js` accepts host messages only from:
   - `window.location.origin`
   - configured trusted embed origins
 - Supported host messages:
@@ -125,8 +125,8 @@ Primary flow (minimal blank create launcher page):
 2. `EmbedController::createByParent` validates:
    - logged-in Nextcloud user
    - writable target folder by stable `parentFolderId`
-3. `templates/embed-create.php` loads `js/embed-create-main.js` explicitly in blank layout.
-4. `js/embed-create-main.js` reads `name` and `accessMode` from the launcher URL, validates them client-side, and calls `POST /api/v1/pads/create-by-parent` same-origin with CSRF token from the template.
+3. `templates/embed-create.php` loads the Vite-built bundle for `src/embed-create-main.js` explicitly in blank layout.
+4. `src/embed-create-main.js` reads `name` and `accessMode` from the launcher URL, validates them client-side, and calls `POST /api/v1/pads/create-by-parent` same-origin with CSRF token from the template.
    - the token is injected manually for the same reason as embed-open: blank layout has no automatic `OC.requestToken` bootstrap
 5. `PadController::createByParent` performs server-side validation of `name`, `accessMode`, and the writable target folder before creating the `.pad` file and binding.
 6. On success the launcher redirects itself to the returned `embed_url`, after which the normal embed-open flow takes over.
@@ -136,7 +136,7 @@ Primary flow (minimal blank create launcher page):
 Primary flow (native viewer when available):
 
 1. Public share routes stay on Nextcloud share URL (`/s/{token}`).
-2. `js/viewer-main.js` detects public share context and resolves open data via:
+2. `src/viewer-main.js` detects public share context and resolves open data via:
    - `GET /api/v1/public/open/{token}?file=...`
 3. Same open-target rules apply:
    - read-only share: Etherpad read-only URL
@@ -162,8 +162,8 @@ Primary flow (native viewer when available):
 
 ### 4) Sync
 
-1. Frontend (`js/viewer-main.js`) triggers periodic sync while a pad is open in native viewer.
-2. Trusted embed flow (`js/embed-main.js`) runs the same snapshot sync contract:
+1. Frontend (`src/viewer-main.js`) triggers periodic sync while a pad is open in native viewer.
+2. Trusted embed flow (`src/embed-main.js`) runs the same snapshot sync contract:
    - interval sync while visible
    - flush on `visibilitychange`
    - flush on `pagehide`
@@ -194,7 +194,7 @@ Primary flow (native viewer when available):
 
 ## Main Frontend Files
 
-- `js/files-main.js`
+- `src/files-main.js`
   - Files/public-share open handling and viewer redirect.
   - In authenticated files app routes, `.pad` open is handled via registered Nextcloud file action (`setDefault`) instead of global click interception.
     - Reason: preserves native list interactions (checkbox selection, multi-select, row actions) without accidental auto-open.
@@ -208,19 +208,19 @@ Primary flow (native viewer when available):
   - Router edge-case fallback: hard navigation to same files URL.
   - Stale-route guard: `/apps/files/files/{fileId}?dir=...` without `openfile=true` is normalized to `/apps/files/files?dir=...` for `.pad`.
   - New-pad menu integration.
-- `js/viewer-main.js`
+- `src/viewer-main.js`
   - Registers Nextcloud viewer handler for MIME `application/x-etherpad-nextcloud`.
   - Open URL resolution via CSRF-protected `POST` endpoints:
     - `open-by-id` (preferred)
     - `open` (fallback)
   - Handles initialize-retry when frontmatter is missing.
   - Triggers periodic/unload-safe sync loop for authenticated native viewer sessions.
-- `js/embed-main.js`
+- `src/embed-main.js`
   - Powers the minimal `/embed/by-id/{fileId}` page for trusted host integrations.
   - Same-origin open flow via `open-by-id` and optional `initialize-by-id` retry.
   - Sets iframe `src` as early as possible, then starts sync/host handlers.
   - Implements trusted host message contract and close-flush ack protocol.
-- `js/embed-create-main.js`
+- `src/embed-create-main.js`
   - Powers the minimal `/embed/create-by-parent/{parentFolderId}` launcher page.
   - Same-origin create flow via `POST /api/v1/pads/create-by-parent`.
   - Redirects to returned `embed_url` after successful creation.

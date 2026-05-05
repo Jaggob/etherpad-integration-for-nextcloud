@@ -280,7 +280,7 @@ Base: `/apps/etherpad_nextcloud`
 
 ## Frontend API Usage
 
-- `js/files-main.js`
+- `src/files-main.js`
   - extracts `fileId` directly from the authenticated Files action context whenever available.
   - uses `GET /api/v1/pads/resolve` mainly as a fallback to convert file path -> `fileId` when no stable `fileId` is available.
   - opens in files view through Nextcloud router (`fileid`, `openfile=true`).
@@ -289,13 +289,13 @@ Base: `/apps/etherpad_nextcloud`
     - legacy fallback: `OC.Plugins.register('OCA.Files.NewFileMenu', ...)`
   - on authenticated files routes, open is triggered through Nextcloud's registered default file action for `.pad` (no global click hijack), so checkbox/multi-select behavior remains native.
   - global click interception is only used on public-share routes to remap share download links to the pad viewer.
-- `js/viewer-main.js`
+- `src/viewer-main.js`
   - prefers `POST /api/v1/pads/open-by-id` (`fileId`, requesttoken).
   - falls back to `POST /api/v1/pads/open` (`file`, requesttoken) only without `fileId`.
   - if open fails with missing frontmatter, calls `POST /api/v1/pads/initialize*` and retries open once.
   - uses `POST /api/v1/pads/sync/{fileId}` periodically and on unload.
-  - sync status UI is exposed in Files sidebar panel via `js/files-main.js`.
-- `js/embed-main.js`
+  - sync status UI is exposed in Files sidebar panel via `src/files-main.js`.
+- `src/embed-main.js`
   - powers the minimal `/embed/by-id/{fileId}` page.
   - uses same-origin `POST /api/v1/pads/open-by-id`.
   - if open fails with missing frontmatter, calls `POST /api/v1/pads/initialize-by-id/{fileId}` and retries once.
@@ -306,7 +306,7 @@ Base: `/apps/etherpad_nextcloud`
     - `epnc:host-hidden`
     - `epnc:host-before-close`
     - `epnc:host-sync-now`
-- `js/embed-create-main.js`
+- `src/embed-create-main.js`
   - powers the minimal `/embed/create-by-parent/{parentFolderId}` page.
   - uses same-origin `POST /api/v1/pads/create-by-parent`.
   - redirects to returned `embed_url` after successful pad creation.

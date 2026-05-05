@@ -1,0 +1,4 @@
+js/*.js linguist-generated=true
+js/*.mjs linguist-generated=true
+js/*.mjs.map linguist-generated=true
+js/*.mjs.license linguist-generated=true
