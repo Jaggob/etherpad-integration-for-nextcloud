@@ -4,11 +4,79 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from '../../../src/lib/urls.js'
+import {
+	filesUrlForFileId,
+	getCurrentDir,
+	getDirFromPath,
+	isPadName,
+	normalizeFilePath,
+	parseFileIdFromCurrentLocation,
+	parseFileIdFromFilesHref,
+	parsePadPathFromDavHref,
+	parsePublicSharePadFromHref,
+	parsePublicShareTokenFromLocation,
+	resolveOpenDir,
+	viewerUrlForPath,
+	viewerUrlForPublicShare,
+} from '../../../src/lib/urls.js'
 
 const setPathname = (pathname) => {
 	window.history.replaceState({}, '', pathname)
 }
+
+const setLocation = (pathAndQuery) => {
+	window.history.replaceState({}, '', pathAndQuery)
+}
+
+describe('path helpers', () => {
+	it('normalizes file paths from directory and file name', () => {
+		expect(normalizeFilePath('/Folder', 'Test.pad')).toBe('/Folder/Test.pad')
+		expect(normalizeFilePath('/', ' Test .pad')).toBe('/ Test.pad')
+		expect(normalizeFilePath('', '/Nested/Test.pad')).toBe('/Nested/Test.pad')
+	})
+
+	it('detects pad names case-insensitively', () => {
+		expect(isPadName('Test.PAD')).toBe(true)
+		expect(isPadName('Test.txt')).toBe(false)
+		expect(isPadName(null)).toBe(false)
+	})
+
+	it('extracts directories from paths', () => {
+		expect(getDirFromPath('/Folder/Test.pad')).toBe('/Folder')
+		expect(getDirFromPath('/Test.pad')).toBe('/')
+		expect(getDirFromPath('')).toBe('/')
+	})
+
+	it('reads the current Files dir from query params', () => {
+		setLocation('/apps/files/files/123?dir=/Folder')
+
+		expect(getCurrentDir()).toBe('/Folder')
+	})
+
+	it('uses the current Files dir when opening root-level paths', () => {
+		setLocation('/apps/files/files/123?dir=/Current')
+
+		expect(resolveOpenDir('/Test.pad')).toBe('/Current')
+		expect(resolveOpenDir('/Folder/Test.pad')).toBe('/Folder')
+	})
+})
+
+describe('viewer URL builders', () => {
+	it('builds internal viewer URLs', () => {
+		expect(viewerUrlForPath('/Folder/Test.pad')).toBe('/index.php/apps/etherpad_nextcloud/?file=%2FFolder%2FTest.pad')
+	})
+
+	it('builds Files viewer URLs', () => {
+		setLocation('/apps/files/files/123?dir=/Current')
+
+		expect(filesUrlForFileId(42, '/Folder/Test.pad')).toBe('/index.php/apps/files/files/42?dir=%2FFolder&editing=false&openfile=true')
+	})
+
+	it('builds public viewer URLs', () => {
+		expect(viewerUrlForPublicShare('abc', '')).toBe('/index.php/apps/etherpad_nextcloud/public/abc')
+		expect(viewerUrlForPublicShare('abc', '/Shared/Test.pad')).toBe('/index.php/apps/etherpad_nextcloud/public/abc?file=%2FShared%2FTest.pad')
+	})
+})
 
 describe('parsePublicShareTokenFromLocation', () => {
 	it('extracts tokens from index.php public share routes', () => {
@@ -27,6 +95,47 @@ describe('parsePublicShareTokenFromLocation', () => {
 		setPathname('/apps/files/files/123')
 
 		expect(parsePublicShareTokenFromLocation()).toBeNull()
+	})
+})
+
+describe('parseFileIdFromFilesHref', () => {
+	it('extracts file ids from Files routes', () => {
+		expect(parseFileIdFromFilesHref('/apps/files/files/123')).toBe(123)
+	})
+
+	it('extracts file ids from /f routes and query params', () => {
+		expect(parseFileIdFromFilesHref('/f/456')).toBe(456)
+		expect(parseFileIdFromFilesHref('/apps/files?fileid=789')).toBe(789)
+	})
+
+	it('returns null for invalid file id hrefs', () => {
+		expect(parseFileIdFromFilesHref('/apps/files/files/nope')).toBeNull()
+		expect(parseFileIdFromFilesHref('https://[invalid')).toBeNull()
+	})
+})
+
+describe('parseFileIdFromCurrentLocation', () => {
+	it('extracts file ids from the current route', () => {
+		setPathname('/apps/files/files/321')
+
+		expect(parseFileIdFromCurrentLocation()).toBe(321)
+	})
+})
+
+describe('parsePublicSharePadFromHref', () => {
+	it('extracts pad paths from public download links', () => {
+		const href = '/s/share-token/download?path=/Shared&files=Pad.pad'
+
+		expect(parsePublicSharePadFromHref(href)).toEqual({
+			token: 'share-token',
+			path: '/Shared/Pad.pad',
+		})
+	})
+
+	it('ignores non-pad public download links', () => {
+		const href = '/s/share-token/download?path=/Shared&files=Readme.md'
+
+		expect(parsePublicSharePadFromHref(href)).toBeNull()
 	})
 })
 

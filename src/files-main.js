@@ -17,7 +17,20 @@ import {
 	apiSyncStatusByFileId,
 } from './lib/api-client.js'
 import { hasNativeViewer, isFilesAppRoute } from './lib/nextcloud-runtime.js'
-import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './lib/urls.js'
+import {
+	filesUrlForFileId,
+	getCurrentDir,
+	isPadName,
+	normalizeFilePath,
+	parseFileIdFromCurrentLocation,
+	parseFileIdFromFilesHref,
+	parsePadPathFromDavHref,
+	parsePublicSharePadFromHref,
+	parsePublicShareTokenFromLocation,
+	resolveOpenDir,
+	viewerUrlForPath,
+	viewerUrlForPublicShare,
+} from './lib/urls.js'
 import { openCreatedPadInViewer } from './files/created-pad-opener.js'
 import { createPublicPadMenuRegistrar } from './files/public-pad-menu.js'
 import {
@@ -44,122 +57,6 @@ import { isSingleFilePublicShare, schedulePublicSingleShareUiStateRefresh } from
 	const SIDEBAR_SYNC_STATUS_POLL_MAX_MS = 60000
 	const SIDEBAR_SYNC_STATUS_POLL_ERROR_MS = 15000
 	const SIDEBAR_SYNC_STATUS_POLL_STEP_MS = 8000
-
-	const normalizeFilePath = (dir, filename) => {
-		const cleanDir = !dir || dir === '/' ? '' : String(dir)
-		const cleanName = String(filename || '').replace(/^\/+/, '').replace(/\s+\.pad$/i, '.pad')
-		if (cleanDir === '') {
-			return '/' + cleanName
-		}
-		return cleanDir + '/' + cleanName
-	}
-
-	const viewerUrlForPath = (path) => ocGenerateUrl('/apps/' + APP_ID + '/?file=' + encodeURIComponent(path))
-	const filesUrlForFileId = (fileId, path) => {
-		const base = ocGenerateUrl('/apps/files/files/' + encodeURIComponent(String(fileId)))
-		const params = new URLSearchParams()
-		params.set('dir', resolveOpenDir(path))
-		params.set('editing', 'false')
-		params.set('openfile', 'true')
-		return base + '?' + params.toString()
-	}
-	const parseFileIdFromFilesHref = (href) => {
-		if (!href || typeof href !== 'string') {
-			return null
-		}
-		let url
-		try {
-			url = new URL(href, window.location.origin)
-		} catch (error) {
-			return null
-		}
-		const pathValue = url.pathname || ''
-		const match = pathValue.match(/\/apps\/files\/files\/(\d+)\/?$/)
-		if (!match) {
-			const shareMatch = pathValue.match(/\/f\/(\d+)\/?$/)
-			if (!shareMatch) {
-				const byQuery = Number(url.searchParams.get('fileid') || '')
-				return Number.isFinite(byQuery) && byQuery > 0 ? byQuery : null
-			}
-			const shareId = parseInt(shareMatch[1], 10)
-			return Number.isFinite(shareId) && shareId > 0 ? shareId : null
-		}
-		const id = parseInt(match[1], 10)
-		return Number.isFinite(id) && id > 0 ? id : null
-	}
-
-	const parseFileIdFromCurrentLocation = () => {
-		const match = (window.location.pathname || '').match(/\/apps\/files\/files\/(\d+)\/?$/)
-		if (!match) {
-			return null
-		}
-		const id = parseInt(match[1], 10)
-		return Number.isFinite(id) && id > 0 ? id : null
-	}
-
-	const viewerUrlForPublicShare = (token, path) => {
-		const base = ocGenerateUrl('/apps/' + APP_ID + '/public/' + encodeURIComponent(token))
-		if (!path) {
-			return base
-		}
-		return base + '?file=' + encodeURIComponent(path)
-	}
-
-	const parsePublicSharePadFromHref = (href) => {
-		if (!href || typeof href !== 'string') {
-			return null
-		}
-		let url
-		try {
-			url = new URL(href, window.location.origin)
-		} catch (error) {
-			return null
-		}
-		const pathMatch = (url.pathname || '').match(/(?:\/index\.php)?\/s\/([^/]+)\/download\/?$/)
-		if (!pathMatch) {
-			return null
-		}
-		const files = (url.searchParams.get('files') || '').trim()
-		if (!isPadName(files)) {
-			return null
-		}
-		const dir = (url.searchParams.get('path') || '/').trim() || '/'
-		return {
-			token: pathMatch[1],
-			path: normalizeFilePath(dir, files),
-		}
-	}
-
-	const isPadName = (name) => typeof name === 'string' && name.toLowerCase().endsWith('.pad')
-
-	const getDirFromPath = (path) => {
-		if (!path || typeof path !== 'string') {
-			return '/'
-		}
-		const idx = path.lastIndexOf('/')
-		if (idx <= 0) {
-			return '/'
-		}
-		return path.slice(0, idx) || '/'
-	}
-
-	const resolveOpenDir = (path) => {
-		const dirFromPath = getDirFromPath(path)
-		if (dirFromPath !== '/') {
-			return dirFromPath
-		}
-		// When a file path has no directory context (or is already root), keep the
-		// currently active Files dir in URL so close/back navigation returns to the
-		// same folder instead of jumping to an unrelated default view.
-		const currentDir = getCurrentDir()
-		return currentDir === '' ? '/' : currentDir
-	}
-
-	const getCurrentDir = () => {
-		const params = new URLSearchParams(window.location.search || '')
-		const dir = (params.get('dir') || '/').trim()
-		return dir === '' ? '/' : dir
-	}
 
 	const isDarkMode = () => {
 		const root = document.documentElement
