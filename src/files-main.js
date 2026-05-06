@@ -8,11 +8,7 @@ import {
 	ocImagePath,
 	ocPermissionRead,
 } from './lib/oc-compat.js'
-import {
-	apiCreatePadFromUrl,
-	apiCreatePublicPad,
-	apiResolvePadByFileId,
-} from './lib/api-client.js'
+import { apiResolvePadByFileId } from './lib/api-client.js'
 import { hasNativeViewer, isFilesAppRoute } from './lib/nextcloud-runtime.js'
 import {
 	getCurrentDir,
@@ -23,18 +19,12 @@ import {
 	parsePadPathFromDavHref,
 	parsePublicSharePadFromHref,
 	parsePublicShareTokenFromLocation,
-	resolveOpenDir,
 	viewerUrlForPublicShare,
 } from './lib/urls.js'
-import { openCreatedPadInViewer } from './files/created-pad-opener.js'
 import { createPadOpener } from './files/pad-opener.js'
+import { createPublicPadCreator } from './files/public-pad-create-flow.js'
 import { createSidebarSyncController } from './files/sidebar-sync.js'
 import { createPublicPadMenuRegistrar } from './files/public-pad-menu.js'
-import {
-	openExternalPublicPadDialog,
-	openInternalPublicPadDialog,
-	openPublicPadModeDialog,
-} from './files/pad-create-dialogs.js'
 import { isSingleFilePublicShare, schedulePublicSingleShareUiStateRefresh } from './files/public-single-share-ui.js'
 
 (function () {
@@ -43,6 +33,7 @@ import { isSingleFilePublicShare, schedulePublicSingleShareUiStateRefresh } from
 	let lastRouteCheckKey = ''
 	const sidebarSync = createSidebarSyncController()
 	const openPadInNativeViewer = createPadOpener()
+	const promptAndCreatePublicPad = createPublicPadCreator({ openPadInNativeViewer })
 
 	const parseNumericFileId = (value) => {
 		const id = Number(value)
@@ -140,77 +131,6 @@ import { isSingleFilePublicShare, schedulePublicSingleShareUiStateRefresh } from
 			}
 		}
 		return null
-	}
-
-	const createInternalPublicPad = async () => {
-		const inputName = await openInternalPublicPadDialog()
-		if (!inputName) {
-			return
-		}
-		const name = inputName.trim()
-		const normalizedName = name.toLowerCase().endsWith('.pad') ? name : (name + '.pad')
-		const filePath = normalizeFilePath(getCurrentDir(), normalizedName)
-
-		try {
-			const created = await apiCreatePublicPad(filePath)
-			const createdPath = (created && typeof created.file === 'string') ? created.file : filePath
-			const createdFileId = created && Number.isFinite(Number(created.file_id)) ? Number(created.file_id) : null
-			await openCreatedPadInViewer(
-				{
-					path: createdPath,
-					fileId: createdFileId,
-				},
-				{
-					fallbackOpen: openPadInNativeViewer,
-					resolveOpenDir,
-				}
-			)
-		} catch (error) {
-			const message = error instanceof Error ? error.message : t(APP_ID, 'Could not create public pad.')
-			window.alert(message)
-		}
-	}
-
-	const promptAndCreatePadFromUrl = async () => {
-		const values = await openExternalPublicPadDialog()
-		if (!values) {
-			return
-		}
-		const trimmedUrl = values.padUrl.trim()
-		const name = values.name.trim()
-		const dir = getCurrentDir()
-		const normalizedName = name.toLowerCase().endsWith('.pad') ? name : (name + '.pad')
-		const filePath = normalizeFilePath(dir, normalizedName)
-
-		try {
-			const created = await apiCreatePadFromUrl(filePath, trimmedUrl)
-			const createdPath = (created && typeof created.file === 'string') ? created.file : filePath
-			const createdFileId = created && Number.isFinite(Number(created.file_id)) ? Number(created.file_id) : null
-			await openCreatedPadInViewer(
-				{
-					path: createdPath,
-					fileId: createdFileId,
-				},
-				{
-					fallbackOpen: openPadInNativeViewer,
-					resolveOpenDir,
-				}
-			)
-		} catch (error) {
-			const message = error instanceof Error ? error.message : t(APP_ID, 'Could not import public pad URL.')
-			window.alert(message)
-		}
-	}
-
-	const promptAndCreatePublicPad = async () => {
-		const choice = await openPublicPadModeDialog()
-		if (choice === 'internal') {
-			await createInternalPublicPad()
-			return
-		}
-		if (choice === 'external') {
-			await promptAndCreatePadFromUrl()
-		}
 	}
 
 	const resolvePublicSharePadPathFromLink = (link, publicToken) => {
