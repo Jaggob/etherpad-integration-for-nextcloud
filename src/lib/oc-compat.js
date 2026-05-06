@@ -27,6 +27,52 @@ export const ocRequestToken = (fallback = '') => {
 	return String((window.OC && window.OC.requestToken) || '')
 }
 
+export const ocCurrentUserId = () => {
+	if (window.OC && typeof window.OC.getCurrentUser === 'function') {
+		const user = window.OC.getCurrentUser()
+		return String((user && user.uid) || '').trim()
+	}
+	return ''
+}
+
+const buildDavFileUrl = (path, encodePath) => {
+	const uid = ocCurrentUserId()
+	const normalizedPath = String(path || '').trim()
+	if (uid === '' || normalizedPath === '') {
+		return ''
+	}
+
+	const remoteBase = (window.OC && typeof window.OC.linkToRemoteBase === 'function')
+		? window.OC.linkToRemoteBase('dav')
+		: '/remote.php/dav'
+	const baseUrl = new URL(remoteBase, window.location.origin)
+	const pathSuffix = normalizedPath
+		.split('/')
+		.filter((part) => part !== '')
+		.map((part) => encodePath ? encodeURIComponent(part) : part)
+		.join('/')
+	return baseUrl.origin
+		+ baseUrl.pathname.replace(/\/+$/, '')
+		+ '/files/'
+		+ (encodePath ? encodeURIComponent(uid) : uid)
+		+ '/'
+		+ pathSuffix
+}
+
+export const ocDavFileSource = (path) => buildDavFileUrl(path, false)
+
+export const ocDavFileFetchUrl = (path) => buildDavFileUrl(path, true)
+
+export const ocEmitEvent = (name, payload) => {
+	const bus = window._nc_event_bus || (window.OC && window.OC._eventBus)
+	if (!bus || typeof bus.emit !== 'function') {
+		return false
+	}
+
+	bus.emit(name, payload)
+	return true
+}
+
 export const ocPermissionRead = () => {
 	const value = window.OC && window.OC.PERMISSION_READ
 	const numeric = Number(value)
