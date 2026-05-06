@@ -20,7 +20,6 @@ class LoadViewerListener implements IEventListener {
 			return;
 		}
 
-		Util::addScript(Application::APP_ID, 'viewer-main', 'viewer');
+		Util::addScript(Application::APP_ID, 'etherpad_nextcloud-viewer-main', 'viewer');
 	}
 }
-

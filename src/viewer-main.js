@@ -2,27 +2,12 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  * Copyright (c) 2026 Jacob Bühler
  */
-(function () {
-	const APP_ID = 'etherpad_nextcloud'
-	const MIME = 'application/x-etherpad-nextcloud'
-	const HANDLER_ID = 'etherpad_nextcloud'
-	let attempts = 0
-	const ocGenerateUrl = (path) => {
-		if (window.OC && typeof window.OC.generateUrl === 'function') {
-			return window.OC.generateUrl(path)
-		}
-		return '/index.php' + path
-	}
-	const ocRequestToken = () => String((window.OC && window.OC.requestToken) || '')
-	const translate = (text) => (typeof window.t === 'function' ? window.t(APP_ID, text) : text)
+import { APP_ID, MIME, VIEWER_HANDLER_ID } from './lib/constants.js'
+import { ocGenerateUrl, ocRequestToken, translate } from './lib/oc-compat.js'
+import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './lib/urls.js'
 
-	const parsePublicShareTokenFromLocation = () => {
-		const match = (window.location.pathname || '').match(/(?:\/index\.php)?\/s\/([^/]+)(?:\/.*)?$/)
-		if (!match) {
-			return null
-		}
-		return match[1] || null
-	}
+(function () {
+	let attempts = 0
 
 	const component = {
 		name: 'EtherpadNextcloudViewer',
@@ -58,20 +43,7 @@
 			sourcePath() {
 				const value = typeof this.source === 'string' ? this.source.trim() : ''
 				if (!value) return ''
-				try {
-					const url = new URL(value, window.location.origin)
-					const path = decodeURIComponent(url.pathname || '')
-					const markers = ['/remote.php/dav/files/', '/public.php/dav/files/']
-					const marker = markers.find((candidate) => path.includes(candidate))
-					if (!marker) return ''
-					const idx = path.indexOf(marker)
-					const rest = path.substring(idx + marker.length)
-					const slash = rest.indexOf('/')
-					if (slash === -1) return ''
-					return '/' + rest.substring(slash + 1)
-				} catch {
-					return ''
-				}
+				return parsePadPathFromDavHref(value) || ''
 			},
 			filePath() {
 				const normalizeName = (value) => String(value || '').trim().replace(/\s+\.pad$/i, '.pad')
@@ -455,10 +427,10 @@
 			return
 		}
 		if (Array.isArray(window.OCA.Viewer.availableHandlers)
-			&& window.OCA.Viewer.availableHandlers.some((handler) => handler && handler.id === HANDLER_ID)) {
+			&& window.OCA.Viewer.availableHandlers.some((handler) => handler && handler.id === VIEWER_HANDLER_ID)) {
 			return
 		}
-		window.OCA.Viewer.registerHandler({ id: HANDLER_ID, mimes: [MIME], component })
+		window.OCA.Viewer.registerHandler({ id: VIEWER_HANDLER_ID, mimes: [MIME], component })
 	}
 
 	tryRegister()

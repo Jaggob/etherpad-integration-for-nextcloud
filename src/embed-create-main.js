@@ -2,6 +2,8 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  * Copyright (c) 2026 Jacob Bühler
  */
+import { ocRequestToken } from './lib/oc-compat.js'
+
 (function () {
 	const REQUEST_TIMEOUT_MS = 10000
 
@@ -20,12 +22,7 @@
 	const errorNode = root.querySelector('[data-epnc-embed-create-error]')
 	const errorMessageNode = root.querySelector('[data-epnc-embed-create-error-message]')
 
-	const ocRequestToken = () => {
-		if (templateRequestToken !== '') {
-			return templateRequestToken
-		}
-		return String((window.OC && window.OC.requestToken) || '')
-	}
+	const requestToken = () => ocRequestToken(templateRequestToken)
 
 	const showError = (message) => {
 		if (loadingNode instanceof HTMLElement) {
@@ -85,7 +82,7 @@
 			showError(incompleteConfigMessage)
 			return
 		}
-		if (ocRequestToken() === '') {
+		if (requestToken() === '') {
 			showError('CSRF request token is missing.')
 			return
 		}
@@ -110,7 +107,7 @@
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-					requesttoken: ocRequestToken(),
+					requesttoken: requestToken(),
 				},
 				body: body.toString(),
 			})

@@ -28,7 +28,7 @@ class AdminSettings implements ISettings {
 
 	public function getForm(): TemplateResponse {
 		Util::addStyle(Application::APP_ID, 'admin-settings');
-		Util::addScript(Application::APP_ID, 'admin-settings');
+		Util::addScript(Application::APP_ID, 'etherpad_nextcloud-admin-settings');
 
 		$etherpadHost = (string)$this->config->getAppValue(Application::APP_ID, 'etherpad_host', '');
 		$etherpadApiHost = (string)$this->config->getAppValue(Application::APP_ID, 'etherpad_api_host', '');

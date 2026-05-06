@@ -5,9 +5,9 @@
  */
 ?>
 <?php $embedCssUrl = link_to('etherpad_nextcloud', 'css/embed.css') . '?v=' . rawurlencode((string)filemtime(__DIR__ . '/../css/embed.css')); ?>
-<?php $embedCreateJsUrl = link_to('etherpad_nextcloud', 'js/embed-create-main.js') . '?v=' . rawurlencode((string)filemtime(__DIR__ . '/../js/embed-create-main.js')); ?>
+<?php $embedCreateJsUrl = link_to('etherpad_nextcloud', 'js/etherpad_nextcloud-embed-create-main.mjs') . '?v=' . rawurlencode((string)filemtime(__DIR__ . '/../js/etherpad_nextcloud-embed-create-main.mjs')); ?>
 <link rel="stylesheet" href="<?php p($embedCssUrl); ?>">
-<script nonce="<?php p((string)$_['cspNonce']); ?>" defer src="<?php p($embedCreateJsUrl); ?>"></script>
+<script nonce="<?php p((string)$_['cspNonce']); ?>" type="module" src="<?php p($embedCreateJsUrl); ?>"></script>
 <div id="etherpad-nextcloud-embed-create"
 	class="epnc-embed"
 	data-parent-folder-id="<?php p((string)$_['parent_folder_id']); ?>"

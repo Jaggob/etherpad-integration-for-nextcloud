@@ -2,6 +2,8 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  * Copyright (c) 2026 Jacob Bühler
  */
+import { ocRequestToken } from './lib/oc-compat.js'
+
 (function () {
 	const REQUEST_TIMEOUT_MS = 10000
 	const IFRAME_REVEAL_DELAY_MS = 100
@@ -38,12 +40,7 @@
 	let pageHideHandler = null
 	let messageHandler = null
 
-	const ocRequestToken = () => {
-		if (templateRequestToken !== '') {
-			return templateRequestToken
-		}
-		return String((window.OC && window.OC.requestToken) || '')
-	}
+	const requestToken = () => ocRequestToken(templateRequestToken)
 
 	const showError = (message) => {
 		if (loadingNode instanceof HTMLElement) {
@@ -168,7 +165,7 @@
 				credentials: 'same-origin',
 				headers: {
 					Accept: 'application/json',
-					requesttoken: ocRequestToken(),
+					requesttoken: requestToken(),
 				},
 				keepalive: Boolean(keepalive),
 			})
@@ -336,7 +333,7 @@
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-				requesttoken: ocRequestToken(),
+				requesttoken: requestToken(),
 			},
 			body: body.toString(),
 		})
@@ -351,7 +348,7 @@
 		await fetchJson(url, {
 			method: 'POST',
 			headers: {
-				requesttoken: ocRequestToken(),
+				requesttoken: requestToken(),
 			},
 		})
 	}
@@ -361,7 +358,7 @@
 			showError('Embed configuration is incomplete.')
 			return
 		}
-		if (ocRequestToken() === '') {
+		if (requestToken() === '') {
 			showError('CSRF request token is missing.')
 			return
 		}
