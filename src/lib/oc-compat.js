@@ -61,8 +61,6 @@ const buildDavFileUrl = (path, encodePath) => {
 
 export const ocDavFileSource = (path) => buildDavFileUrl(path, false)
 
-export const ocDavFileFetchUrl = (path) => buildDavFileUrl(path, true)
-
 export const ocEmitEvent = (name, payload) => {
 	const bus = window._nc_event_bus || (window.OC && window.OC._eventBus)
 	if (!bus || typeof bus.emit !== 'function') {
