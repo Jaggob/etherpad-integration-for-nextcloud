@@ -10,8 +10,6 @@ import {
 	isPadName,
 	normalizeFilePath,
 	parseFileIdFromCurrentLocation,
-	parsePadPathFromDavHref,
-	parsePublicSharePadFromHref,
 	parsePublicShareTokenFromLocation,
 	viewerUrlForPublicShare,
 } from './lib/urls.js'
@@ -20,6 +18,7 @@ import { createPadOpener } from './files/pad-opener.js'
 import { createPublicPadCreator } from './files/public-pad-create-flow.js'
 import { createSidebarSyncController } from './files/sidebar-sync.js'
 import { createPublicPadMenuRegistrar } from './files/public-pad-menu.js'
+import { registerPublicSharePadClickInterceptor } from './files/public-share-pad-links.js'
 import { isSingleFilePublicShare, schedulePublicSingleShareUiStateRefresh } from './files/public-single-share-ui.js'
 
 (function () {
@@ -28,67 +27,6 @@ import { isSingleFilePublicShare, schedulePublicSingleShareUiStateRefresh } from
 	const sidebarSync = createSidebarSyncController()
 	const openPadInNativeViewer = createPadOpener()
 	const promptAndCreatePublicPad = createPublicPadCreator({ openPadInNativeViewer })
-
-	const resolvePublicSharePadPathFromLink = (link, publicToken) => {
-		if (!(link instanceof HTMLAnchorElement) || !publicToken) {
-			return null
-		}
-		const href = link.getAttribute('href') || ''
-		const publicSharePad = parsePublicSharePadFromHref(href)
-		if (publicSharePad && publicSharePad.token === publicToken && isPadName(publicSharePad.path)) {
-			return publicSharePad.path
-		}
-		const davPadPath = parsePadPathFromDavHref(href)
-		if (isPadName(davPadPath)) {
-			return davPadPath
-		}
-		return null
-	}
-
-	const registerPadClickInterceptor = () => {
-		if (window.OCA && window.OCA.EtherpadNextcloudClickInterceptorRegistered === true) {
-			return
-		}
-		if (window.OCA) {
-			window.OCA.EtherpadNextcloudClickInterceptorRegistered = true
-		}
-
-		const maybeOpenPad = async (event) => {
-			if (!event || event.defaultPrevented) {
-				return
-			}
-			const publicToken = parsePublicShareTokenFromLocation()
-			if (!publicToken) {
-				return
-			}
-			if (event.type === 'click' && (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)) {
-				return
-			}
-			if (!(event.target instanceof Element)) {
-				return
-			}
-			const link = event.target.closest('a[href]')
-			if (!(link instanceof HTMLAnchorElement)) {
-				return
-			}
-			const padPath = resolvePublicSharePadPathFromLink(link, publicToken)
-			if (!padPath) {
-				return
-			}
-			event.preventDefault()
-			event.stopPropagation()
-			if (typeof event.stopImmediatePropagation === 'function') {
-				event.stopImmediatePropagation()
-			}
-			if (hasNativeViewer()) {
-				await openPadInNativeViewer({ path: padPath, fileId: null })
-				return
-			}
-			window.location.assign(viewerUrlForPublicShare(publicToken, padPath))
-		}
-
-		document.addEventListener('click', maybeOpenPad, true)
-	}
 
 	const ensurePublicPadMenuRegistration = createPublicPadMenuRegistrar({
 		isFilesAppRoute,
@@ -235,7 +173,7 @@ import { isSingleFilePublicShare, schedulePublicSingleShareUiStateRefresh } from
 		installRouteWatchers()
 		evaluateCurrentRoute()
 		registerOpenAction({ openPadInNativeViewer })
-		registerPadClickInterceptor()
+		registerPublicSharePadClickInterceptor({ openPadInNativeViewer })
 		sidebarSync.installObserver()
 		sidebarSync.scheduleRefresh(200)
 	}
