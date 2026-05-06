@@ -12,13 +12,9 @@ import {
 	normalizeFilePath,
 	parseFileIdFromFilesHref,
 } from '../lib/urls.js'
+import { parseNumericFileId } from '../lib/dom-helpers.js'
 
 const OPEN_ACTION = 'etherpad_nextcloud_open'
-
-const parseNumericFileId = (value) => {
-	const id = Number(value)
-	return Number.isFinite(id) && id > 0 ? id : null
-}
 
 const readFileIdCandidate = (source) => {
 	if (!source) {

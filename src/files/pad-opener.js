@@ -18,6 +18,7 @@ import {
 
 const DEDUPE_OPEN_WINDOW_MS = 800
 const ROUTE_FALLBACK_DELAY_MS = 180
+const ROUTE_OPEN_DELAY_MS = 120
 
 const navigateFilesRouteAndOpen = (fileId, path) => {
 	const router = window.OCP && window.OCP.Files && window.OCP.Files.Router
@@ -40,6 +41,16 @@ const navigateFilesRouteAndOpen = (fileId, path) => {
 		}
 	)
 	window.setTimeout(() => {
+		try {
+			window.OCA.Viewer.open({
+				path,
+				onClose: clearFilesViewerRoute,
+			})
+		} catch (e) {
+			// The route fallback below still lets Nextcloud handle viewer opening.
+		}
+	}, ROUTE_OPEN_DELAY_MS)
+	window.setTimeout(() => {
 		const hasExpectedPath = (window.location.pathname || '').includes('/apps/files/files/' + String(fileId))
 		if (hasExpectedPath) {
 			return
@@ -48,6 +59,17 @@ const navigateFilesRouteAndOpen = (fileId, path) => {
 		window.location.assign(fallbackUrl)
 	}, ROUTE_FALLBACK_DELAY_MS)
 	return true
+}
+
+const clearFilesViewerRoute = () => {
+	const router = window.OCP && window.OCP.Files && window.OCP.Files.Router
+	if (!router || typeof router.goToRoute !== 'function') {
+		return
+	}
+	const query = { ...(router.query || {}) }
+	delete query.openfile
+	delete query.editing
+	router.goToRoute(null, router.params || {}, query)
 }
 
 export const createPadOpener = () => {

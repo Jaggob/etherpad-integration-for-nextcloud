@@ -11,57 +11,26 @@ import {
 } from '../lib/api-client.js'
 import { isFilesAppRoute } from '../lib/nextcloud-runtime.js'
 import {
-	parseFileIdFromCurrentLocation,
 	parseFileIdFromFilesHref,
 	parsePublicShareTokenFromLocation,
 } from '../lib/urls.js'
+import {
+	isDarkMode,
+	isElementVisible,
+	parseFileIdFromRoute,
+	parseNumericFileId,
+} from '../lib/dom-helpers.js'
 
 const SIDEBAR_PANEL_ATTR = 'data-epnc-sidebar-sync-panel'
 const SIDEBAR_PANEL_MOUNT_ATTR = 'data-epnc-sidebar-sync-mount'
+// Sidebar sync status poll cadence:
+// - 8s while out of sync, so edits show fresh status quickly.
+// - +8s on consecutive synced polls, capped at 60s for idle pads.
+// - 15s on errors, to avoid hammering a failing backend.
 const SIDEBAR_SYNC_STATUS_POLL_BASE_MS = 8000
 const SIDEBAR_SYNC_STATUS_POLL_MAX_MS = 60000
 const SIDEBAR_SYNC_STATUS_POLL_ERROR_MS = 15000
 const SIDEBAR_SYNC_STATUS_POLL_STEP_MS = 8000
-
-const isDarkMode = () => {
-	const root = document.documentElement
-	const body = document.body
-	const classes = (root?.className || '') + ' ' + (body?.className || '')
-	if (/theme[-_]?dark|dark-theme|theme--dark/i.test(classes)) {
-		return true
-	}
-	const media = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)')
-	return Boolean(media && media.matches)
-}
-
-const isElementVisible = (element) => {
-	if (!(element instanceof HTMLElement)) {
-		return false
-	}
-	const style = window.getComputedStyle(element)
-	if (style.display === 'none' || style.visibility === 'hidden') {
-		return false
-	}
-	if (style.position === 'fixed') {
-		return true
-	}
-	return element.offsetParent !== null
-}
-
-const parseNumericFileId = (value) => {
-	const id = Number(value)
-	return Number.isFinite(id) && id > 0 ? id : null
-}
-
-const parseFileIdFromRoute = () => {
-	const fromPath = parseFileIdFromCurrentLocation()
-	if (fromPath !== null) {
-		return fromPath
-	}
-	const params = new URLSearchParams(window.location.search || '')
-	const byQuery = Number(params.get('fileid') || '')
-	return Number.isFinite(byQuery) && byQuery > 0 ? byQuery : null
-}
 
 const findSidebarRoot = () => {
 	const selectors = [
@@ -200,7 +169,6 @@ export const createSidebarSyncController = () => {
 	let sidebarSyncObserver = null
 	let sidebarSyncRefreshTimer = null
 	let sidebarSyncStatusPollTimer = null
-	let sidebarSyncStatusPollFileId = null
 	let sidebarSyncRefreshToken = 0
 
 	const clearSidebarSyncStatusPoll = () => {
@@ -208,7 +176,6 @@ export const createSidebarSyncController = () => {
 			window.clearTimeout(sidebarSyncStatusPollTimer)
 			sidebarSyncStatusPollTimer = null
 		}
-		sidebarSyncStatusPollFileId = null
 	}
 
 	const removeSidebarSyncPanel = () => {
@@ -345,7 +312,6 @@ export const createSidebarSyncController = () => {
 		if (!(panel instanceof HTMLElement) || !Number.isFinite(fileId) || fileId <= 0) {
 			return
 		}
-		sidebarSyncStatusPollFileId = fileId
 		let nextDelayMs = SIDEBAR_SYNC_STATUS_POLL_BASE_MS
 		const scheduleNext = (delayMs) => {
 			sidebarSyncStatusPollTimer = window.setTimeout(() => {

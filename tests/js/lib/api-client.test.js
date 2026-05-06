@@ -60,6 +60,18 @@ describe('api-client', () => {
 		expect(fetch).toHaveBeenCalledTimes(2)
 	})
 
+	it('limits resolve cache growth', async () => {
+		const { apiResolvePadByFileId } = await importClient()
+		fetch.mockImplementation((url) => Promise.resolve(jsonResponse({ url })))
+
+		for (let fileId = 1; fileId <= 51; fileId += 1) {
+			await apiResolvePadByFileId(fileId)
+		}
+		await apiResolvePadByFileId(1)
+
+		expect(fetch).toHaveBeenCalledTimes(52)
+	})
+
 	it('resolves pads by encoded file path', async () => {
 		const { apiResolvePadByPath } = await importClient()
 		fetch.mockResolvedValueOnce(jsonResponse({ is_pad: true }))

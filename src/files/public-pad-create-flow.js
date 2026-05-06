@@ -9,6 +9,7 @@ import {
 } from '../lib/api-client.js'
 import {
 	getCurrentDir,
+	isPadName,
 	normalizeFilePath,
 	resolveOpenDir,
 } from '../lib/urls.js'
@@ -19,7 +20,7 @@ import {
 	openPublicPadModeDialog,
 } from './pad-create-dialogs.js'
 
-const ensurePadExtension = (name) => name.toLowerCase().endsWith('.pad') ? name : (name + '.pad')
+const ensurePadExtension = (name) => isPadName(name) ? name : (name + '.pad')
 
 const createdPadNavigation = (created, fallbackPath) => ({
 	path: (created && typeof created.file === 'string') ? created.file : fallbackPath,
