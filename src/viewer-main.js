@@ -4,6 +4,7 @@
  */
 import { APP_ID, MIME, VIEWER_HANDLER_ID } from './lib/constants.js'
 import { ocGenerateUrl, ocRequestToken, translate } from './lib/oc-compat.js'
+import { buildPadFrameSrcdoc } from './lib/pad-frame-srcdoc.js'
 import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './lib/urls.js'
 
 (function () {
@@ -411,8 +412,13 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 			}
 
 			return createElement('div', { class: 'epnc-native-shell' }, [
+				// Nextcloud Viewer tries to inspect/focus direct iframe children during
+				// teardown. Keep the direct iframe same-origin via srcdoc, and put the
+				// cross-origin Etherpad frame one level deeper.
 				createElement('iframe', {
-					attrs: { src: this.iframeSrc },
+					attrs: { srcdoc: buildPadFrameSrcdoc(this.iframeSrc), title: 'Etherpad' },
+					// This fires when the srcdoc wrapper is ready. Etherpad then continues
+					// loading in the inner iframe and shows its own loading UI.
 					on: { load: () => this.markLoaded(), error: () => this.markLoaded() },
 					class: 'epnc-native-iframe',
 				}),

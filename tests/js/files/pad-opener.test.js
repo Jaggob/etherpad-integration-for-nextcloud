@@ -19,6 +19,8 @@ const installFilesRouter = () => {
 	return router
 }
 
+let assignSpy
+
 beforeEach(() => {
 	vi.useFakeTimers()
 	window.history.replaceState({}, '', '/index.php/apps/files/files?dir=/Current')
@@ -27,6 +29,7 @@ beforeEach(() => {
 			open: vi.fn(),
 		},
 	}
+	assignSpy = vi.spyOn(window.location, 'assign').mockImplementation(() => {})
 })
 
 afterEach(() => {
@@ -47,7 +50,7 @@ describe('pad opener', () => {
 		expect(router.goToRoute).toHaveBeenCalledWith(
 			null,
 			{ view: 'files', fileid: '42' },
-			{ dir: '/Folder', editing: 'false', openfile: 'true' }
+			{ dir: '/Folder' }
 		)
 		expect(window.OCA.Viewer.open).toHaveBeenCalledWith(expect.objectContaining({
 			path: '/Folder/Test.pad',
@@ -63,6 +66,51 @@ describe('pad opener', () => {
 			router.params,
 			{ dir: '/Folder' }
 		)
+	})
+
+	it('swallows expected Files router redirect rejections', async () => {
+		const router = installFilesRouter()
+		router.goToRoute.mockImplementation((route, params = {}, query = {}) => {
+			router.params = { ...params }
+			router.query = { ...query }
+			return Promise.reject(new Error('Redirected when going via a navigation guard.'))
+		})
+		const openPad = createPadOpener()
+
+		await openPad({ path: '/Folder/Test.pad', fileId: 42 })
+		await vi.advanceTimersByTimeAsync(120)
+		await Promise.resolve()
+
+		expect(window.OCA.Viewer.open).toHaveBeenCalledWith(expect.objectContaining({
+			path: '/Folder/Test.pad',
+		}))
+	})
+
+	it('swallows expected native viewer navigation rejections', async () => {
+		installFilesRouter()
+		window.OCA.Viewer.open.mockImplementation(() => Promise.reject(new Error('Redirected when going via a navigation guard.')))
+		const openPad = createPadOpener()
+
+		await openPad({ path: '/Folder/Test.pad', fileId: 42 })
+		await vi.advanceTimersByTimeAsync(120)
+		await Promise.resolve()
+
+		expect(window.OCA.Viewer.open).toHaveBeenCalledWith(expect.objectContaining({
+			path: '/Folder/Test.pad',
+		}))
+	})
+
+	it('falls back to the Files auto-open URL when native viewer opening throws', async () => {
+		installFilesRouter()
+		window.OCA.Viewer.open.mockImplementation(() => {
+			throw new Error('Viewer failed to open.')
+		})
+		const openPad = createPadOpener()
+
+		await openPad({ path: '/Folder/Test.pad', fileId: 42 })
+		await vi.advanceTimersByTimeAsync(180)
+
+		expect(assignSpy).toHaveBeenCalledWith('/index.php/apps/files/files/42?dir=%2FFolder&editing=false&openfile=true')
 	})
 
 	it('deduplicates repeated open requests in a short window', async () => {
