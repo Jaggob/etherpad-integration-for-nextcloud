@@ -15,6 +15,8 @@ const isSafePadUrl = (url) => {
 	try {
 		const parsed = new URL(String(url || ''))
 		return ALLOWED_PAD_URL_SCHEMES.includes(parsed.protocol)
+			&& parsed.username === ''
+			&& parsed.password === ''
 	} catch {
 		return false
 	}

@@ -49,6 +49,10 @@ describe('pad frame srcdoc builder', () => {
 		expect(buildPadFrameSrcdoc('data:text/html,<script>alert(1)</script>')).toContain('src=""')
 	})
 
+	it('drops URLs with embedded credentials', () => {
+		expect(buildPadFrameSrcdoc('https://user:pass@pad.example.test/p/demo')).toContain('src=""')
+	})
+
 	it('adds a restrictive CSP for the wrapper document', () => {
 		const srcdoc = buildPadFrameSrcdoc('https://pad.example.test/p/demo')
 
