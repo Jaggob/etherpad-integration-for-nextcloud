@@ -4,6 +4,7 @@
  */
 import { APP_ID, MIME, VIEWER_HANDLER_ID } from './lib/constants.js'
 import { ocGenerateUrl, ocRequestToken, translate } from './lib/oc-compat.js'
+import { buildPadFrameSrcdoc } from './lib/pad-frame-srcdoc.js'
 import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './lib/urls.js'
 
 (function () {
@@ -223,16 +224,6 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 					this.pageHideHandler = null
 				}
 			},
-			buildPadFrameSrcdoc(url) {
-				const escapedUrl = String(url || '')
-					.replace(/&/g, '&amp;')
-					.replace(/"/g, '&quot;')
-					.replace(/</g, '&lt;')
-					.replace(/>/g, '&gt;')
-				return '<!doctype html><html><head><meta charset="utf-8">'
-					+ '<style>html,body,iframe{width:100%;height:100%;margin:0;border:0;overflow:hidden}iframe{display:block}</style>'
-					+ '</head><body><iframe src="' + escapedUrl + '" title="Etherpad"></iframe></body></html>'
-			},
 			async resolveOpenUrl() {
 				const generation = ++this.resolveGeneration
 				const isCurrent = () => generation === this.resolveGeneration
@@ -425,7 +416,9 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 				// teardown. Keep the direct iframe same-origin via srcdoc, and put the
 				// cross-origin Etherpad frame one level deeper.
 				createElement('iframe', {
-					attrs: { srcdoc: this.buildPadFrameSrcdoc(this.iframeSrc), title: 'Etherpad' },
+					attrs: { srcdoc: buildPadFrameSrcdoc(this.iframeSrc), title: 'Etherpad' },
+					// This fires when the srcdoc wrapper is ready. Etherpad then continues
+					// loading in the inner iframe and shows its own loading UI.
 					on: { load: () => this.markLoaded(), error: () => this.markLoaded() },
 					class: 'epnc-native-iframe',
 				}),
