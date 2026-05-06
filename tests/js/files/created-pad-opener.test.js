@@ -48,6 +48,7 @@ afterEach(() => {
 describe('created pad opener', () => {
 	it('notifies Files, opens through the native viewer, and clears openfile on close', async () => {
 		const router = installFilesRouter()
+		router.query = { dir: '/Current', editing: 'false', openfile: 'true' }
 		const pendingOpen = openCreatedPadInViewer(
 			{ path: '/Folder/New.pad', fileId: 55 },
 			{ resolveOpenDir: () => '/Folder' }

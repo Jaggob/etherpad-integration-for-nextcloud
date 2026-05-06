@@ -36,6 +36,7 @@ const navigateFilesRouteAndOpen = (fileId, path) => {
 	if (!fileId || !Number.isFinite(fileId)) {
 		return false
 	}
+	let nativeOpenStarted = false
 	ignoreExpectedNavigationResult(router.goToRoute(
 		null,
 		{
@@ -52,14 +53,14 @@ const navigateFilesRouteAndOpen = (fileId, path) => {
 				path,
 				onClose: clearFilesViewerRoute,
 			})
+			nativeOpenStarted = true
 			ignoreExpectedNavigationResult(result)
 		} catch (e) {
 			// The route fallback below still lets Nextcloud handle viewer opening.
 		}
 	}, ROUTE_OPEN_DELAY_MS)
 	window.setTimeout(() => {
-		const hasExpectedPath = (window.location.pathname || '').includes('/apps/files/files/' + String(fileId))
-		if (hasExpectedPath) {
+		if (nativeOpenStarted) {
 			return
 		}
 		const fallbackUrl = filesUrlForFileId(fileId, path)

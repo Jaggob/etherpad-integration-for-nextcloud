@@ -21,5 +21,5 @@ export const ignoreExpectedNavigationResult = (result) => {
 	}
 	// Nextcloud's router/viewer can reject on expected navigation guard redirects.
 	// The route change still happened; we only attach a catch to avoid console noise.
-	result.catch(() => {})
+	Promise.resolve(result).catch(() => {})
 }

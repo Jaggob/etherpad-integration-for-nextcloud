@@ -67,6 +67,10 @@ const pushViewerRouteForCreatedPad = (fileId, path, resolveOpenDir) => {
 	if (!router) {
 		return
 	}
+	const query = { ...(router.query || {}) }
+	delete query.openfile
+	delete query.editing
+	query.dir = resolveOpenDirForCreatedPad(path, resolveOpenDir)
 	ignoreExpectedNavigationResult(router.goToRoute(
 		null,
 		{
@@ -74,10 +78,7 @@ const pushViewerRouteForCreatedPad = (fileId, path, resolveOpenDir) => {
 			view: (router.params && router.params.view) ? router.params.view : 'files',
 			fileid: String(fileId),
 		},
-		{
-			...(router.query || {}),
-			dir: resolveOpenDirForCreatedPad(path, resolveOpenDir),
-		},
+		query,
 		true
 	))
 }
