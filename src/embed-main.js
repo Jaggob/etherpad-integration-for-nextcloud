@@ -26,9 +26,9 @@ import { ocRequestToken } from './lib/oc-compat.js'
 	const errorMessageNode = root.querySelector('[data-epnc-embed-error-message]')
 	const iframe = root.querySelector('[data-epnc-embed-iframe]')
 	const externalTitleText = String(root.getAttribute('data-l10n-external-title') || 'Pad from another server').trim()
-	const externalMessageText = String(root.getAttribute('data-l10n-external-message') || 'This view shows the last synced snapshot stored in the .pad file. It is read-only here. To edit the pad, open the original pad in a new tab.').trim()
+	const externalMessageText = String(root.getAttribute('data-l10n-external-message') || 'Read-only snapshot from the .pad file.').trim()
 	const externalEmptyText = String(root.getAttribute('data-l10n-external-empty') || 'No synced snapshot is stored in this .pad file yet.').trim()
-	const externalLinkText = String(root.getAttribute('data-l10n-external-link') || 'Open original pad in new tab').trim()
+	const externalLinkText = String(root.getAttribute('data-l10n-external-link') || 'Open original pad').trim()
 	let syncUrl = ''
 	let syncIntervalMs = 120000
 	let syncPromise = null
@@ -45,6 +45,7 @@ import { ocRequestToken } from './lib/oc-compat.js'
 	const showError = (message) => {
 		if (loadingNode instanceof HTMLElement) {
 			loadingNode.hidden = true
+			loadingNode.classList.remove('epnc-embed__loading--snapshot')
 		}
 		if (iframe instanceof HTMLIFrameElement) {
 			iframe.hidden = true
@@ -58,7 +59,7 @@ import { ocRequestToken } from './lib/oc-compat.js'
 		}
 	}
 
-	const showExternalPadPreview = (url, snapshotText) => {
+	const showExternalPadPreview = (url, snapshotText, snapshotHtml) => {
 		if (errorNode instanceof HTMLElement) {
 			errorNode.hidden = true
 		}
@@ -70,35 +71,59 @@ import { ocRequestToken } from './lib/oc-compat.js'
 			return
 		}
 		loadingNode.hidden = false
+		loadingNode.classList.add('epnc-embed__loading--snapshot')
 		loadingNode.textContent = ''
 
-		const card = document.createElement('div')
-		card.className = 'epnc-embed__external-card'
+		const snapshot = document.createElement('div')
+		snapshot.className = 'epnc-embed__snapshot'
+
+		const inner = document.createElement('div')
+		inner.className = 'epnc-embed__snapshot-inner'
 
 		const title = document.createElement('h2')
-		title.className = 'epnc-embed__external-title'
+		title.className = 'epnc-embed__snapshot-title'
 		title.textContent = externalTitleText
 
 		const message = document.createElement('p')
-		message.className = 'epnc-embed__external-message'
+		message.className = 'epnc-embed__snapshot-message'
 		message.textContent = externalMessageText
 
-		const preview = document.createElement('pre')
-		preview.className = 'epnc-embed__external-preview'
-		preview.textContent = String(snapshotText || '').trim() !== '' ? String(snapshotText) : externalEmptyText
-
 		const link = document.createElement('a')
-		link.className = 'epnc-embed__external-link'
+		link.className = 'epnc-embed__snapshot-link'
 		link.href = url
 		link.target = '_blank'
 		link.rel = 'noopener noreferrer'
 		link.textContent = externalLinkText
 
-		card.appendChild(title)
-		card.appendChild(message)
-		card.appendChild(link)
-		card.appendChild(preview)
-		loadingNode.appendChild(card)
+		const actions = document.createElement('div')
+		actions.className = 'epnc-embed__snapshot-actions'
+		actions.appendChild(link)
+
+		const hasSnapshotHtml = String(snapshotHtml || '').trim() !== ''
+		const preview = document.createElement(hasSnapshotHtml ? 'div' : 'pre')
+		preview.className = hasSnapshotHtml
+			? 'epnc-embed__snapshot-text epnc-embed__snapshot-text--html'
+			: 'epnc-embed__snapshot-text'
+		if (hasSnapshotHtml) {
+			preview.innerHTML = String(snapshotHtml)
+		} else {
+			preview.textContent = String(snapshotText || '').trim() !== '' ? String(snapshotText) : externalEmptyText
+		}
+
+		const heading = document.createElement('div')
+		heading.className = 'epnc-embed__snapshot-heading'
+		heading.appendChild(title)
+		heading.appendChild(message)
+
+		const header = document.createElement('div')
+		header.className = 'epnc-embed__snapshot-header'
+		header.appendChild(heading)
+		header.appendChild(actions)
+
+		inner.appendChild(header)
+		inner.appendChild(preview)
+		snapshot.appendChild(inner)
+		loadingNode.appendChild(snapshot)
 	}
 
 	const showIframe = (url) => {
@@ -108,6 +133,9 @@ import { ocRequestToken } from './lib/oc-compat.js'
 		}
 		if (errorNode instanceof HTMLElement) {
 			errorNode.hidden = true
+		}
+		if (loadingNode instanceof HTMLElement) {
+			loadingNode.classList.remove('epnc-embed__loading--snapshot')
 		}
 		iframe.hidden = true
 		const revealIframe = () => {
@@ -380,7 +408,11 @@ import { ocRequestToken } from './lib/oc-compat.js'
 			installHostMessageHandler()
 			startSyncLoop()
 			if (data.is_external === true) {
-				showExternalPadPreview(data.url, typeof data.snapshot_text === 'string' ? data.snapshot_text : '')
+				showExternalPadPreview(
+					data.url,
+					typeof data.snapshot_text === 'string' ? data.snapshot_text : '',
+					typeof data.snapshot_html === 'string' ? data.snapshot_html : '',
+				)
 				return
 			}
 			showIframe(data.url)
