@@ -26,7 +26,7 @@ class PadOpenService {
 		private BindingService $bindingService,
 		private EtherpadClient $etherpadClient,
 		private PadSessionService $padSessionService,
-		private SnapshotHtmlSanitizer $snapshotHtmlSanitizer,
+		private SnapshotExtractor $snapshotExtractor,
 		private LoggerInterface $logger,
 	) {
 	}
@@ -77,10 +77,9 @@ class PadOpenService {
 			$accessMode = $meta['access_mode'];
 			$padUrl = $meta['pad_url'];
 			$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
-			$snapshotText = $isExternal ? $this->padFileService->getTextSnapshotForRestore((string)$content) : '';
-			$snapshotHtml = $isExternal
-				? $this->snapshotHtmlSanitizer->sanitize($this->padFileService->getHtmlSnapshotForRestore((string)$content))
-				: '';
+			$snapshot = $isExternal
+				? $this->snapshotExtractor->extract((string)$content)
+				: new SnapshotPayload('', '');
 			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
 
 			return $this->buildOpenContext(
@@ -92,8 +91,8 @@ class PadOpenService {
 				$accessMode,
 				$padUrl,
 				$isExternal,
-				$snapshotText,
-				$snapshotHtml
+				$snapshot->text,
+				$snapshot->html
 			);
 		} catch (LockedException $e) {
 			$this->logger->info('Pad open deferred because .pad file is locked', [

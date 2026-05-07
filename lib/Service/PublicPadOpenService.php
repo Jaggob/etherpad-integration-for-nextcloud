@@ -22,10 +22,9 @@ class PublicPadOpenService {
 	private const PUBLIC_SHARE_SESSION_TTL_SECONDS = 3600;
 
 	public function __construct(
-		private PadFileService $padFileService,
 		private EtherpadClient $etherpadClient,
 		private PadSessionService $padSessionService,
-		private SnapshotHtmlSanitizer $snapshotHtmlSanitizer,
+		private SnapshotExtractor $snapshotExtractor,
 	) {
 	}
 
@@ -44,13 +43,14 @@ class PublicPadOpenService {
 
 		if ($accessMode === BindingService::ACCESS_PROTECTED) {
 			if ($readOnly) {
+				$snapshot = $this->snapshotExtractor->extract($padFileContent);
 				return new PublicPadOpenTarget(
 					'',
 					'',
 					'',
 					true,
-					$this->padFileService->getTextSnapshotForRestore($padFileContent),
-					$this->snapshotHtmlSanitizer->sanitize($this->padFileService->getHtmlSnapshotForRestore($padFileContent)),
+					$snapshot->text,
+					$snapshot->html,
 				);
 			}
 
@@ -76,13 +76,14 @@ class PublicPadOpenService {
 				throw new EtherpadClientException('External pad URL metadata is missing or invalid.');
 			}
 			$normalized = $this->etherpadClient->normalizeAndValidateExternalPublicPadUrl($padUrl);
+			$snapshot = $this->snapshotExtractor->extract($padFileContent);
 			return new PublicPadOpenTarget(
 				$normalized['pad_url'],
 				$normalized['pad_url'],
 				'',
 				false,
-				$this->padFileService->getTextSnapshotForRestore($padFileContent),
-				$this->snapshotHtmlSanitizer->sanitize($this->padFileService->getHtmlSnapshotForRestore($padFileContent)),
+				$snapshot->text,
+				$snapshot->html,
 			);
 		}
 

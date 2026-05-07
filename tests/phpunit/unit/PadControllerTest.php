@@ -21,6 +21,7 @@ use OCA\EtherpadNextcloud\Service\PadPathService;
 use OCA\EtherpadNextcloud\Service\PadResponseService;
 use OCA\EtherpadNextcloud\Service\PadSessionService;
 use OCA\EtherpadNextcloud\Service\PadSyncService;
+use OCA\EtherpadNextcloud\Service\SnapshotExtractor;
 use OCA\EtherpadNextcloud\Service\SnapshotHtmlSanitizer;
 use OCA\EtherpadNextcloud\Service\UserNodeResolver;
 use OCA\EtherpadNextcloud\Util\PathNormalizer;
@@ -166,7 +167,7 @@ class PadControllerTest extends TestCase {
 			$bindingService,
 			$etherpadClient,
 			$this->createMock(PadSessionService::class),
-			new SnapshotHtmlSanitizer(),
+			new SnapshotExtractor($padFileService, new SnapshotHtmlSanitizer()),
 			$logger,
 		);
 		$padResponseService = new PadResponseService($urlGenerator, $appConfigService);
@@ -298,7 +299,7 @@ class PadControllerTest extends TestCase {
 			$bindingService,
 			$etherpadClient,
 			$this->createMock(PadSessionService::class),
-			new SnapshotHtmlSanitizer(),
+			new SnapshotExtractor($padFileService, new SnapshotHtmlSanitizer()),
 			$logger,
 		);
 		$padResponseService = new PadResponseService($urlGenerator, $appConfigService);
@@ -642,7 +643,7 @@ class PadControllerTest extends TestCase {
 			$resolvedBindingService,
 			$resolvedEtherpadClient,
 			$this->createMock(PadSessionService::class),
-			new SnapshotHtmlSanitizer(),
+			new SnapshotExtractor($resolvedPadFileService, new SnapshotHtmlSanitizer()),
 			$logger,
 		);
 		$padSyncService = new PadSyncService($resolvedPadFileService, $userNodeResolver, $lockRetryService, $resolvedBindingService, $resolvedEtherpadClient, $logger);

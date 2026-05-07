@@ -14,6 +14,7 @@ use OCA\EtherpadNextcloud\Service\PublicPadContextService;
 use OCA\EtherpadNextcloud\Service\PublicPadOpenService;
 use OCA\EtherpadNextcloud\Service\PublicShareResolver;
 use OCA\EtherpadNextcloud\Service\PublicShareUrlBuilder;
+use OCA\EtherpadNextcloud\Service\SnapshotExtractor;
 use OCA\EtherpadNextcloud\Service\SnapshotHtmlSanitizer;
 use OCA\EtherpadNextcloud\Util\PathNormalizer;
 use OCP\AppFramework\Http;
@@ -250,7 +251,7 @@ class PublicViewerControllerTest extends TestCase {
 		$urlGenerator->method('getWebroot')->willReturn('');
 		$shareUrlBuilder = new PublicShareUrlBuilder($urlGenerator, new PathNormalizer());
 		$shareResolver = new PublicShareResolver($shareManager, new PathNormalizer());
-		$publicPadOpenService = new PublicPadOpenService($padFileService, $etherpadClient, $padSessionService, new SnapshotHtmlSanitizer());
+		$publicPadOpenService = new PublicPadOpenService($etherpadClient, $padSessionService, new SnapshotExtractor($padFileService, new SnapshotHtmlSanitizer()));
 
 		$controller = new PublicViewerController(
 			'etherpad_nextcloud',
@@ -343,7 +344,7 @@ class PublicViewerControllerTest extends TestCase {
 		$padSessionService ??= $this->createMock(PadSessionService::class);
 		$bindingService ??= $this->createMock(BindingService::class);
 		$shareResolver = new PublicShareResolver($shareManager, new PathNormalizer());
-		$publicPadOpenService = new PublicPadOpenService($padFileService, $etherpadClient, $padSessionService, new SnapshotHtmlSanitizer());
+		$publicPadOpenService = new PublicPadOpenService($etherpadClient, $padSessionService, new SnapshotExtractor($padFileService, new SnapshotHtmlSanitizer()));
 
 		return new PublicViewerController(
 			'etherpad_nextcloud',
