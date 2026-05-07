@@ -401,7 +401,7 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 					]),
 				])
 			}
-			if (this.externalOpenUrl) {
+			if (this.snapshotMode === 'external') {
 				return this.renderSnapshotView(createElement, {
 					title: translate('Pad from another server'),
 					message: this.externalOpenMessage,
