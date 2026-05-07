@@ -21,6 +21,7 @@ use OCA\EtherpadNextcloud\Service\PadPathService;
 use OCA\EtherpadNextcloud\Service\PadResponseService;
 use OCA\EtherpadNextcloud\Service\PadSessionService;
 use OCA\EtherpadNextcloud\Service\PadSyncService;
+use OCA\EtherpadNextcloud\Service\SnapshotHtmlSanitizer;
 use OCA\EtherpadNextcloud\Service\UserNodeResolver;
 use OCA\EtherpadNextcloud\Util\PathNormalizer;
 use OCP\AppFramework\Http;
@@ -165,6 +166,7 @@ class PadControllerTest extends TestCase {
 			$bindingService,
 			$etherpadClient,
 			$this->createMock(PadSessionService::class),
+			new SnapshotHtmlSanitizer(),
 			$logger,
 		);
 		$padResponseService = new PadResponseService($urlGenerator, $appConfigService);
@@ -256,6 +258,10 @@ class PadControllerTest extends TestCase {
 			->method('getTextSnapshotForRestore')
 			->with('frontmatter')
 			->willReturn("External snapshot\nSecond line");
+		$padFileService->expects($this->once())
+			->method('getHtmlSnapshotForRestore')
+			->with('frontmatter')
+			->willReturn('<h1>External</h1><script>bad()</script>');
 
 		$bindingService = $this->createMock(BindingService::class);
 		$bindingService->expects($this->once())
@@ -292,6 +298,7 @@ class PadControllerTest extends TestCase {
 			$bindingService,
 			$etherpadClient,
 			$this->createMock(PadSessionService::class),
+			new SnapshotHtmlSanitizer(),
 			$logger,
 		);
 		$padResponseService = new PadResponseService($urlGenerator, $appConfigService);
@@ -319,6 +326,7 @@ class PadControllerTest extends TestCase {
 		$this->assertSame('https://pad.portal.fzs.de/p/Test', $response->getData()['pad_url']);
 		$this->assertSame('https://pad.portal.fzs.de/p/Test', $response->getData()['original_pad_url']);
 		$this->assertSame("External snapshot\nSecond line", $response->getData()['snapshot_text']);
+		$this->assertSame('<h1>External</h1>', $response->getData()['snapshot_html']);
 	}
 
 	public function testMetaByIdRejectsInvalidFileId(): void {
@@ -634,6 +642,7 @@ class PadControllerTest extends TestCase {
 			$resolvedBindingService,
 			$resolvedEtherpadClient,
 			$this->createMock(PadSessionService::class),
+			new SnapshotHtmlSanitizer(),
 			$logger,
 		);
 		$padSyncService = new PadSyncService($resolvedPadFileService, $userNodeResolver, $lockRetryService, $resolvedBindingService, $resolvedEtherpadClient, $logger);

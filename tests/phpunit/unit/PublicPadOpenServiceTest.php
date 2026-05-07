@@ -63,6 +63,7 @@ class PublicPadOpenServiceTest extends TestCase {
 	public function testExternalPublicPadReturnsNormalizedUrlAndTextSnapshot(): void {
 		$padFiles = $this->createMock(PadFileService::class);
 		$padFiles->expects($this->once())->method('getTextSnapshotForRestore')->with('content')->willReturn('External snapshot');
+		$padFiles->expects($this->once())->method('getHtmlSnapshotForRestore')->with('content')->willReturn('<h1>External</h1><iframe></iframe>');
 
 		$etherpad = $this->createMock(EtherpadClient::class);
 		$etherpad->expects($this->once())
@@ -83,7 +84,7 @@ class PublicPadOpenServiceTest extends TestCase {
 		$this->assertSame('https://remote.example/p/Test', $result->url);
 		$this->assertSame('https://remote.example/p/Test', $result->originalPadUrl);
 		$this->assertSame('External snapshot', $result->snapshotText);
-		$this->assertSame('', $result->snapshotHtml);
+		$this->assertSame('<h1>External</h1>', $result->snapshotHtml);
 	}
 
 	public function testExternalProtectedMetadataIsRejected(): void {

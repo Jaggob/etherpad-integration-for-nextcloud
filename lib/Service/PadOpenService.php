@@ -26,12 +26,13 @@ class PadOpenService {
 		private BindingService $bindingService,
 		private EtherpadClient $etherpadClient,
 		private PadSessionService $padSessionService,
+		private SnapshotHtmlSanitizer $snapshotHtmlSanitizer,
 		private LoggerInterface $logger,
 	) {
 	}
 
 	/**
-	 * @return array{file:string,file_id:int,pad_id:string,access_mode:string,pad_url:string,is_external:bool,original_pad_url:string,snapshot_text:string,url:string,cookie_header:string}
+	 * @return array{file:string,file_id:int,pad_id:string,access_mode:string,pad_url:string,is_external:bool,original_pad_url:string,snapshot_text:string,snapshot_html:string,url:string,cookie_header:string}
 	 * @throws NotFoundException
 	 */
 	public function openByPath(string $uid, string $displayName, string $file): array {
@@ -45,7 +46,7 @@ class PadOpenService {
 	}
 
 	/**
-	 * @return array{file:string,file_id:int,pad_id:string,access_mode:string,pad_url:string,is_external:bool,original_pad_url:string,snapshot_text:string,url:string,cookie_header:string}
+	 * @return array{file:string,file_id:int,pad_id:string,access_mode:string,pad_url:string,is_external:bool,original_pad_url:string,snapshot_text:string,snapshot_html:string,url:string,cookie_header:string}
 	 * @throws NotFoundException
 	 */
 	public function openById(string $uid, string $displayName, int $fileId): array {
@@ -55,7 +56,7 @@ class PadOpenService {
 	}
 
 	/**
-	 * @return array{file:string,file_id:int,pad_id:string,access_mode:string,pad_url:string,is_external:bool,original_pad_url:string,snapshot_text:string,url:string,cookie_header:string}
+	 * @return array{file:string,file_id:int,pad_id:string,access_mode:string,pad_url:string,is_external:bool,original_pad_url:string,snapshot_text:string,snapshot_html:string,url:string,cookie_header:string}
 	 * @throws BindingException
 	 * @throws EtherpadClientException
 	 * @throws LockedException
@@ -77,6 +78,9 @@ class PadOpenService {
 			$padUrl = $meta['pad_url'];
 			$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
 			$snapshotText = $isExternal ? $this->padFileService->getTextSnapshotForRestore((string)$content) : '';
+			$snapshotHtml = $isExternal
+				? $this->snapshotHtmlSanitizer->sanitize($this->padFileService->getHtmlSnapshotForRestore((string)$content))
+				: '';
 			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
 
 			return $this->buildOpenContext(
@@ -88,7 +92,8 @@ class PadOpenService {
 				$accessMode,
 				$padUrl,
 				$isExternal,
-				$snapshotText
+				$snapshotText,
+				$snapshotHtml
 			);
 		} catch (LockedException $e) {
 			$this->logger->info('Pad open deferred because .pad file is locked', [
@@ -101,7 +106,7 @@ class PadOpenService {
 		}
 	}
 
-	/** @return array{file:string,file_id:int,pad_id:string,access_mode:string,pad_url:string,is_external:bool,original_pad_url:string,snapshot_text:string,url:string,cookie_header:string} */
+	/** @return array{file:string,file_id:int,pad_id:string,access_mode:string,pad_url:string,is_external:bool,original_pad_url:string,snapshot_text:string,snapshot_html:string,url:string,cookie_header:string} */
 	private function buildOpenContext(
 		string $uid,
 		string $displayName,
@@ -111,7 +116,8 @@ class PadOpenService {
 		string $accessMode,
 		string $padUrl = '',
 		bool $isExternal = false,
-		string $snapshotText = ''
+		string $snapshotText = '',
+		string $snapshotHtml = ''
 	): array {
 		if ($isExternal && $accessMode !== BindingService::ACCESS_PUBLIC) {
 			throw new EtherpadClientException('External pad metadata requires public access_mode.');
@@ -151,6 +157,7 @@ class PadOpenService {
 			'is_external' => $isExternal,
 			'original_pad_url' => $originalPadUrl,
 			'snapshot_text' => $isExternal ? $snapshotText : '',
+			'snapshot_html' => $isExternal ? $snapshotHtml : '',
 			'url' => $url,
 			'cookie_header' => $cookieHeader,
 		];

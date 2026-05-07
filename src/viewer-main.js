@@ -28,6 +28,7 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 				externalOpenUrl: '',
 				externalOpenMessage: '',
 				externalSnapshotText: '',
+				externalSnapshotHtml: '',
 				readonlySnapshotMode: false,
 				readonlySnapshotText: '',
 				readonlySnapshotHtml: '',
@@ -234,6 +235,7 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 				this.externalOpenUrl = ''
 				this.externalOpenMessage = ''
 				this.externalSnapshotText = ''
+				this.externalSnapshotHtml = ''
 				this.readonlySnapshotMode = false
 				this.readonlySnapshotText = ''
 				this.readonlySnapshotHtml = ''
@@ -335,6 +337,7 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 						this.externalOpenUrl = targetUrl
 						this.externalOpenMessage = translate('This view shows the last synced snapshot stored in the .pad file. It is read-only here. To edit the pad, open the original pad in a new tab.')
 						this.externalSnapshotText = (data && typeof data.snapshot_text === 'string') ? data.snapshot_text : ''
+						this.externalSnapshotHtml = (data && typeof data.snapshot_html === 'string') ? data.snapshot_html : ''
 						this.markLoaded()
 						return
 					}
@@ -373,21 +376,28 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 				])
 			}
 			if (this.externalOpenUrl) {
-				return createElement('div', { class: 'epnc-native-status' }, [
-					createElement('div', { class: 'epnc-native-error-card' }, [
-						createElement('div', { class: 'epnc-native-error-title' }, translate('Pad from another server')),
-						createElement('div', { class: 'epnc-native-error-message' }, this.externalOpenMessage),
-						createElement('pre', { class: 'epnc-native-preview' }, this.externalSnapshotText.trim() !== ''
-							? this.externalSnapshotText
-							: translate('No synced snapshot is stored in this .pad file yet.')),
-						createElement('a', {
-							class: 'button primary',
-							attrs: {
-								href: this.externalOpenUrl,
-								target: '_blank',
-								rel: 'noopener noreferrer',
-							},
-						}, translate('Open original pad in new tab')),
+				return createElement('div', { class: 'epnc-native-snapshot' }, [
+					createElement('div', { class: 'epnc-native-snapshot__inner' }, [
+						createElement('div', { class: 'epnc-native-snapshot__title' }, translate('Pad from another server')),
+						createElement('div', { class: 'epnc-native-snapshot__message' }, this.externalOpenMessage),
+						this.externalSnapshotHtml.trim() !== ''
+							? createElement('div', {
+								class: 'epnc-native-snapshot__text epnc-native-snapshot__text--html',
+								domProps: { innerHTML: this.externalSnapshotHtml },
+							})
+							: createElement('pre', { class: 'epnc-native-snapshot__text' }, this.externalSnapshotText.trim() !== ''
+								? this.externalSnapshotText
+								: translate('No synced snapshot is stored in this .pad file yet.')),
+						createElement('div', { class: 'epnc-native-snapshot__actions' }, [
+							createElement('a', {
+								class: 'button primary',
+								attrs: {
+									href: this.externalOpenUrl,
+									target: '_blank',
+									rel: 'noopener noreferrer',
+								},
+							}, translate('Open original pad in new tab')),
+						]),
 					]),
 				])
 			}

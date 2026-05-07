@@ -11,6 +11,7 @@ use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadOpenService;
 use OCA\EtherpadNextcloud\Service\PadPathService;
 use OCA\EtherpadNextcloud\Service\PadSessionService;
+use OCA\EtherpadNextcloud\Service\SnapshotHtmlSanitizer;
 use OCA\EtherpadNextcloud\Service\UserNodeResolver;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -41,6 +42,7 @@ class PadOpenServiceTest extends TestCase {
 			$this->createMock(BindingService::class),
 			$this->createMock(EtherpadClient::class),
 			$this->createMock(PadSessionService::class),
+			new SnapshotHtmlSanitizer(),
 			$this->createMock(LoggerInterface::class),
 		);
 	}

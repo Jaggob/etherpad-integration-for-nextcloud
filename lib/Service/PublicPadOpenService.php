@@ -82,7 +82,7 @@ class PublicPadOpenService {
 				'',
 				false,
 				$this->padFileService->getTextSnapshotForRestore($padFileContent),
-				'',
+				$this->snapshotHtmlSanitizer->sanitize($this->padFileService->getHtmlSnapshotForRestore($padFileContent)),
 			);
 		}
 
