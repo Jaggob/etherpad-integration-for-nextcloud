@@ -106,7 +106,7 @@ class PublicViewerControllerTest extends TestCase {
 		$this->assertArrayNotHasKey('Set-Cookie', $response->getHeaders());
 	}
 
-	public function testPublicExternalPadShareReturnsStoredTextSnapshot(): void {
+	public function testPublicExternalPadShareReturnsStoredTextAndSanitizedHtmlSnapshots(): void {
 		$file = $this->createMock(File::class);
 		$file->method('getName')->willReturn('External.pad');
 		$file->method('getId')->willReturn(77);

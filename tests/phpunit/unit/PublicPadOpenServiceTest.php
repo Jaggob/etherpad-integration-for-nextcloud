@@ -61,7 +61,7 @@ class PublicPadOpenServiceTest extends TestCase {
 		$this->assertFalse($result->isReadOnlySnapshot);
 	}
 
-	public function testExternalPublicPadReturnsNormalizedUrlAndTextSnapshot(): void {
+	public function testExternalPublicPadReturnsNormalizedUrlAndSanitizedSnapshots(): void {
 		$padFiles = $this->createMock(PadFileService::class);
 		$padFiles->expects($this->once())->method('getTextSnapshotForRestore')->with('content')->willReturn('External snapshot');
 		$padFiles->expects($this->once())->method('getHtmlSnapshotForRestore')->with('content')->willReturn('<h1>External</h1><iframe></iframe>');
