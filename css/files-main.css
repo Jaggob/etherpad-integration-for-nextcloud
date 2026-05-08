@@ -103,6 +103,18 @@
 	flex-direction: column;
 }
 
+.epnc-native-snapshot__header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+	margin: 0 0 18px;
+}
+
+.epnc-native-snapshot__heading {
+	min-width: 0;
+}
+
 .epnc-native-snapshot__title {
 	margin: 0 0 6px;
 	font-size: 18px;
@@ -112,10 +124,23 @@
 }
 
 .epnc-native-snapshot__message {
-	margin: 0 0 18px;
+	margin: 0;
 	font-size: 14px;
 	line-height: 1.5;
 	color: var(--color-text-maxcontrast, #374151);
+}
+
+.epnc-native-snapshot__actions {
+	flex: 0 0 auto;
+	display: flex;
+	justify-content: flex-start;
+	margin: 0;
+}
+
+@media (max-width: 700px) {
+	.epnc-native-snapshot__header {
+		flex-direction: column;
+	}
 }
 
 .epnc-native-snapshot__text {

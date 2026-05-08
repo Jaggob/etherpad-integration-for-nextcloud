@@ -73,6 +73,10 @@ checked-in runtime assets in `js/`.
 - `.pad` file
   - Frontmatter: format, binding metadata, state, export metadata.
   - Body: text and HTML snapshot.
+- Snapshot helpers
+  - `PadFileService::withExportSnapshot(...)` constructs updated `.pad` content for snapshot writes.
+  - `PadFileLockRetryService::putContentWithSyncLockRetry(...)` persists that content to the Nextcloud file.
+  - `SnapshotExtractor` only reads stored snapshot text + sanitized HTML for viewers.
 
 ## Main Flows
 
@@ -187,6 +191,7 @@ Primary flow (native viewer when available):
 3. `PadController::syncById` fetches revision state from Etherpad.
 4. `.pad` snapshot is updated only when the upstream snapshot actually differs.
    - `force=1` requests an immediate upstream re-check, but unchanged snapshots are still not rewritten.
+   - Snapshot writes are built via `PadFileService::withExportSnapshot(...)` and persisted via `PadFileLockRetryService::putContentWithSyncLockRetry(...)`.
 5. External pads are synced as text only (no HTML import).
 6. Write-lock handling:
    - short bounded retry around `.pad` snapshot writes (`150ms`, `300ms`, `600ms`)

@@ -10,6 +10,7 @@ use OCA\EtherpadNextcloud\Service\EtherpadClient;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadSessionService;
 use OCA\EtherpadNextcloud\Service\PublicPadOpenService;
+use OCA\EtherpadNextcloud\Service\SnapshotExtractor;
 use OCA\EtherpadNextcloud\Service\SnapshotHtmlSanitizer;
 use PHPUnit\Framework\TestCase;
 
@@ -60,9 +61,10 @@ class PublicPadOpenServiceTest extends TestCase {
 		$this->assertFalse($result->isReadOnlySnapshot);
 	}
 
-	public function testExternalPublicPadReturnsNormalizedUrlAndTextSnapshot(): void {
+	public function testExternalPublicPadReturnsNormalizedUrlAndSanitizedSnapshots(): void {
 		$padFiles = $this->createMock(PadFileService::class);
 		$padFiles->expects($this->once())->method('getTextSnapshotForRestore')->with('content')->willReturn('External snapshot');
+		$padFiles->expects($this->once())->method('getHtmlSnapshotForRestore')->with('content')->willReturn('<h1>External</h1><iframe></iframe>');
 
 		$etherpad = $this->createMock(EtherpadClient::class);
 		$etherpad->expects($this->once())
@@ -83,7 +85,7 @@ class PublicPadOpenServiceTest extends TestCase {
 		$this->assertSame('https://remote.example/p/Test', $result->url);
 		$this->assertSame('https://remote.example/p/Test', $result->originalPadUrl);
 		$this->assertSame('External snapshot', $result->snapshotText);
-		$this->assertSame('', $result->snapshotHtml);
+		$this->assertSame('<h1>External</h1>', $result->snapshotHtml);
 	}
 
 	public function testExternalProtectedMetadataIsRejected(): void {
@@ -164,11 +166,11 @@ class PublicPadOpenServiceTest extends TestCase {
 		?EtherpadClient $etherpadClient = null,
 		?PadSessionService $padSessionService = null,
 	): PublicPadOpenService {
+		$padFileService ??= $this->createMock(PadFileService::class);
 		return new PublicPadOpenService(
-			$padFileService ?? $this->createMock(PadFileService::class),
 			$etherpadClient ?? $this->createMock(EtherpadClient::class),
 			$padSessionService ?? $this->createMock(PadSessionService::class),
-			new SnapshotHtmlSanitizer(),
+			new SnapshotExtractor($padFileService, new SnapshotHtmlSanitizer()),
 		);
 	}
 }

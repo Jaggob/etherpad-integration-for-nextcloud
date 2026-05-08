@@ -111,6 +111,13 @@ Implementation: `lib/Service/PadFileService.php`
 - `serialize(array $frontmatter, string $body): string`
 - `withExportSnapshot(...)` updates export metadata + snapshot body
 - `withStateAndSnapshot(...)` updates state + snapshot
+- `getTextSnapshotForRestore(...)` and `getHtmlSnapshotForRestore(...)` read stored snapshots from the body
+
+Snapshot write flow:
+
+- `PadFileService::withExportSnapshot(...)` builds the new `.pad` content after an Etherpad export.
+- `PadFileLockRetryService::putContentWithSyncLockRetry(...)` writes that content back to the Nextcloud file with bounded lock retry.
+- `SnapshotExtractor` is read-only: it extracts text + sanitized HTML for viewer responses and does not mutate `.pad` files.
 
 ## Sync Semantics
 
