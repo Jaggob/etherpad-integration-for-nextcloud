@@ -93,11 +93,11 @@ class LifecycleService {
 							$padUrl = isset($frontmatter['pad_url']) ? trim((string)$frontmatter['pad_url']) : '';
 							if ($padUrl === '') {
 							throw new \RuntimeException('External pad URL metadata is missing.');
-						}
-						$external = $this->etherpadClient->normalizeAndFetchExternalPublicPadText($padUrl);
-						$revision = max(0, $this->padFileService->getSnapshotRevision($currentContent) + 1);
-						$updatedContent = $this->padFileService->withExportSnapshot($currentContent, $external['text'], '', $revision, false);
-					} else {
+							}
+							$external = $this->etherpadClient->normalizeAndFetchExternalPublicPadText($padUrl);
+							$revision = max(0, $this->padFileService->getSnapshotRevisionFromFrontmatter($frontmatter) + 1);
+							$updatedContent = $this->padFileService->withExportSnapshot($currentContent, $external['text'], '', $revision, false);
+						} else {
 						$snapshot = $this->etherpadClient->getText($padId);
 						$html = $this->etherpadClient->getHTML($padId);
 						$revision = $this->etherpadClient->getRevisionsCount($padId);
@@ -345,12 +345,13 @@ class LifecycleService {
 			}
 			$currentContent = (string)$file->getContent();
 			$parsed = $this->padFileService->parsePadFile($currentContent);
-			$frontmatter = $parsed['frontmatter'];
-			$meta = $this->padFileService->extractPadMetadata($frontmatter);
+				$frontmatter = $parsed['frontmatter'];
+				$meta = $this->padFileService->extractPadMetadata($frontmatter);
 				$oldPadId = $meta['pad_id'];
 				$accessMode = $meta['access_mode'];
-				$snapshot = $this->padFileService->getTextSnapshotForRestore($currentContent);
-				$htmlSnapshot = $this->padFileService->getHtmlSnapshotForRestore($currentContent);
+				$snapshotParts = $this->padFileService->getSnapshotPartsFromBody((string)$parsed['body']);
+				$snapshot = $snapshotParts['text'];
+				$htmlSnapshot = $snapshotParts['html'];
 				$isExternal = str_starts_with($oldPadId, 'ext.') || $this->padFileService->isExternalFrontmatter($frontmatter, $oldPadId);
 
 				if ($isExternal) {

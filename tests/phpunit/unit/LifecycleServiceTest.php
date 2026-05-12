@@ -343,8 +343,10 @@ class LifecycleServiceTest extends TestCase {
 			'pad_url' => 'https://pad.example.test/p/' . rawurlencode($oldPadId),
 		]);
 		$padFileService->method('isExternalFrontmatter')->willReturn(false);
-		$padFileService->method('getTextSnapshotForRestore')->with('doc-before')->willReturn('plain text');
-		$padFileService->method('getHtmlSnapshotForRestore')->with('doc-before')->willReturn('');
+		$padFileService->method('getSnapshotPartsFromBody')->willReturn([
+			'text' => 'plain text',
+			'html' => '',
+		]);
 		$padFileService->expects($this->once())
 			->method('withStateAndSnapshot')
 			->with('doc-before', BindingService::STATE_ACTIVE, 'plain text', $newPadId, null, $newPadUrl)
@@ -416,8 +418,10 @@ class LifecycleServiceTest extends TestCase {
 			'pad_url' => $padUrl,
 		]);
 		$padFileService->method('isExternalFrontmatter')->with($frontmatter, $oldPadId)->willReturn(true);
-		$padFileService->method('getTextSnapshotForRestore')->with('doc-before')->willReturn('external snapshot');
-		$padFileService->method('getHtmlSnapshotForRestore')->with('doc-before')->willReturn('');
+		$padFileService->method('getSnapshotPartsFromBody')->willReturn([
+			'text' => 'external snapshot',
+			'html' => '',
+		]);
 		$padFileService->expects($this->once())
 			->method('withStateAndSnapshot')
 			->with('doc-before', BindingService::STATE_ACTIVE, 'external snapshot', $newPadId, null, $padUrl)
@@ -475,8 +479,10 @@ class LifecycleServiceTest extends TestCase {
 			'pad_url' => '',
 		]);
 		$padFileService->method('isExternalFrontmatter')->with($frontmatter, $oldPadId)->willReturn(false);
-		$padFileService->method('getTextSnapshotForRestore')->with('doc-before')->willReturn('external snapshot');
-		$padFileService->method('getHtmlSnapshotForRestore')->with('doc-before')->willReturn('');
+		$padFileService->method('getSnapshotPartsFromBody')->willReturn([
+			'text' => 'external snapshot',
+			'html' => '',
+		]);
 		$padFileService->expects($this->never())->method('withStateAndSnapshot');
 
 		$etherpadClient = $this->createMock(EtherpadClient::class);

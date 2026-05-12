@@ -205,9 +205,9 @@
 			if (typeof data.api_version === 'string' && data.api_version.trim() !== '') {
 				details.push(`api=${data.api_version}`)
 			}
-			if (typeof data.latency_ms !== 'undefined') {
-				details.push(`latency=${String(data.latency_ms)}ms`)
-			}
+				if (typeof data.latency_ms !== 'undefined') {
+					details.push(`latency=${String(data.latency_ms)}ms`)
+				}
 				if (typeof data.target === 'string' && data.target.trim() !== '') {
 					details.push(`target=${data.target}`)
 				}

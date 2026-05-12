@@ -184,7 +184,12 @@ class PadFileService {
 
 	public function getSnapshotRevision(string $content): int {
 		$parsed = $this->parsePadFile($content);
-		$rev = $parsed['frontmatter']['snapshot_rev'] ?? null;
+		return $this->getSnapshotRevisionFromFrontmatter($parsed['frontmatter']);
+	}
+
+	/** @param array<string,mixed> $frontmatter */
+	public function getSnapshotRevisionFromFrontmatter(array $frontmatter): int {
+		$rev = $frontmatter['snapshot_rev'] ?? null;
 		if (!is_numeric($rev)) {
 			return -1;
 		}
@@ -193,14 +198,17 @@ class PadFileService {
 
 	public function getTextSnapshotForRestore(string $content): string {
 		$parsed = $this->parsePadFile($content);
-		$parts = $this->splitSnapshotBody((string)$parsed['body']);
-		return $parts['text'];
+		return $this->getSnapshotPartsFromBody((string)$parsed['body'])['text'];
 	}
 
 	public function getHtmlSnapshotForRestore(string $content): string {
 		$parsed = $this->parsePadFile($content);
-		$parts = $this->splitSnapshotBody((string)$parsed['body']);
-		return $parts['html'];
+		return $this->getSnapshotPartsFromBody((string)$parsed['body'])['html'];
+	}
+
+	/** @return array{text:string,html:string} */
+	public function getSnapshotPartsFromBody(string $body): array {
+		return $this->splitSnapshotBody($body);
 	}
 
 	/** @return array<string,mixed> */
