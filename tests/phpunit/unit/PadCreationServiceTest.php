@@ -128,8 +128,9 @@ class PadCreationServiceTest extends TestCase {
 				'pad_id' => 'RemotePad',
 			]);
 		$etherpadClient->expects($this->once())
-			->method('assertPublicPadAvailable')
-			->with('https://pad.remote.test/p/RemotePad');
+			->method('getPublicTextFromPadUrl')
+			->with('https://pad.remote.test/p/RemotePad')
+			->willReturn("Initial snapshot\nfrom remote pad");
 
 		$padFileService = $this->createMock(PadFileService::class);
 		$padFileService->expects($this->once())
@@ -145,6 +146,10 @@ class PadCreationServiceTest extends TestCase {
 					'remote_pad_id' => 'RemotePad',
 				]
 			)
+			->willReturn('external-empty-frontmatter');
+		$padFileService->expects($this->once())
+			->method('withExportSnapshot')
+			->with('external-empty-frontmatter', "Initial snapshot\nfrom remote pad", '', 0, false)
 			->willReturn('external-frontmatter');
 
 		$bindingService = $this->createMock(BindingService::class);
@@ -188,7 +193,7 @@ class PadCreationServiceTest extends TestCase {
 				'pad_id' => 'RemotePad',
 			]);
 		$etherpadClient->expects($this->once())
-			->method('assertPublicPadAvailable')
+			->method('getPublicTextFromPadUrl')
 			->with('https://pad.remote.test/p/RemotePad')
 			->willThrowException(new EtherpadClientException('Remote pad unavailable.'));
 
