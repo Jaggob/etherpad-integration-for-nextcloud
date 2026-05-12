@@ -182,7 +182,7 @@ Base: `/apps/etherpad_nextcloud`
     - `200` with `status=trashed` for successful trash flow.
       - includes `snapshot_persisted` (`true|false`) if file lock prevented snapshot write.
       - includes `delete_pending` (`true|false`): `true` when Etherpad delete is deferred to background job.
-    - `409` with `status=skipped` + `reason` on invalid lifecycle state (for example already trashed).
+    - `409` with `status=skipped` + `reason` on invalid lifecycle state (for example already pending delete).
       - includes transition-race guard reason `binding_state_transition_conflict` on concurrent state updates.
 
 - `POST /api/v1/pads/restore`
@@ -190,7 +190,7 @@ Base: `/apps/etherpad_nextcloud`
   - Params: `file=/path/file.pad`
   - Result:
     - `200` with `status=restored` for successful restore flow.
-    - `409` with `status=skipped` + `reason` on invalid lifecycle state (for example not trashed).
+    - `409` with `status=skipped` + `reason` on invalid lifecycle state.
       - includes transition-race guard reason `binding_state_transition_conflict` on concurrent state updates.
 
 - `POST /api/v1/admin/settings`
@@ -212,7 +212,6 @@ Base: `/apps/etherpad_nextcloud`
     - `latency_ms`
     - `target`
     - `pending_delete_count`
-    - `trashed_without_file_count`
 
 - `POST /api/v1/admin/consistency-check`
   - Controller: `AdminController::consistencyCheck`
@@ -231,16 +230,11 @@ Base: `/apps/etherpad_nextcloud`
   - Auth: admin only
   - Purpose: immediate retry of deferred Etherpad deletions:
     - `state=pending_delete`
-    - `state=trashed` where the file is already removed from Nextcloud storage/trashbin
   - Result:
     - `attempted`
     - `resolved`
     - `failed`
     - `remaining`
-    - `trashed_attempted`
-    - `trashed_resolved`
-    - `trashed_failed`
-    - `trashed_without_file_remaining`
 
 - `POST /api/v1/admin/test-fault`
   - Controller: `AdminController::setTestFault`
@@ -336,7 +330,7 @@ Base: `/apps/etherpad_nextcloud`
   - failure path: create -> sync(force=1) must fail with non-2xx when Etherpad is down
   - goal: no silent best-effort success on critical sync
 - `tests/integration/e2e-lifecycle-state-guards.sh`
-  - state guards: restore(active) and trash(trashed) must return `409 status=skipped`
+  - state guards: restore(active) and trash(pending_delete) must return `409 status=skipped`
 - `tests/integration/e2e-lifecycle-trash-failure.sh`
   - deferred-delete path: create -> trash remains `200` with `delete_pending=true` when Etherpad is down
   - post-condition: trash-again must return `409 status=skipped` (`binding_not_active`)
@@ -348,7 +342,7 @@ Base: `/apps/etherpad_nextcloud`
   - post-condition: restore still succeeds after fault is cleared
 - `tests/integration/e2e-lifecycle-restore-write-failure.sh`
   - write-failure path: inject `restore_write_fail`, restore must fail non-2xx
-  - post-condition: binding remains trashed; restore succeeds after fault is cleared
+  - post-condition: restore succeeds after fault is cleared
 - `tests/integration/e2e-public-share-folder.sh`
   - folder share: viewer/open/download/reopen + DAV-style `file` parameter + route switch
 - `tests/integration/e2e-public-share-single-file.sh`

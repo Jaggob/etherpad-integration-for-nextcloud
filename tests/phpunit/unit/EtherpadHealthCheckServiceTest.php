@@ -23,13 +23,11 @@ class EtherpadHealthCheckServiceTest extends TestCase {
 
 		$pending = $this->createMock(PendingDeleteRetryService::class);
 		$pending->expects($this->once())->method('countPendingDeletes')->willReturn(3);
-		$pending->expects($this->once())->method('countTrashedWithoutFile')->willReturn(1);
 
 		$result = (new EtherpadHealthCheckService($etherpad, $pending, $this->buildL10n()))->check($this->settings());
 
 		$this->assertSame(42, $result->padCount);
 		$this->assertSame(3, $result->pendingDeleteCount);
-		$this->assertSame(1, $result->trashedWithoutFileCount);
 		$this->assertSame('https://pad-api.example.test/api/1.3.0/listAllPads', $result->target);
 	}
 
@@ -39,7 +37,7 @@ class EtherpadHealthCheckServiceTest extends TestCase {
 
 		$result = (new EtherpadHealthCheckService(
 			$etherpad,
-			$this->pendingCounts(0, 0),
+			$this->pendingCounts(0),
 			$this->buildL10n(),
 		))->check($this->settings());
 
@@ -53,7 +51,7 @@ class EtherpadHealthCheckServiceTest extends TestCase {
 
 		$service = new class(
 			$etherpad,
-			$this->pendingCounts(0, 0),
+			$this->pendingCounts(0),
 			$this->buildL10n(),
 			$ticks,
 		) extends EtherpadHealthCheckService {
@@ -118,10 +116,9 @@ class EtherpadHealthCheckServiceTest extends TestCase {
 		);
 	}
 
-	private function pendingCounts(int $pendingDeleteCount, int $trashedWithoutFileCount): PendingDeleteRetryService {
+	private function pendingCounts(int $pendingDeleteCount): PendingDeleteRetryService {
 		$pending = $this->createMock(PendingDeleteRetryService::class);
 		$pending->method('countPendingDeletes')->willReturn($pendingDeleteCount);
-		$pending->method('countTrashedWithoutFile')->willReturn($trashedWithoutFileCount);
 		return $pending;
 	}
 

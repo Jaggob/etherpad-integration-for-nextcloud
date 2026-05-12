@@ -19,7 +19,7 @@ Required fields:
 - `file_id`
 - `pad_id`
 - `access_mode` (`public|protected`)
-- `state` (`active|trashed|purged`)
+- `state` (`active`; legacy files may still contain `trashed` or `purged`)
 - `created_at` (ISO8601)
 - `updated_at` (ISO8601)
 - `snapshot_rev` (int, `-1` before first successful sync)
@@ -87,7 +87,7 @@ Notes:
   - `pad_url`: internal Etherpad URL
 - External + Public
   - `access_mode: public`
-  - `pad_id`: namespaced binding ID (`ext.<hash>.<padid>.<fileid>`)
+  - `pad_id`: namespaced binding ID (`ext.<hash>`)
   - `pad_origin` + `remote_pad_id` are set
   - `pad_url`: external URL used for viewer open
 
@@ -97,12 +97,11 @@ Protected + external is not supported.
 
 - `active`
   - normal editing state
-- `trashed`
-  - file is in Nextcloud trash, Etherpad pad was deleted
-- `pending_delete`
-  - file is in Nextcloud trash, Etherpad delete is still pending (retry job)
-- `purged`
-  - reserved for future hard cleanup
+- `trashed` / `purged`
+  - legacy parser compatibility only; new writes do not use these states
+
+The DB binding table uses `active` and `pending_delete`. Successful trash deletes
+the binding row; restore can recreate it from the `.pad` frontmatter and snapshot.
 
 ## Parsing/Serializing
 

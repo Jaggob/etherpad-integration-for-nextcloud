@@ -64,6 +64,7 @@ class LifecycleService {
 		$currentContent = '';
 		$snapshotPersisted = false;
 		$canPersistSnapshotToFile = true;
+		$isExternal = str_starts_with($padId, 'ext.');
 
 		try {
 			try {
@@ -84,16 +85,23 @@ class LifecycleService {
 			if ($canPersistSnapshotToFile && $currentContent !== '') {
 				$updatedContent = null;
 				try {
-					$snapshot = $this->etherpadClient->getText($padId);
-					$html = $this->etherpadClient->getHTML($padId);
-					$revision = $this->etherpadClient->getRevisionsCount($padId);
-					$updatedContent = $this->padFileService->withStateAndSnapshot(
-						$this->padFileService->withExportSnapshot($currentContent, $snapshot, $html, $revision),
-						BindingService::STATE_TRASHED,
-						$snapshot,
-						null,
-						$deletedAt,
-					);
+					$parsed = $this->padFileService->parsePadFile($currentContent);
+					$frontmatter = $parsed['frontmatter'];
+					$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
+					if ($isExternal) {
+						$padUrl = isset($frontmatter['pad_url']) ? trim((string)$frontmatter['pad_url']) : '';
+						if ($padUrl === '') {
+							throw new \RuntimeException('External pad URL metadata is missing.');
+						}
+						$external = $this->etherpadClient->normalizeAndFetchExternalPublicPadText($padUrl);
+						$revision = max(0, $this->padFileService->getSnapshotRevision($currentContent) + 1);
+						$updatedContent = $this->padFileService->withExportSnapshot($currentContent, $external['text'], '', $revision, false);
+					} else {
+						$snapshot = $this->etherpadClient->getText($padId);
+						$html = $this->etherpadClient->getHTML($padId);
+						$revision = $this->etherpadClient->getRevisionsCount($padId);
+						$updatedContent = $this->padFileService->withExportSnapshot($currentContent, $snapshot, $html, $revision);
+					}
 				} catch (\Throwable $snapshotError) {
 					$this->logger->warning('Could not fetch fresh Etherpad snapshot during trash. Using current .pad snapshot/body.', [
 						'app' => 'etherpad_nextcloud',
@@ -101,29 +109,6 @@ class LifecycleService {
 						'padId' => $padId,
 						'exception' => $snapshotError,
 					]);
-					$fallbackSnapshot = '';
-					try {
-						$fallbackSnapshot = $this->padFileService->getTextSnapshotForRestore($currentContent);
-					} catch (\Throwable) {
-						$fallbackSnapshot = '';
-					}
-					try {
-						$updatedContent = $this->padFileService->withStateAndSnapshot(
-							$currentContent,
-							BindingService::STATE_TRASHED,
-							$fallbackSnapshot,
-							null,
-							$deletedAt,
-						);
-					} catch (\Throwable $fallbackFormatError) {
-						$this->logger->warning('Could not apply fallback trash snapshot to .pad file content.', [
-							'app' => 'etherpad_nextcloud',
-							'fileId' => $fileId,
-							'padId' => $padId,
-							'exception' => $fallbackFormatError,
-						]);
-						$updatedContent = null;
-					}
 				}
 
 				if ($updatedContent !== null) {
@@ -155,12 +140,23 @@ class LifecycleService {
 				}
 			}
 
-			$this->bindingService->markTrashed($fileId, $deletedAt);
+			if ($isExternal) {
+				$this->bindingService->deleteByFileId($fileId);
+				return [
+					'status' => self::RESULT_TRASHED,
+					'file_id' => $fileId,
+					'pad_id' => $padId,
+					'deleted_at' => $deletedAt,
+					'snapshot_persisted' => $snapshotPersisted,
+					'delete_pending' => false,
+				];
+			}
+
 			try {
 				$this->etherpadClient->deletePad($padId);
 			} catch (\Throwable $deleteError) {
 				if (EtherpadErrorClassifier::isPadAlreadyDeleted($deleteError)) {
-					$this->logger->info('Pad already deleted while processing trash; marking as trashed.', [
+					$this->logger->info('Pad already deleted while processing trash; deleting binding row.', [
 						'app' => 'etherpad_nextcloud',
 						'fileId' => $fileId,
 						'padId' => $padId,
@@ -184,6 +180,7 @@ class LifecycleService {
 					];
 				}
 			}
+			$this->bindingService->deleteByFileId($fileId);
 			return [
 				'status' => self::RESULT_TRASHED,
 				'file_id' => $fileId,
@@ -224,11 +221,11 @@ class LifecycleService {
 
 		$binding = $this->bindingService->findByFileId($fileId);
 		if ($binding === null) {
-			return $this->buildSkippedResult('binding_not_found', $fileId);
+			return $this->restoreWithoutBinding($file, $fileId);
 		}
 		$bindingState = (string)$binding['state'];
-		if (!in_array($bindingState, [BindingService::STATE_TRASHED, BindingService::STATE_PENDING_DELETE], true)) {
-			return $this->buildSkippedResult('binding_not_trashed', $fileId, (string)$binding['pad_id']);
+		if ($bindingState !== BindingService::STATE_PENDING_DELETE) {
+			return $this->buildSkippedResult('binding_not_pending_delete', $fileId, (string)$binding['pad_id']);
 		}
 
 		$oldPadId = (string)$binding['pad_id'];
@@ -333,6 +330,114 @@ class LifecycleService {
 		}
 	}
 
+	/** @return array{status: string, reason?: string, file_id: int, old_pad_id?: string, new_pad_id?: string} */
+	private function restoreWithoutBinding(File $file, int $fileId): array {
+		$oldPadId = '';
+		$newPadId = '';
+		$currentContent = '';
+		$fileContentUpdated = false;
+		$managedPadCreated = false;
+
+		try {
+			if ($this->isTestFaultActive(self::TEST_FAULT_RESTORE_READ_LOCK)) {
+				throw new LockedException('Injected test fault: restore_read_lock');
+			}
+			$currentContent = (string)$file->getContent();
+			$parsed = $this->padFileService->parsePadFile($currentContent);
+			$frontmatter = $parsed['frontmatter'];
+			$meta = $this->padFileService->extractPadMetadata($frontmatter);
+			$oldPadId = $meta['pad_id'];
+			$accessMode = $meta['access_mode'];
+			$snapshot = $this->padFileService->getTextSnapshotForRestore($currentContent);
+			$htmlSnapshot = $this->padFileService->getHtmlSnapshotForRestore($currentContent);
+
+			if ($this->padFileService->isExternalFrontmatter($frontmatter, $oldPadId)) {
+				$padOrigin = trim((string)($frontmatter['pad_origin'] ?? ''));
+				$remotePadId = trim((string)($frontmatter['remote_pad_id'] ?? ''));
+				$padUrl = $meta['pad_url'];
+				if ($accessMode !== BindingService::ACCESS_PUBLIC || $padOrigin === '' || $remotePadId === '' || $padUrl === '') {
+					return $this->buildSkippedResult('invalid_external_frontmatter', $fileId, $oldPadId);
+				}
+
+				$newPadId = $this->buildExternalBindingPadId($padOrigin, $remotePadId, $fileId);
+				$updatedContent = $this->padFileService->withStateAndSnapshot(
+					$currentContent,
+					BindingService::STATE_ACTIVE,
+					$snapshot,
+					$newPadId,
+					null,
+					$padUrl,
+				);
+				$this->writeRestoredContent($file, $updatedContent);
+				$fileContentUpdated = true;
+				$this->bindingService->createBinding($fileId, $newPadId, BindingService::ACCESS_PUBLIC);
+
+				return [
+					'status' => self::RESULT_RESTORED,
+					'file_id' => $fileId,
+					'old_pad_id' => $oldPadId,
+					'new_pad_id' => $newPadId,
+				];
+			}
+
+			$newPadId = $this->provisionRestorePadId($accessMode, $oldPadId);
+			$managedPadCreated = true;
+			$this->restoreSnapshotToManagedPad($fileId, $oldPadId, $newPadId, $snapshot, $htmlSnapshot);
+			$updatedContent = $this->padFileService->withStateAndSnapshot(
+				$currentContent,
+				BindingService::STATE_ACTIVE,
+				$snapshot,
+				$newPadId,
+				null,
+				$this->etherpadClient->buildPadUrl($newPadId),
+			);
+			$this->writeRestoredContent($file, $updatedContent);
+			$fileContentUpdated = true;
+			$this->bindingService->createBinding($fileId, $newPadId, $accessMode);
+
+			return [
+				'status' => self::RESULT_RESTORED,
+				'file_id' => $fileId,
+				'old_pad_id' => $oldPadId,
+				'new_pad_id' => $newPadId,
+			];
+		} catch (\Throwable $e) {
+			if ($fileContentUpdated) {
+				try {
+					$file->putContent($currentContent);
+				} catch (\Throwable $fileRollbackError) {
+					$this->logger->warning('Could not rollback .pad content after failed restore without binding.', [
+						'app' => 'etherpad_nextcloud',
+						'fileId' => $fileId,
+						'oldPadId' => $oldPadId,
+						'newPadId' => $newPadId,
+						'exception' => $fileRollbackError,
+					]);
+				}
+			}
+			if ($managedPadCreated && $newPadId !== '') {
+				try {
+					$this->etherpadClient->deletePad($newPadId);
+				} catch (\Throwable $cleanupError) {
+					$this->logger->warning('Could not cleanup newly provisioned restore pad after failed no-binding restore.', [
+						'app' => 'etherpad_nextcloud',
+						'fileId' => $fileId,
+						'newPadId' => $newPadId,
+						'exception' => $cleanupError,
+					]);
+				}
+			}
+			$this->logger->error('Restore lifecycle failed without existing binding.', [
+				'app' => 'etherpad_nextcloud',
+				'fileId' => $fileId,
+				'oldPadId' => $oldPadId,
+				'newPadId' => $newPadId,
+				'exception' => $e,
+			]);
+			throw new LifecycleException('Restore flow failed before completion.', 0, $e);
+		}
+	}
+
 	/** @return array{status: string, reason: string, file_id: int, pad_id?: string} */
 	private function buildSkippedResult(string $reason, int $fileId, ?string $padId = null): array {
 		$result = [
@@ -370,6 +475,39 @@ class LifecycleService {
 		$newPadId = $this->buildPublicRestorePadId($oldPadId);
 		$this->etherpadClient->createPad($newPadId);
 		return $newPadId;
+	}
+
+	private function restoreSnapshotToManagedPad(int $fileId, string $oldPadId, string $newPadId, string $snapshot, string $htmlSnapshot): void {
+		if (trim($htmlSnapshot) !== '') {
+			try {
+				$this->etherpadClient->setHTML($newPadId, $htmlSnapshot);
+				return;
+			} catch (\Throwable $htmlRestoreError) {
+				$this->logger->warning('HTML restore failed, falling back to plain text snapshot.', [
+					'app' => 'etherpad_nextcloud',
+					'fileId' => $fileId,
+					'oldPadId' => $oldPadId,
+					'newPadId' => $newPadId,
+					'exception' => $htmlRestoreError,
+				]);
+			}
+		}
+
+		$this->etherpadClient->setText($newPadId, $snapshot);
+	}
+
+	private function writeRestoredContent(File $file, string $updatedContent): void {
+		if ($this->isTestFaultActive(self::TEST_FAULT_RESTORE_WRITE_LOCK)) {
+			throw new LockedException('Injected test fault: restore_write_lock');
+		}
+		if ($this->isTestFaultActive(self::TEST_FAULT_RESTORE_WRITE_FAIL)) {
+			throw new \RuntimeException('Injected test fault: restore_write_fail');
+		}
+		$file->putContent($updatedContent);
+	}
+
+	private function buildExternalBindingPadId(string $origin, string $remotePadId, int $fileId): string {
+		return 'ext.' . substr(hash('sha256', $origin . '|' . $remotePadId . '|' . $fileId), 0, 40);
 	}
 
 	private function buildPublicRestorePadId(string $oldPadId): string {

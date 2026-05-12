@@ -21,8 +21,6 @@ class BindingService {
 	public const ACCESS_PUBLIC = 'public';
 	public const ACCESS_PROTECTED = 'protected';
 	public const STATE_ACTIVE = 'active';
-	public const STATE_TRASHED = 'trashed';
-	public const STATE_PURGED = 'purged';
 	public const STATE_PENDING_DELETE = 'pending_delete';
 
 	public function __construct(
@@ -76,23 +74,6 @@ class BindingService {
 		return $rows;
 	}
 
-	/** @return array<int,array<string,mixed>> */
-	public function findTrashedWithoutFile(int $limit = 100): array {
-		$qb = $this->db->getQueryBuilder();
-		$qb->select('b.*')
-			->from(self::TABLE, 'b')
-			->leftJoin('b', 'filecache', 'fc', $qb->expr()->eq('b.file_id', 'fc.fileid'))
-			->where($qb->expr()->eq('b.state', $qb->createNamedParameter(self::STATE_TRASHED)))
-			->andWhere($qb->expr()->isNull('fc.fileid'))
-			->orderBy('b.updated_at', 'ASC')
-			->setMaxResults(max(1, $limit));
-
-		$result = $qb->executeQuery();
-		$rows = $result->fetchAll();
-		$result->closeCursor();
-		return is_array($rows) ? $rows : [];
-	}
-
 	public function countByState(string $state): int {
 		$qb = $this->db->getQueryBuilder();
 		$qb->selectAlias($qb->createFunction('COUNT(*)'), 'cnt')
@@ -102,24 +83,6 @@ class BindingService {
 		$result = $qb->executeQuery();
 		$row = $result->fetch();
 		$result->closeCursor();
-		if (!is_array($row) || !isset($row['cnt'])) {
-			return 0;
-		}
-		return max(0, (int)$row['cnt']);
-	}
-
-	public function countTrashedWithoutFile(): int {
-		$qb = $this->db->getQueryBuilder();
-		$qb->selectAlias($qb->createFunction('COUNT(*)'), 'cnt')
-			->from(self::TABLE, 'b')
-			->leftJoin('b', 'filecache', 'fc', $qb->expr()->eq('b.file_id', 'fc.fileid'))
-			->where($qb->expr()->eq('b.state', $qb->createNamedParameter(self::STATE_TRASHED)))
-			->andWhere($qb->expr()->isNull('fc.fileid'));
-
-		$result = $qb->executeQuery();
-		$row = $result->fetch();
-		$result->closeCursor();
-
 		if (!is_array($row) || !isset($row['cnt'])) {
 			return 0;
 		}
@@ -189,36 +152,18 @@ class BindingService {
 		}
 	}
 
-	public function markTrashed(int $fileId, int $deletedAtTs): void {
-		$qb = $this->db->getQueryBuilder();
-		$qb->update(self::TABLE)
-			->set('state', $qb->createNamedParameter(self::STATE_TRASHED))
-			->set('deleted_at', $qb->createNamedParameter($deletedAtTs, IQueryBuilder::PARAM_INT))
-			->set('updated_at', $qb->createNamedParameter(time(), IQueryBuilder::PARAM_INT))
-			->where($qb->expr()->eq('file_id', $qb->createNamedParameter($fileId, IQueryBuilder::PARAM_INT)))
-			->andWhere($qb->expr()->eq('state', $qb->createNamedParameter(self::STATE_ACTIVE)));
-		$updated = $qb->executeStatement();
-		if ($updated < 1) {
-			throw new BindingStateConflictException('State transition conflict while marking trashed (expected active).');
-		}
-	}
-
 	public function markRestored(int $fileId, string $newPadId): void {
 		$qb = $this->db->getQueryBuilder();
-		$stateExpr = $qb->expr()->orX(
-			$qb->expr()->eq('state', $qb->createNamedParameter(self::STATE_TRASHED)),
-			$qb->expr()->eq('state', $qb->createNamedParameter(self::STATE_PENDING_DELETE)),
-		);
 		$qb->update(self::TABLE)
 			->set('pad_id', $qb->createNamedParameter($newPadId))
 			->set('state', $qb->createNamedParameter(self::STATE_ACTIVE))
 			->set('deleted_at', $qb->createNamedParameter(null, IQueryBuilder::PARAM_NULL))
 			->set('updated_at', $qb->createNamedParameter(time(), IQueryBuilder::PARAM_INT))
 			->where($qb->expr()->eq('file_id', $qb->createNamedParameter($fileId, IQueryBuilder::PARAM_INT)))
-			->andWhere($stateExpr);
+			->andWhere($qb->expr()->eq('state', $qb->createNamedParameter(self::STATE_PENDING_DELETE)));
 		$updated = $qb->executeStatement();
 		if ($updated < 1) {
-			throw new BindingStateConflictException('State transition conflict while restoring (expected trashed or pending_delete).');
+			throw new BindingStateConflictException('State transition conflict while restoring (expected pending_delete).');
 		}
 	}
 
@@ -229,40 +174,10 @@ class BindingService {
 			->set('deleted_at', $qb->createNamedParameter($deletedAtTs, IQueryBuilder::PARAM_INT))
 			->set('updated_at', $qb->createNamedParameter(time(), IQueryBuilder::PARAM_INT))
 			->where($qb->expr()->eq('file_id', $qb->createNamedParameter($fileId, IQueryBuilder::PARAM_INT)))
-			->andWhere($qb->expr()->eq('state', $qb->createNamedParameter(self::STATE_TRASHED)));
+			->andWhere($qb->expr()->eq('state', $qb->createNamedParameter(self::STATE_ACTIVE)));
 		$updated = $qb->executeStatement();
 		if ($updated < 1) {
-			throw new BindingStateConflictException('State transition conflict while marking pending_delete (expected trashed).');
-		}
-	}
-
-	public function markPendingDeleteResolved(int $fileId): void {
-		$qb = $this->db->getQueryBuilder();
-		$qb->update(self::TABLE)
-			->set('state', $qb->createNamedParameter(self::STATE_TRASHED))
-			->set('updated_at', $qb->createNamedParameter(time(), IQueryBuilder::PARAM_INT))
-			->where($qb->expr()->eq('file_id', $qb->createNamedParameter($fileId, IQueryBuilder::PARAM_INT)))
-			->andWhere($qb->expr()->eq('state', $qb->createNamedParameter(self::STATE_PENDING_DELETE)));
-		$updated = $qb->executeStatement();
-		if ($updated < 1) {
-			throw new BindingStateConflictException('State transition conflict while resolving pending_delete (expected pending_delete).');
-		}
-	}
-
-	public function markPurged(int $fileId): void {
-		$qb = $this->db->getQueryBuilder();
-		$allowedStateExpr = $qb->expr()->orX(
-			$qb->expr()->eq('state', $qb->createNamedParameter(self::STATE_TRASHED)),
-			$qb->expr()->eq('state', $qb->createNamedParameter(self::STATE_PENDING_DELETE)),
-		);
-		$qb->update(self::TABLE)
-			->set('state', $qb->createNamedParameter(self::STATE_PURGED))
-			->set('updated_at', $qb->createNamedParameter(time(), IQueryBuilder::PARAM_INT))
-			->where($qb->expr()->eq('file_id', $qb->createNamedParameter($fileId, IQueryBuilder::PARAM_INT)))
-			->andWhere($allowedStateExpr);
-		$updated = $qb->executeStatement();
-		if ($updated < 1) {
-			throw new BindingStateConflictException('State transition conflict while marking purged (expected trashed or pending_delete).');
+			throw new BindingStateConflictException('State transition conflict while marking pending_delete (expected active).');
 		}
 	}
 

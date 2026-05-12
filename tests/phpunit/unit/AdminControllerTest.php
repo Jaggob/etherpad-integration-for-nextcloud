@@ -92,7 +92,6 @@ class AdminControllerTest extends TestCase {
 				123,
 				'https://pad-api.internal/api/1.3.0/listAllPads',
 				3,
-				1,
 			));
 
 		$response = $this->buildController($request, validator: $validator, repository: $repository, healthCheck: $health)->healthCheck();
@@ -102,7 +101,7 @@ class AdminControllerTest extends TestCase {
 		$this->assertTrue((bool)$data['ok']);
 		$this->assertSame(72, $data['pad_count']);
 		$this->assertSame(3, $data['pending_delete_count']);
-		$this->assertSame(1, $data['trashed_without_file_count']);
+		$this->assertArrayNotHasKey('trashed_without_file_count', $data);
 		$this->assertSame('https://pad-api.internal/api/1.3.0/listAllPads', $data['target']);
 	}
 
@@ -116,10 +115,6 @@ class AdminControllerTest extends TestCase {
 				'resolved' => 1,
 				'failed' => 0,
 				'remaining' => 0,
-				'trashed_attempted' => 0,
-				'trashed_resolved' => 0,
-				'trashed_failed' => 0,
-				'trashed_without_file_remaining' => 0,
 			]);
 
 		$response = $this->buildController(pendingDeletes: $pendingDeletes)->retryPendingDeletes();

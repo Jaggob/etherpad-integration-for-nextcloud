@@ -275,7 +275,9 @@ class PadFileService {
 			throw new PadFileFormatException('Invalid access_mode in frontmatter.');
 		}
 
-		if (!in_array($state, [BindingService::STATE_ACTIVE, BindingService::STATE_TRASHED, BindingService::STATE_PURGED], true)) {
+		// Keep parsing legacy files that were moved to trash before the binding
+		// lifecycle was simplified. New writes use active only.
+		if (!in_array($state, [BindingService::STATE_ACTIVE, 'trashed', 'purged'], true)) {
 			throw new PadFileFormatException('Invalid state in frontmatter.');
 		}
 

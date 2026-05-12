@@ -18,7 +18,6 @@ class HealthCheckResult {
 		public readonly int $latencyMs,
 		public readonly string $target,
 		public readonly int $pendingDeleteCount,
-		public readonly int $trashedWithoutFileCount,
 	) {
 	}
 }

@@ -43,7 +43,6 @@
 		healthFailed: root.getAttribute('data-l10n-health-failed') || 'Health check failed.',
 		consistencyFailed: root.getAttribute('data-l10n-consistency-failed') || 'Consistency check failed.',
 		pendingDeleteLabel: root.getAttribute('data-l10n-pending-delete-label') || 'Pending Etherpad deletes',
-		trashedWithoutFileLabel: root.getAttribute('data-l10n-trashed-without-file-label') || 'Trashed bindings without file',
 		retryFailed: root.getAttribute('data-l10n-retry-failed') || 'Lifecycle delete retry failed.',
 	}
 
@@ -129,18 +128,16 @@
 		}
 	}
 
-	function updatePendingDeleteUi(count, trashedWithoutFileCount) {
+	function updatePendingDeleteUi(count) {
 		const pendingCount = Number.isFinite(Number(count)) ? Number(count) : 0
-		const trashedCount = Number.isFinite(Number(trashedWithoutFileCount)) ? Number(trashedWithoutFileCount) : 0
-		const total = pendingCount + trashedCount
 		if (pendingActions instanceof HTMLElement) {
-			pendingActions.style.display = total > 0 ? '' : 'none'
+			pendingActions.style.display = pendingCount > 0 ? '' : 'none'
 		}
 		if (pendingCountNode instanceof HTMLElement) {
-			pendingCountNode.textContent = `${l10n.pendingDeleteLabel}: ${String(pendingCount)} | ${l10n.trashedWithoutFileLabel}: ${String(trashedCount)}`
+			pendingCountNode.textContent = `${l10n.pendingDeleteLabel}: ${String(pendingCount)}`
 		}
 		if (retryPendingButton instanceof HTMLButtonElement) {
-			retryPendingButton.disabled = total <= 0
+			retryPendingButton.disabled = pendingCount <= 0
 		}
 	}
 
@@ -214,12 +211,9 @@
 			if (typeof data.target === 'string' && data.target.trim() !== '') {
 				details.push(`target=${data.target}`)
 			}
-			if (typeof data.pending_delete_count !== 'undefined') {
-				updatePendingDeleteUi(
-					Number(data.pending_delete_count),
-					Number(data.trashed_without_file_count || 0),
-				)
-			}
+				if (typeof data.pending_delete_count !== 'undefined') {
+					updatePendingDeleteUi(Number(data.pending_delete_count))
+				}
 			const suffix = details.length > 0 ? ` ${details.join(' | ')}` : ''
 			const message = `${String(data.message || l10n.healthOk)}${suffix}`
 			setStatus(message, 'success')
@@ -296,23 +290,8 @@
 				if (typeof data.remaining !== 'undefined') {
 					details.push(`remaining=${String(data.remaining)}`)
 				}
-				if (typeof data.trashed_attempted !== 'undefined') {
-					details.push(`trashed_attempted=${String(data.trashed_attempted)}`)
-				}
-				if (typeof data.trashed_resolved !== 'undefined') {
-					details.push(`trashed_resolved=${String(data.trashed_resolved)}`)
-				}
-				if (typeof data.trashed_failed !== 'undefined') {
-					details.push(`trashed_failed=${String(data.trashed_failed)}`)
-				}
-				if (
-					typeof data.remaining !== 'undefined' ||
-					typeof data.trashed_without_file_remaining !== 'undefined'
-				) {
-					updatePendingDeleteUi(
-						Number(data.remaining || 0),
-						Number(data.trashed_without_file_remaining || 0),
-					)
+				if (typeof data.remaining !== 'undefined') {
+					updatePendingDeleteUi(Number(data.remaining || 0))
 				}
 				const suffix = details.length > 0 ? ` ${details.join(' | ')}` : ''
 				setStatus(`${String(data.message || 'OK')}${suffix}`, 'success')

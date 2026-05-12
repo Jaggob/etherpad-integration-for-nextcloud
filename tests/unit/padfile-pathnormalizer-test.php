@@ -63,13 +63,13 @@ $test->assertSame('snapshot', $parsed['body'], 'snapshot body must roundtrip');
 
 $updated = $padFileService->withStateAndSnapshot(
 	$initial,
-	BindingService::STATE_TRASHED,
+	'trashed',
 	'new snapshot',
 	null,
 	1700000000,
 );
 $updatedParsed = $padFileService->parsePadFile($updated);
-$test->assertSame(BindingService::STATE_TRASHED, $updatedParsed['frontmatter']['state'], 'state must update');
+$test->assertSame('trashed', $updatedParsed['frontmatter']['state'], 'legacy trash state must still parse');
 $test->assertSame('new snapshot', $padFileService->getTextSnapshotForRestore($updated), 'body text snapshot must update');
 
 $withExport = $padFileService->withExportSnapshot(
