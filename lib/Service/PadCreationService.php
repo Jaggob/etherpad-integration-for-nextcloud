@@ -193,7 +193,7 @@ class PadCreationService {
 					throw new \RuntimeException('Could not resolve new file ID.');
 				}
 
-				$external = $this->etherpadClient->normalizeAndFetchExternalPublicPadText($padUrl);
+				$external = $this->etherpadClient->normalizeAndFetchExternalPublicPadTextOrEmpty($padUrl);
 				$bindingPadId = $this->rollbackService->buildExternalBindingPadId($external['origin'], $external['pad_id'], $fileId);
 				$content = $this->padFileService->buildInitialDocument(
 					$fileId,

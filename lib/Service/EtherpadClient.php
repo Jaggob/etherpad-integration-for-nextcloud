@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace OCA\EtherpadNextcloud\Service;
 
 use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
+use OCA\EtherpadNextcloud\Exception\ExternalPadExportNotFoundException;
 use OCP\IConfig;
 
 class EtherpadClient {
@@ -139,6 +140,23 @@ class EtherpadClient {
 			'pad_id' => $resolved['pad_id'],
 			'pad_url' => $resolved['pad_url'],
 			'text' => $this->getPublicTextFromResolvedExternalPad($resolved),
+		];
+	}
+
+	/** @return array{origin:string,pad_id:string,pad_url:string,text:string} */
+	public function normalizeAndFetchExternalPublicPadTextOrEmpty(string $padUrl): array {
+		$resolved = $this->resolveAndValidateExternalPublicPadUrl($padUrl);
+		try {
+			$text = $this->getPublicTextFromResolvedExternalPad($resolved);
+		} catch (ExternalPadExportNotFoundException) {
+			$text = '';
+		}
+
+		return [
+			'origin' => $resolved['origin'],
+			'pad_id' => $resolved['pad_id'],
+			'pad_url' => $resolved['pad_url'],
+			'text' => $text,
 		];
 	}
 
@@ -438,6 +456,11 @@ class EtherpadClient {
 				continue;
 			}
 			if ($httpCode >= 400) {
+				if ($httpCode === 404) {
+					throw new ExternalPadExportNotFoundException(
+						'External public pad export was not found. Make sure the pad exists and can be exported.'
+					);
+				}
 				throw new EtherpadClientException('Public export HTTP error (' . $httpCode . ')');
 			}
 
