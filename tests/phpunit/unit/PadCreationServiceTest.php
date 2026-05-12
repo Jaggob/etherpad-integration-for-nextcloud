@@ -166,7 +166,7 @@ class PadCreationServiceTest extends TestCase {
 		], $result);
 	}
 
-	public function testCreateFromUrlDoesNotCreateFileWhenInitialSnapshotFetchFails(): void {
+	public function testCreateFromUrlRollsBackWhenInitialSnapshotFetchFails(): void {
 		$fileNode = $this->createMock(File::class);
 		$fileNode->method('getId')->willReturn(321);
 		$fileNode->expects($this->never())->method('putContent');
@@ -174,9 +174,11 @@ class PadCreationServiceTest extends TestCase {
 		$padPaths = $this->createMock(PadPathService::class);
 		$padPaths->method('normalizeCreatePath')->with('/External')->willReturn('/External.pad');
 		$fileCreator = $this->createMock(PadFileCreator::class);
-		$fileCreator->expects($this->never())->method('createUserFile');
+		$fileCreator->expects($this->once())->method('createUserFile')->with('alice', '/External.pad')->willReturn($fileNode);
 		$rollbackService = $this->createMock(PadCreateRollbackService::class);
-		$rollbackService->expects($this->never())->method('rollbackExternalCreate');
+		$rollbackService->expects($this->once())
+			->method('rollbackExternalCreate')
+			->with('alice', '/External.pad', true);
 
 		$etherpadClient = $this->createMock(EtherpadClient::class);
 		$etherpadClient->method('normalizeAndFetchExternalPublicPadText')

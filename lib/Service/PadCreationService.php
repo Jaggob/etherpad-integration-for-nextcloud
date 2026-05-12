@@ -181,11 +181,11 @@ class PadCreationService {
 	 */
 	public function createFromUrl(string $uid, string $file, string $padUrl): array {
 		$path = $this->padPaths->normalizeCreatePath($file);
-		$external = $this->etherpadClient->normalizeAndFetchExternalPublicPadText($padUrl);
 		$fileCreated = false;
+		$external = null;
 
 		return $this->withCreateRollback(
-			function () use ($uid, $path, $external, &$fileCreated): array {
+			function () use ($uid, $path, $padUrl, &$external, &$fileCreated): array {
 				$fileNode = $this->padFileCreator->createUserFile($uid, $path);
 				$fileCreated = true;
 				$fileId = (int)$fileNode->getId();
@@ -193,6 +193,7 @@ class PadCreationService {
 					throw new \RuntimeException('Could not resolve new file ID.');
 				}
 
+				$external = $this->etherpadClient->normalizeAndFetchExternalPublicPadText($padUrl);
 				$bindingPadId = $this->rollbackService->buildExternalBindingPadId($external['origin'], $external['pad_id'], $fileId);
 				$content = $this->padFileService->buildInitialDocument(
 					$fileId,
@@ -221,14 +222,14 @@ class PadCreationService {
 			function () use ($uid, $path, &$fileCreated): void {
 				$this->rollbackService->rollbackExternalCreate($uid, $path, $fileCreated);
 			},
-			function (\Throwable $e) use ($path, $padUrl, $external): ?array {
+			function (\Throwable $e) use ($path, $padUrl, &$external): ?array {
 				if ($e instanceof BindingException) {
 					return [
 						'message' => 'External pad URL already linked',
 						'context' => [
 							'file' => $path,
-							'origin' => $external['origin'],
-							'remotePadId' => $external['pad_id'],
+							'origin' => is_array($external) ? $external['origin'] : '',
+							'remotePadId' => is_array($external) ? $external['pad_id'] : '',
 						],
 					];
 				}
