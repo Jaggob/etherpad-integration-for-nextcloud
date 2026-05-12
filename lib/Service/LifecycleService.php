@@ -13,6 +13,7 @@ namespace OCA\EtherpadNextcloud\Service;
 use OCA\EtherpadNextcloud\Exception\BindingStateConflictException;
 use OCA\EtherpadNextcloud\Exception\LifecycleException;
 use OCA\EtherpadNextcloud\Util\EtherpadErrorClassifier;
+use OCA\EtherpadNextcloud\Util\ExternalPadBindingId;
 use OCP\Files\File;
 use OCP\IConfig;
 use OCP\Lock\LockedException;
@@ -359,7 +360,7 @@ class LifecycleService {
 					return $this->buildSkippedResult('invalid_external_frontmatter', $fileId, $oldPadId);
 				}
 
-				$newPadId = $this->buildExternalBindingPadId($padOrigin, $remotePadId, $fileId);
+				$newPadId = ExternalPadBindingId::build($padOrigin, $remotePadId, $fileId);
 				$updatedContent = $this->padFileService->withStateAndSnapshot(
 					$currentContent,
 					BindingService::STATE_ACTIVE,
@@ -504,10 +505,6 @@ class LifecycleService {
 			throw new \RuntimeException('Injected test fault: restore_write_fail');
 		}
 		$file->putContent($updatedContent);
-	}
-
-	private function buildExternalBindingPadId(string $origin, string $remotePadId, int $fileId): string {
-		return 'ext.' . substr(hash('sha256', $origin . '|' . $remotePadId . '|' . $fileId), 0, 40);
 	}
 
 	private function buildPublicRestorePadId(string $oldPadId): string {

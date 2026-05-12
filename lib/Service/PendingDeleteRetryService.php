@@ -56,22 +56,36 @@ class PendingDeleteRetryService {
 			if ($fileId <= 0 || $padId === '') {
 				continue;
 			}
-			$attempted++;
-			try {
-				$this->etherpadClient->deletePad($padId);
-				$this->bindingService->deleteByFileId($fileId);
-				$resolved++;
-				$this->logger->info('Resolved pending pad delete.', [
+				$attempted++;
+				try {
+					$this->etherpadClient->deletePad($padId);
+					if (!$this->bindingService->deletePendingDeleteBinding($fileId, $padId)) {
+						$this->logger->info('Skipped stale pending delete binding after successful pad delete.', [
+							'app' => 'etherpad_nextcloud',
+							'fileId' => $fileId,
+							'padId' => $padId,
+						]);
+						continue;
+					}
+					$resolved++;
+					$this->logger->info('Resolved pending pad delete.', [
 					'app' => 'etherpad_nextcloud',
 					'fileId' => $fileId,
 					'padId' => $padId,
 				]);
 				continue;
-			} catch (\Throwable $e) {
-				if (EtherpadErrorClassifier::isPadAlreadyDeleted($e)) {
-					$this->bindingService->deleteByFileId($fileId);
-					$resolved++;
-					$this->logger->info('Resolved pending delete because pad is already gone.', [
+				} catch (\Throwable $e) {
+					if (EtherpadErrorClassifier::isPadAlreadyDeleted($e)) {
+						if (!$this->bindingService->deletePendingDeleteBinding($fileId, $padId)) {
+							$this->logger->info('Skipped stale pending delete binding after already-deleted response.', [
+								'app' => 'etherpad_nextcloud',
+								'fileId' => $fileId,
+								'padId' => $padId,
+							]);
+							continue;
+						}
+						$resolved++;
+						$this->logger->info('Resolved pending delete because pad is already gone.', [
 						'app' => 'etherpad_nextcloud',
 						'fileId' => $fileId,
 						'padId' => $padId,

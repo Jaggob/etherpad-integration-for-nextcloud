@@ -188,6 +188,15 @@ class BindingService {
 		$qb->executeStatement();
 	}
 
+	public function deletePendingDeleteBinding(int $fileId, string $padId): bool {
+		$qb = $this->db->getQueryBuilder();
+		$qb->delete(self::TABLE)
+			->where($qb->expr()->eq('file_id', $qb->createNamedParameter($fileId, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->eq('pad_id', $qb->createNamedParameter($padId)))
+			->andWhere($qb->expr()->eq('state', $qb->createNamedParameter(self::STATE_PENDING_DELETE)));
+		return $qb->executeStatement() > 0;
+	}
+
 	private function assertAccessMode(string $accessMode): void {
 		if (!in_array($accessMode, [self::ACCESS_PUBLIC, self::ACCESS_PROTECTED], true)) {
 			throw new BindingException('Unsupported access mode: ' . $accessMode);
