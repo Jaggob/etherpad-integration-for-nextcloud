@@ -10,11 +10,11 @@ export const fetchJsonWithTimeout = async (url, init = {}, timeoutMs = DEFAULT_R
 	const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
 	const headers = Object.assign({ Accept: 'application/json' }, init.headers || {})
 	try {
-		const response = await fetch(url, Object.assign({
+		const response = await fetch(url, Object.assign({}, init, {
 			credentials: 'same-origin',
 			headers,
 			signal: controller.signal,
-		}, init))
+		}))
 		const data = await response.json().catch(() => ({}))
 		if (!response.ok) {
 			throw new Error((data && data.message) || 'Request failed.')
