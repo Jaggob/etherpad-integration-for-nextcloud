@@ -87,18 +87,18 @@ class LifecycleService {
 			if ($canPersistSnapshotToFile && $currentContent !== '') {
 				$updatedContent = null;
 				try {
-						$parsed = $this->padFileService->parsePadFile($currentContent);
-						$frontmatter = $parsed['frontmatter'];
-						$isExternal = $isExternal || $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
-						if ($isExternal) {
-							$padUrl = isset($frontmatter['pad_url']) ? trim((string)$frontmatter['pad_url']) : '';
-							if ($padUrl === '') {
+					$parsed = $this->padFileService->parsePadFile($currentContent);
+					$frontmatter = $parsed['frontmatter'];
+					$isExternal = $isExternal || $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
+					if ($isExternal) {
+						$padUrl = isset($frontmatter['pad_url']) ? trim((string)$frontmatter['pad_url']) : '';
+						if ($padUrl === '') {
 							throw new \RuntimeException('External pad URL metadata is missing.');
-							}
-							$external = $this->etherpadClient->normalizeAndFetchExternalPublicPadText($padUrl);
-							$revision = max(0, $this->padFileService->getSnapshotRevisionFromFrontmatter($frontmatter) + 1);
-							$updatedContent = $this->padFileService->withExportSnapshot($currentContent, $external['text'], '', $revision, false);
-						} else {
+						}
+						$external = $this->etherpadClient->normalizeAndFetchExternalPublicPadText($padUrl);
+						$revision = max(0, $this->padFileService->getSnapshotRevisionFromFrontmatter($frontmatter) + 1);
+						$updatedContent = $this->padFileService->withExportSnapshot($currentContent, $external['text'], '', $revision, false);
+					} else {
 						$snapshot = $this->etherpadClient->getText($padId);
 						$html = $this->etherpadClient->getHTML($padId);
 						$revision = $this->etherpadClient->getRevisionsCount($padId);
@@ -340,12 +340,12 @@ class LifecycleService {
 		$fileContentUpdated = false;
 		$managedPadCreated = false;
 
-		try {
-			if ($this->isTestFaultActive(self::TEST_FAULT_RESTORE_READ_LOCK)) {
-				throw new LockedException('Injected test fault: restore_read_lock');
-			}
-			$currentContent = (string)$file->getContent();
-			$parsed = $this->padFileService->parsePadFile($currentContent);
+			try {
+				if ($this->isTestFaultActive(self::TEST_FAULT_RESTORE_READ_LOCK)) {
+					throw new LockedException('Injected test fault: restore_read_lock');
+				}
+				$currentContent = (string)$file->getContent();
+				$parsed = $this->padFileService->parsePadFile($currentContent);
 				$frontmatter = $parsed['frontmatter'];
 				$meta = $this->padFileService->extractPadMetadata($frontmatter);
 				$oldPadId = $meta['pad_id'];
@@ -380,17 +380,17 @@ class LifecycleService {
 						null,
 						$external['pad_url'],
 					);
-				$this->writeRestoredContent($file, $updatedContent);
-				$fileContentUpdated = true;
-				$this->bindingService->createBinding($fileId, $newPadId, BindingService::ACCESS_PUBLIC);
+					$this->writeRestoredContent($file, $updatedContent);
+					$fileContentUpdated = true;
+					$this->bindingService->createBinding($fileId, $newPadId, BindingService::ACCESS_PUBLIC);
 
-				return [
-					'status' => self::RESULT_RESTORED,
-					'file_id' => $fileId,
-					'old_pad_id' => $oldPadId,
-					'new_pad_id' => $newPadId,
-				];
-			}
+					return [
+						'status' => self::RESULT_RESTORED,
+						'file_id' => $fileId,
+						'old_pad_id' => $oldPadId,
+						'new_pad_id' => $newPadId,
+					];
+				}
 
 			$newPadId = $this->provisionRestorePadId($accessMode, $oldPadId);
 			$managedPadCreated = true;

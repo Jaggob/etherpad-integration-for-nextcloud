@@ -10,6 +10,7 @@ use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
 use OCA\EtherpadNextcloud\Service\LifecycleService;
 use OCA\EtherpadNextcloud\Service\PadFileService;
+use OCA\EtherpadNextcloud\Util\ExternalPadBindingId;
 use OCP\Files\File;
 use OCP\IConfig;
 use OCP\Security\ISecureRandom;
@@ -392,7 +393,7 @@ class LifecycleServiceTest extends TestCase {
 		$origin = 'https://pad.remote.test';
 		$remotePadId = 'RemotePad';
 		$padUrl = $origin . '/p/' . $remotePadId;
-		$newPadId = 'ext.' . substr(hash('sha256', $origin . '|' . $remotePadId . '|' . $fileId), 0, 40);
+		$newPadId = ExternalPadBindingId::build($origin, $remotePadId, $fileId);
 
 		$bindingService = $this->createMock(BindingService::class);
 		$bindingService->expects($this->once())->method('findByFileId')->with($fileId)->willReturn(null);

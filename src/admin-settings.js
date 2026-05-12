@@ -205,16 +205,16 @@
 			if (typeof data.api_version === 'string' && data.api_version.trim() !== '') {
 				details.push(`api=${data.api_version}`)
 			}
-				if (typeof data.latency_ms !== 'undefined') {
-					details.push(`latency=${String(data.latency_ms)}ms`)
-				}
-				if (typeof data.target === 'string' && data.target.trim() !== '') {
-					details.push(`target=${data.target}`)
-				}
-				if (typeof data.pending_delete_count !== 'undefined') {
-					updatePendingDeleteUi(Number(data.pending_delete_count))
-				}
-				const suffix = details.length > 0 ? ` ${details.join(' | ')}` : ''
+			if (typeof data.latency_ms !== 'undefined') {
+				details.push(`latency=${String(data.latency_ms)}ms`)
+			}
+			if (typeof data.target === 'string' && data.target.trim() !== '') {
+				details.push(`target=${data.target}`)
+			}
+			if (typeof data.pending_delete_count !== 'undefined') {
+				updatePendingDeleteUi(Number(data.pending_delete_count))
+			}
+			const suffix = details.length > 0 ? ` ${details.join(' | ')}` : ''
 			const message = `${String(data.message || l10n.healthOk)}${suffix}`
 			setStatus(message, 'success')
 		} catch (error) {
