@@ -181,7 +181,7 @@ class PadCreationService {
 	 */
 	public function createFromUrl(string $uid, string $file, string $padUrl): array {
 		$path = $this->padPaths->normalizeCreatePath($file);
-		$external = $this->etherpadClient->normalizeAndValidateExternalPublicPadUrl($padUrl);
+		$external = $this->etherpadClient->normalizeAndFetchExternalPublicPadText($padUrl);
 		$fileCreated = false;
 
 		return $this->withCreateRollback(
@@ -194,7 +194,6 @@ class PadCreationService {
 				}
 
 				$bindingPadId = $this->rollbackService->buildExternalBindingPadId($external['origin'], $external['pad_id'], $fileId);
-				$initialSnapshot = $this->etherpadClient->getPublicTextFromPadUrl($external['pad_url']);
 				$content = $this->padFileService->buildInitialDocument(
 					$fileId,
 					$bindingPadId,
@@ -206,7 +205,7 @@ class PadCreationService {
 						'remote_pad_id' => $external['pad_id'],
 					]
 				);
-				$content = $this->padFileService->withExportSnapshot($content, $initialSnapshot, '', 0, false);
+				$content = $this->padFileService->withExportSnapshot($content, $external['text'], '', 0, false);
 				$fileNode->putContent($content);
 
 				$this->bindingService->createBinding($fileId, $bindingPadId, BindingService::ACCESS_PUBLIC);

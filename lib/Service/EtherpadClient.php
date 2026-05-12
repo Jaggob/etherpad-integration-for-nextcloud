@@ -132,6 +132,18 @@ class EtherpadClient {
 		return $this->sendPinnedPublicGetRequest($url, $resolved['host'], $resolved['port'], $resolved['resolved_ips']);
 	}
 
+	/** @return array{origin:string,pad_id:string,pad_url:string,text:string} */
+	public function normalizeAndFetchExternalPublicPadText(string $padUrl): array {
+		$resolved = $this->resolveAndValidateExternalPublicPadUrl($padUrl);
+		$url = $this->buildPublicExportUrl($resolved['pad_url'], 'txt');
+		return [
+			'origin' => $resolved['origin'],
+			'pad_id' => $resolved['pad_id'],
+			'pad_url' => $resolved['pad_url'],
+			'text' => $this->sendPinnedPublicGetRequest($url, $resolved['host'], $resolved['port'], $resolved['resolved_ips']),
+		];
+	}
+
 	public function assertPublicPadAvailable(string $padUrl): void {
 		$this->getPublicTextFromPadUrl($padUrl);
 	}
