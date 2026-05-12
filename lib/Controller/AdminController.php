@@ -95,7 +95,6 @@ class AdminController extends Controller {
 				'latency_ms' => $result->latencyMs,
 				'target' => $result->target,
 				'pending_delete_count' => $result->pendingDeleteCount,
-				'trashed_without_file_count' => $result->trashedWithoutFileCount,
 			]),
 			[
 				'generic' => $this->l10n->t('Health check failed.'),
@@ -117,10 +116,6 @@ class AdminController extends Controller {
 				'resolved' => $result['resolved'],
 				'failed' => $result['failed'],
 				'remaining' => $result['remaining'],
-				'trashed_attempted' => $result['trashed_attempted'],
-				'trashed_resolved' => $result['trashed_resolved'],
-				'trashed_failed' => $result['trashed_failed'],
-				'trashed_without_file_remaining' => $result['trashed_without_file_remaining'],
 			]),
 			[
 				'generic' => $this->l10n->t('Pending delete retry failed.'),

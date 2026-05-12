@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\EtherpadNextcloud\Service;
 
+use OCA\EtherpadNextcloud\Util\ExternalPadBindingId;
 use OCP\Files\IRootFolder;
 use Psr\Log\LoggerInterface;
 
@@ -66,13 +67,7 @@ class PadCreateRollbackService {
 	}
 
 	public function buildExternalBindingPadId(string $origin, string $remotePadId, int $fileId): string {
-		/*
-		 * ext. separates external bindings from managed Etherpad IDs. fileId is
-		 * part of the hash so the same external pad can be linked by multiple
-		 * .pad files without colliding. 40 hex chars keeps the ID compact while
-		 * retaining a SHA-1-length identifier space for this namespace.
-		 */
-		return 'ext.' . substr(hash('sha256', $origin . '|' . $remotePadId . '|' . $fileId), 0, 40);
+		return ExternalPadBindingId::build($origin, $remotePadId, $fileId);
 	}
 
 	private function deleteUserNodeIfExists(string $uid, string $absolutePath): void {

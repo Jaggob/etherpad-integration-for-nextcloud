@@ -11,7 +11,7 @@ Etherpad is the editing source of truth; the `.pad` file acts as binding storage
 
 - `lib/Service/BindingService.php`
   - Manages the central DB table `ep_pad_bindings`.
-  - Owns mapping `file_id <-> pad_id` and states (`active`, `trashed`, `pending_delete`, `purged`).
+  - Owns mapping `file_id <-> pad_id` and states (`active`, `pending_delete`).
 - `lib/Service/LifecycleService.php`
   - Trash/restore flow.
   - Snapshot on trash, re-provisioning on restore.
@@ -19,7 +19,6 @@ Etherpad is the editing source of truth; the `.pad` file acts as binding storage
 - `lib/BackgroundJob/RetryPendingDeleteJob.php`
   - Daily retry for deferred Etherpad deletions:
     - unresolved `pending_delete`
-    - stale `trashed` bindings where the file is no longer present in Nextcloud storage/trashbin
 - `lib/Service/EtherpadClient.php`
   - Adapter for Etherpad HTTP API (pad create/delete/session/read-only/export).
 - `lib/Service/PadFileService.php`
@@ -203,9 +202,9 @@ Primary flow (native viewer when available):
 
 ### 5) Trash/Restore
 
-- Trash: persist snapshot, switch state to `trashed`, delete pad in Etherpad.
+- Trash: persist a fresh snapshot if possible, delete the managed Etherpad pad, then delete the binding row.
 - If Etherpad is unavailable during delete: switch state to `pending_delete`, keep Nextcloud trash successful.
-- Restore: provision new pad, replay snapshot, switch binding/frontmatter back to `active`.
+- Restore: provision a new pad from `.pad` frontmatter/snapshot when no binding row exists, or finish a `pending_delete` row if one remains.
 
 ### 6) Admin Integrity Check (optional)
 

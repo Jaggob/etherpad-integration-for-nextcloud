@@ -86,7 +86,6 @@ class AdminSettings implements ISettings {
 				'consistency_button' => $this->l10n->t('Consistency check'),
 				'retry_pending_button' => $this->l10n->t('Retry deferred deletes now'),
 				'pending_delete_label' => $this->l10n->t('Pending Etherpad deletes'),
-				'trashed_without_file_label' => $this->l10n->t('Trashed bindings without file'),
 				'saving' => $this->l10n->t('Saving settings...'),
 				'saved' => $this->l10n->t('Settings saved.'),
 				'checking' => $this->l10n->t('Running health check...'),

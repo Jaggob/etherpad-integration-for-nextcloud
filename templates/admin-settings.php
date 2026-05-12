@@ -21,7 +21,6 @@
 	data-l10n-health-failed="<?php p((string)$_['l10n']['health_failed']); ?>"
 	data-l10n-consistency-failed="<?php p((string)$_['l10n']['consistency_failed']); ?>"
 	data-l10n-pending-delete-label="<?php p((string)$_['l10n']['pending_delete_label']); ?>"
-	data-l10n-trashed-without-file-label="<?php p((string)$_['l10n']['trashed_without_file_label']); ?>"
 	data-l10n-retry-failed="<?php p((string)$_['l10n']['retry_failed']); ?>">
 	<h2><?php p((string)$_['l10n']['section_title']); ?></h2>
 	<p class="settings-hint">
