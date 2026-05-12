@@ -42,7 +42,9 @@ class PublicPadContextService {
 		$padUrl = $meta['pad_url'];
 		$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
 
-		$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
+		if (!$isExternal) {
+			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
+		}
 		$openTarget = $this->publicPadOpenService->open(
 			$padId,
 			$accessMode,

@@ -87,9 +87,10 @@ Notes:
   - `pad_url`: internal Etherpad URL
 - External + Public
   - `access_mode: public`
-  - `pad_id`: namespaced binding ID (`ext.<hash>`)
+  - `pad_id`: external marker (`ext.<remote_pad_id>`)
   - `pad_origin` + `remote_pad_id` are set
   - `pad_url`: external URL used for viewer open
+  - no row in `ep_pad_bindings`; the `.pad` frontmatter is the source of truth for the remote target
 
 Protected + external is not supported.
 
@@ -102,6 +103,9 @@ Protected + external is not supported.
 
 The DB binding table uses `active` and `pending_delete`. Successful trash deletes
 the binding row; restore can recreate it from the `.pad` frontmatter and snapshot.
+External pads are not managed in the DB binding table, so trash/restore only moves
+the Nextcloud file and never creates, deletes, or restores anything on the remote
+Etherpad server.
 
 ## Parsing/Serializing
 

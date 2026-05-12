@@ -12,6 +12,7 @@ Etherpad is the editing source of truth; the `.pad` file acts as binding storage
 - `lib/Service/BindingService.php`
   - Manages the central DB table `ep_pad_bindings`.
   - Owns mapping `file_id <-> pad_id` and states (`active`, `pending_delete`).
+  - Only managed internal pads are bound. External pads are represented solely by `.pad` frontmatter and snapshots.
 - `lib/Service/LifecycleService.php`
   - Trash/restore flow.
   - Snapshot on trash, re-provisioning on restore.
@@ -69,9 +70,11 @@ checked-in runtime assets in `js/`.
   - `deleted_at`
   - `created_at`
   - `updated_at`
+  - stores internal managed pads only; external `ext.*` rows from earlier development versions are removed by `Version000003Date20260512230000`
 - `.pad` file
   - Frontmatter: format, binding metadata, state, export metadata.
   - Body: text and HTML snapshot.
+  - For external pads, frontmatter (`pad_origin`, `remote_pad_id`, `pad_url`) is the source of truth and no DB binding exists.
 - Snapshot helpers
   - `PadFileService::withExportSnapshot(...)` constructs updated `.pad` content for snapshot writes.
   - `PadFileLockRetryService::putContentWithSyncLockRetry(...)` persists that content to the Nextcloud file.
@@ -85,6 +88,7 @@ checked-in runtime assets in `js/`.
 2. Creates the `.pad` file.
 3. Writes initial frontmatter.
 4. Creates DB binding.
+5. External create-from-URL is different: it only creates the `.pad` file with external frontmatter plus an optional text snapshot; it does not create or own anything on the remote Etherpad server.
 
 ### 2) Open (authenticated)
 
@@ -98,6 +102,7 @@ Primary flow (native viewer):
    - fallback: `POST /api/v1/pads/open` (`file`, CSRF `requesttoken`) if no stable `fileId` is available
 3. `PadController` validates frontmatter/binding and resolves secure open URL:
    - `protected`: session URL via `PadSessionService`
+   - external: validate the stored external URL and return a read-only snapshot/open target without DB binding lookup
    - `public`: direct/read-only URL as appropriate
 4. For protected pads, response includes one Etherpad session `Set-Cookie` header.
 5. Legacy app routes (`/apps/etherpad_nextcloud`, `/by-id/{fileId}`) redirect into the same native files viewer URL.
@@ -192,6 +197,7 @@ Primary flow (native viewer when available):
    - `force=1` requests an immediate upstream re-check, but unchanged snapshots are still not rewritten.
    - Snapshot writes are built via `PadFileService::withExportSnapshot(...)` and persisted via `PadFileLockRetryService::putContentWithSyncLockRetry(...)`.
 5. External pads are synced as text only (no HTML import).
+   - They are selected by `.pad` frontmatter, not by `ep_pad_bindings`.
 6. Write-lock handling:
    - short bounded retry around `.pad` snapshot writes (`150ms`, `300ms`, `600ms`)
    - if still locked, API returns `status=locked` and `retryable=true`
@@ -205,12 +211,14 @@ Primary flow (native viewer when available):
 - Trash: persist a fresh snapshot if possible, delete the managed Etherpad pad, then delete the binding row.
 - If Etherpad is unavailable during delete: switch state to `pending_delete`, keep Nextcloud trash successful.
 - Restore: provision a new pad from `.pad` frontmatter/snapshot when no binding row exists, or finish a `pending_delete` row if one remains.
+- External pads skip lifecycle side effects entirely. Trash/restore only affects the Nextcloud file; the remote Etherpad server is never mutated.
 
 ### 6) Admin Integrity Check (optional)
 
 1. Admin runs `POST /api/v1/admin/consistency-check`.
 2. Service scans DB/file metadata consistency.
 3. Returns aggregate counters and bounded sample lists for diagnostics.
+4. External `.pad` files without bindings are expected and are excluded from missing-binding diagnostics.
 
 ## Main Frontend Modules
 

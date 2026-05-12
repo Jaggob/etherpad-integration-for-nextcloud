@@ -37,9 +37,7 @@ class PadSyncServiceTest extends TestCase {
 		$padFileService->method('isExternalFrontmatter')->willReturn(true);
 
 		$bindingService = $this->createMock(BindingService::class);
-		$bindingService->expects($this->once())
-			->method('assertConsistentMapping')
-			->with(138, 'ext.remote', BindingService::ACCESS_PUBLIC);
+		$bindingService->expects($this->never())->method('assertConsistentMapping');
 
 		$result = $this->buildService($padFileService, $userNodeResolver, $bindingService)
 			->syncStatusById('alice', 138);
@@ -131,9 +129,7 @@ class PadSyncServiceTest extends TestCase {
 			->willReturn('updated-frontmatter');
 
 		$bindingService = $this->createMock(BindingService::class);
-		$bindingService->expects($this->once())
-			->method('assertConsistentMapping')
-			->with(138, 'ext.remote', BindingService::ACCESS_PUBLIC);
+		$bindingService->expects($this->never())->method('assertConsistentMapping');
 
 		$etherpadClient = $this->createMock(EtherpadClient::class);
 		$etherpadClient->expects($this->once())

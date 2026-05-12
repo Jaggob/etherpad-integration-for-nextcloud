@@ -104,6 +104,7 @@ Base: `/apps/etherpad_nextcloud`
     - `file` (required)
     - `padUrl` (required, absolute `https` URL with `/p/{padId}`)
   - Purpose: creates `.pad` for public Etherpad links from external servers.
+  - External `.pad` files are file-only metadata/snapshot records and do not create rows in `ep_pad_bindings`.
   - Security rules:
     - public pad URLs only
     - no GroupPad IDs (`g.<group>$<name>`)
@@ -167,6 +168,7 @@ Base: `/apps/etherpad_nextcloud`
   - External pads:
     - Sync uses public text export only (`/export/txt`) based on `pad_url`.
     - HTML is not imported for external pads.
+    - No DB binding is required; the external target is validated from `.pad` frontmatter.
 
 - `GET /api/v1/pads/sync-status/{fileId}`
   - Controller: `PadController::syncStatusById`
@@ -174,6 +176,7 @@ Base: `/apps/etherpad_nextcloud`
     - `status=synced` if `snapshot_rev >= current_rev`
     - `status=out_of_sync` if `snapshot_rev < current_rev`
     - `status=unavailable` for external pads without safe revision lookup
+    - External pads return `unavailable` because the app intentionally does not keep revision state for remote servers.
 
 - `POST /api/v1/pads/trash`
   - Controller: `PadController::trash`

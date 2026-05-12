@@ -80,7 +80,9 @@ class PadOpenService {
 			$snapshot = $isExternal
 				? $this->snapshotExtractor->extract((string)$content)
 				: new SnapshotPayload('', '');
-			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
+			if (!$isExternal) {
+				$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
+			}
 
 			return $this->buildOpenContext(
 				$uid,

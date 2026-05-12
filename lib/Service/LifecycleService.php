@@ -11,10 +11,8 @@ declare(strict_types=1);
 namespace OCA\EtherpadNextcloud\Service;
 
 use OCA\EtherpadNextcloud\Exception\BindingStateConflictException;
-use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
 use OCA\EtherpadNextcloud\Exception\LifecycleException;
 use OCA\EtherpadNextcloud\Util\EtherpadErrorClassifier;
-use OCA\EtherpadNextcloud\Util\ExternalPadBindingId;
 use OCP\Files\File;
 use OCP\IConfig;
 use OCP\Lock\LockedException;
@@ -55,18 +53,23 @@ class LifecycleService {
 
 		$binding = $this->bindingService->findByFileId($fileId);
 		if ($binding === null) {
+			if ($this->isExternalPadFile($file)) {
+				return $this->buildSkippedResult('external_pad', $fileId);
+			}
 			return $this->buildSkippedResult('binding_not_found', $fileId);
 		}
+		$padId = (string)$binding['pad_id'];
+		if (str_starts_with($padId, 'ext.')) {
+			return $this->buildSkippedResult('external_pad', $fileId, $padId);
+		}
 		if ((string)$binding['state'] !== BindingService::STATE_ACTIVE) {
-			return $this->buildSkippedResult('binding_not_active', $fileId, (string)$binding['pad_id']);
+			return $this->buildSkippedResult('binding_not_active', $fileId, $padId);
 		}
 
-		$padId = (string)$binding['pad_id'];
 		$deletedAt = time();
 		$currentContent = '';
 		$snapshotPersisted = false;
 		$canPersistSnapshotToFile = true;
-		$isExternal = str_starts_with($padId, 'ext.');
 
 		try {
 			try {
@@ -89,21 +92,13 @@ class LifecycleService {
 				try {
 					$parsed = $this->padFileService->parsePadFile($currentContent);
 					$frontmatter = $parsed['frontmatter'];
-					$isExternal = $isExternal || $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
-					if ($isExternal) {
-						$padUrl = isset($frontmatter['pad_url']) ? trim((string)$frontmatter['pad_url']) : '';
-						if ($padUrl === '') {
-							throw new \RuntimeException('External pad URL metadata is missing.');
-						}
-						$external = $this->etherpadClient->normalizeAndFetchExternalPublicPadText($padUrl);
-						$revision = max(0, $this->padFileService->getSnapshotRevisionFromFrontmatter($frontmatter) + 1);
-						$updatedContent = $this->padFileService->withExportSnapshot($currentContent, $external['text'], '', $revision, false);
-					} else {
-						$snapshot = $this->etherpadClient->getText($padId);
-						$html = $this->etherpadClient->getHTML($padId);
-						$revision = $this->etherpadClient->getRevisionsCount($padId);
-						$updatedContent = $this->padFileService->withExportSnapshot($currentContent, $snapshot, $html, $revision);
+					if ($this->padFileService->isExternalFrontmatter($frontmatter, $padId)) {
+						return $this->buildSkippedResult('external_pad', $fileId, $padId);
 					}
+					$snapshot = $this->etherpadClient->getText($padId);
+					$html = $this->etherpadClient->getHTML($padId);
+					$revision = $this->etherpadClient->getRevisionsCount($padId);
+					$updatedContent = $this->padFileService->withExportSnapshot($currentContent, $snapshot, $html, $revision);
 				} catch (\Throwable $snapshotError) {
 					$this->logger->warning('Could not fetch fresh Etherpad snapshot during trash. Using current .pad snapshot/body.', [
 						'app' => 'etherpad_nextcloud',
@@ -140,18 +135,6 @@ class LifecycleService {
 						]);
 					}
 				}
-			}
-
-			if ($isExternal) {
-				$this->bindingService->deleteByFileId($fileId);
-				return [
-					'status' => self::RESULT_TRASHED,
-					'file_id' => $fileId,
-					'pad_id' => $padId,
-					'deleted_at' => $deletedAt,
-					'snapshot_persisted' => $snapshotPersisted,
-					'delete_pending' => false,
-				];
 			}
 
 			try {
@@ -226,11 +209,14 @@ class LifecycleService {
 			return $this->restoreWithoutBinding($file, $fileId);
 		}
 		$bindingState = (string)$binding['state'];
+		$oldPadId = (string)$binding['pad_id'];
+		if (str_starts_with($oldPadId, 'ext.')) {
+			return $this->buildSkippedResult('external_pad', $fileId, $oldPadId);
+		}
 		if ($bindingState !== BindingService::STATE_PENDING_DELETE) {
-			return $this->buildSkippedResult('binding_not_pending_delete', $fileId, (string)$binding['pad_id']);
+			return $this->buildSkippedResult('binding_not_pending_delete', $fileId, $oldPadId);
 		}
 
-		$oldPadId = (string)$binding['pad_id'];
 		$accessMode = (string)$binding['access_mode'];
 		$newPadId = $this->provisionRestorePadId($accessMode, $oldPadId);
 		$restored = false;
@@ -340,58 +326,22 @@ class LifecycleService {
 		$fileContentUpdated = false;
 		$managedPadCreated = false;
 
-			try {
-				if ($this->isTestFaultActive(self::TEST_FAULT_RESTORE_READ_LOCK)) {
-					throw new LockedException('Injected test fault: restore_read_lock');
-				}
-				$currentContent = (string)$file->getContent();
-				$parsed = $this->padFileService->parsePadFile($currentContent);
-				$frontmatter = $parsed['frontmatter'];
-				$meta = $this->padFileService->extractPadMetadata($frontmatter);
-				$oldPadId = $meta['pad_id'];
-				$accessMode = $meta['access_mode'];
-				$snapshotParts = $this->padFileService->getSnapshotPartsFromBody((string)$parsed['body']);
-				$snapshot = $snapshotParts['text'];
-				$htmlSnapshot = $snapshotParts['html'];
-				$isExternal = str_starts_with($oldPadId, 'ext.') || $this->padFileService->isExternalFrontmatter($frontmatter, $oldPadId);
-
-				if ($isExternal) {
-					$padOrigin = trim((string)($frontmatter['pad_origin'] ?? ''));
-					$remotePadId = trim((string)($frontmatter['remote_pad_id'] ?? ''));
-					$padUrl = $meta['pad_url'];
-					if ($accessMode !== BindingService::ACCESS_PUBLIC || $padOrigin === '' || $remotePadId === '' || $padUrl === '') {
-						return $this->buildSkippedResult('invalid_external_frontmatter', $fileId, $oldPadId);
-					}
-					try {
-						$external = $this->etherpadClient->normalizeAndValidateExternalPublicPadUrl($padUrl);
-					} catch (EtherpadClientException) {
-						return $this->buildSkippedResult('invalid_external_frontmatter', $fileId, $oldPadId);
-					}
-					if ($external['origin'] !== $padOrigin || $external['pad_id'] !== $remotePadId) {
-						return $this->buildSkippedResult('invalid_external_frontmatter', $fileId, $oldPadId);
-					}
-
-					$newPadId = ExternalPadBindingId::build($external['origin'], $external['pad_id'], $fileId);
-					$updatedContent = $this->padFileService->withStateAndSnapshot(
-						$currentContent,
-						BindingService::STATE_ACTIVE,
-						$snapshot,
-						$newPadId,
-						null,
-						$external['pad_url'],
-					);
-					$this->writeRestoredContent($file, $updatedContent);
-					$fileContentUpdated = true;
-					$this->bindingService->createBinding($fileId, $newPadId, BindingService::ACCESS_PUBLIC);
-
-					return [
-						'status' => self::RESULT_RESTORED,
-						'file_id' => $fileId,
-						'old_pad_id' => $oldPadId,
-						'new_pad_id' => $newPadId,
-					];
-				}
-
+		try {
+			if ($this->isTestFaultActive(self::TEST_FAULT_RESTORE_READ_LOCK)) {
+				throw new LockedException('Injected test fault: restore_read_lock');
+			}
+			$currentContent = (string)$file->getContent();
+			$parsed = $this->padFileService->parsePadFile($currentContent);
+			$frontmatter = $parsed['frontmatter'];
+			$meta = $this->padFileService->extractPadMetadata($frontmatter);
+			$oldPadId = $meta['pad_id'];
+			$accessMode = $meta['access_mode'];
+			if (str_starts_with($oldPadId, 'ext.') || $this->padFileService->isExternalFrontmatter($frontmatter, $oldPadId)) {
+				return $this->buildSkippedResult('external_pad', $fileId, $oldPadId);
+			}
+			$snapshotParts = $this->padFileService->getSnapshotPartsFromBody((string)$parsed['body']);
+			$snapshot = $snapshotParts['text'];
+			$htmlSnapshot = $snapshotParts['html'];
 			$newPadId = $this->provisionRestorePadId($accessMode, $oldPadId);
 			$managedPadCreated = true;
 			$this->restoreSnapshotToManagedPad($fileId, $oldPadId, $newPadId, $snapshot, $htmlSnapshot);
@@ -475,6 +425,19 @@ class LifecycleService {
 
 	private function isPadFile(File $file): bool {
 		return str_ends_with(strtolower($file->getName()), '.pad');
+	}
+
+	private function isExternalPadFile(File $file): bool {
+		try {
+			$content = (string)$file->getContent();
+			$parsed = $this->padFileService->parsePadFile($content);
+			$frontmatter = $parsed['frontmatter'];
+			$meta = $this->padFileService->extractPadMetadata($frontmatter);
+			return str_starts_with($meta['pad_id'], 'ext.')
+				|| $this->padFileService->isExternalFrontmatter($frontmatter, $meta['pad_id']);
+		} catch (\Throwable) {
+			return false;
+		}
 	}
 
 	private function provisionRestorePadId(string $accessMode, string $oldPadId): string {
