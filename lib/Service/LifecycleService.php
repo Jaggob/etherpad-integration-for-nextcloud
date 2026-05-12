@@ -86,12 +86,12 @@ class LifecycleService {
 			if ($canPersistSnapshotToFile && $currentContent !== '') {
 				$updatedContent = null;
 				try {
-					$parsed = $this->padFileService->parsePadFile($currentContent);
-					$frontmatter = $parsed['frontmatter'];
-					$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
-					if ($isExternal) {
-						$padUrl = isset($frontmatter['pad_url']) ? trim((string)$frontmatter['pad_url']) : '';
-						if ($padUrl === '') {
+						$parsed = $this->padFileService->parsePadFile($currentContent);
+						$frontmatter = $parsed['frontmatter'];
+						$isExternal = $isExternal || $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
+						if ($isExternal) {
+							$padUrl = isset($frontmatter['pad_url']) ? trim((string)$frontmatter['pad_url']) : '';
+							if ($padUrl === '') {
 							throw new \RuntimeException('External pad URL metadata is missing.');
 						}
 						$external = $this->etherpadClient->normalizeAndFetchExternalPublicPadText($padUrl);
@@ -347,15 +347,16 @@ class LifecycleService {
 			$parsed = $this->padFileService->parsePadFile($currentContent);
 			$frontmatter = $parsed['frontmatter'];
 			$meta = $this->padFileService->extractPadMetadata($frontmatter);
-			$oldPadId = $meta['pad_id'];
-			$accessMode = $meta['access_mode'];
-			$snapshot = $this->padFileService->getTextSnapshotForRestore($currentContent);
-			$htmlSnapshot = $this->padFileService->getHtmlSnapshotForRestore($currentContent);
+				$oldPadId = $meta['pad_id'];
+				$accessMode = $meta['access_mode'];
+				$snapshot = $this->padFileService->getTextSnapshotForRestore($currentContent);
+				$htmlSnapshot = $this->padFileService->getHtmlSnapshotForRestore($currentContent);
+				$isExternal = str_starts_with($oldPadId, 'ext.') || $this->padFileService->isExternalFrontmatter($frontmatter, $oldPadId);
 
-			if ($this->padFileService->isExternalFrontmatter($frontmatter, $oldPadId)) {
-				$padOrigin = trim((string)($frontmatter['pad_origin'] ?? ''));
-				$remotePadId = trim((string)($frontmatter['remote_pad_id'] ?? ''));
-				$padUrl = $meta['pad_url'];
+				if ($isExternal) {
+					$padOrigin = trim((string)($frontmatter['pad_origin'] ?? ''));
+					$remotePadId = trim((string)($frontmatter['remote_pad_id'] ?? ''));
+					$padUrl = $meta['pad_url'];
 				if ($accessMode !== BindingService::ACCESS_PUBLIC || $padOrigin === '' || $remotePadId === '' || $padUrl === '') {
 					return $this->buildSkippedResult('invalid_external_frontmatter', $fileId, $oldPadId);
 				}
