@@ -33,10 +33,12 @@ class ViewerControllerErrorMapper {
 	/**
 	 * @param callable(): mixed $action
 	 * @param callable(mixed): RedirectResponse|TemplateResponse $success
+	 * @param string|null $notFoundMessage context-specific message for `NotFoundException`; defaults to the open-pad wording
 	 */
 	public function runForTemplate(
 		callable $action,
 		callable $success,
+		?string $notFoundMessage = null,
 	): RedirectResponse|TemplateResponse {
 		try {
 			return $success($action());
@@ -47,7 +49,9 @@ class ViewerControllerErrorMapper {
 				$e->getMessage() !== '' ? $e->getMessage() : $this->l10n->t('Invalid input.')
 			);
 		} catch (NotFoundException) {
-			return $this->errorTemplate($this->l10n->t('Cannot open selected .pad file.'));
+			return $this->errorTemplate(
+				$notFoundMessage ?? $this->l10n->t('Cannot open selected .pad file.')
+			);
 		} catch (\Throwable $e) {
 			$this->logger->error('Unhandled viewer controller error', [
 				'app' => Application::APP_ID,

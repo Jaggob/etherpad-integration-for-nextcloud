@@ -37,11 +37,14 @@ class EmbedControllerErrorMapper {
 	/**
 	 * @param callable(): mixed $action
 	 * @param callable(mixed): TemplateResponse $success
+	 * @param string $errorTitle title rendered in the noviewer template on failure
+	 * @param string|null $notFoundMessage context-specific message for `NotFoundException`; defaults to the open-pad wording
 	 */
 	public function runForTemplate(
 		callable $action,
 		callable $success,
 		string $errorTitle,
+		?string $notFoundMessage = null,
 	): TemplateResponse {
 		try {
 			return $success($action());
@@ -54,7 +57,7 @@ class EmbedControllerErrorMapper {
 			);
 		} catch (NotFoundException) {
 			return $this->errorTemplate(
-				$this->l10n->t('Cannot open selected .pad file.'),
+				$notFoundMessage ?? $this->l10n->t('Cannot open selected .pad file.'),
 				$errorTitle,
 			);
 		} catch (NotAPadFileException $e) {

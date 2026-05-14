@@ -129,6 +129,23 @@ class EmbedControllerTest extends TestCase {
 		$this->assertSame('Unable to create pad', $params['title']);
 	}
 
+	public function testCreateByParentReturnsParentFolderErrorWhenResolverThrowsNotFound(): void {
+		// Regression: createByParent must surface "Cannot resolve selected parent folder."
+		// rather than the open-pad default when the parent folder cannot be resolved.
+		$resolver = $this->createMock(UserNodeResolver::class);
+		$resolver->method('resolveUserFolderNodeById')
+			->willThrowException(new NotFoundException());
+
+		$controller = $this->buildController($resolver);
+
+		$response = $controller->createByParent(99);
+		$params = $response->getParams();
+
+		$this->assertSame('noviewer', $response->getTemplateName());
+		$this->assertSame('Cannot resolve selected parent folder.', $params['error']);
+		$this->assertSame('Unable to create pad', $params['title']);
+	}
+
 	public function testCreateByParentBuildsEmbedCreateTemplate(): void {
 		$folder = $this->createMock(\OCP\Files\Folder::class);
 		$folder->method('isCreatable')->willReturn(true);

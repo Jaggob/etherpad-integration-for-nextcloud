@@ -73,6 +73,7 @@ class ViewerController extends Controller {
 			fn(array $resolved): RedirectResponse => new RedirectResponse(
 				$this->buildFilesOpenUrl($resolved['file_id'], $resolved['path'])
 			),
+			notFoundMessage: $this->l10n->t('Cannot resolve file path for file ID.'),
 		);
 	}
 

@@ -101,6 +101,21 @@ class ViewerControllerTest extends TestCase {
 		$this->assertSame('/apps/files/7?dir=%2FFolder&editing=false&openfile=true', $response->getRedirectURL());
 	}
 
+	public function testShowPadByIdReturnsFileIdErrorWhenResolverThrowsNotFound(): void {
+		// Regression: showPadById must surface "Cannot resolve file path for file ID."
+		// rather than the open-pad default when the file ID cannot be resolved.
+		$resolver = $this->createMock(UserNodeResolver::class);
+		$resolver->method('resolveUserFileNodeById')
+			->willThrowException(new NotFoundException());
+
+		$controller = $this->buildController($resolver);
+
+		$response = $controller->showPadById(7);
+
+		$this->assertSame('noviewer', $response->getTemplateName());
+		$this->assertSame('Cannot resolve file path for file ID.', $response->getParams()['error']);
+	}
+
 	public function testShowPadByIdRejectsInvalidFileId(): void {
 		$controller = $this->buildController($this->createMock(UserNodeResolver::class));
 

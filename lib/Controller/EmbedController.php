@@ -94,6 +94,7 @@ class EmbedController extends Controller {
 				],
 			]),
 			errorTitle: $this->l10n->t('Unable to create pad'),
+			notFoundMessage: $this->l10n->t('Cannot resolve selected parent folder.'),
 		);
 	}
 

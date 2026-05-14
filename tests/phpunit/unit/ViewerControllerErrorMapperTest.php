@@ -56,6 +56,17 @@ class ViewerControllerErrorMapperTest extends TestCase {
 		$this->assertSame('Cannot open selected .pad file.', $response->getParams()['error']);
 	}
 
+	public function testRunUsesEndpointSpecificNotFoundMessageWhenProvided(): void {
+		$response = $this->buildMapper()->runForTemplate(
+			static fn (): never => throw new NotFoundException(),
+			static fn ($value) => $this->fail('unreachable'),
+			notFoundMessage: 'Cannot resolve file path for file ID.',
+		);
+
+		$this->assertInstanceOf(TemplateResponse::class, $response);
+		$this->assertSame('Cannot resolve file path for file ID.', $response->getParams()['error']);
+	}
+
 	public function testRunLogsUnhandledExceptionAndReturnsGenericMessage(): void {
 		$logger = $this->createMock(LoggerInterface::class);
 		$logger->expects($this->once())

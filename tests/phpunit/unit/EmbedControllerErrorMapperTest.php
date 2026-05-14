@@ -65,6 +65,18 @@ class EmbedControllerErrorMapperTest extends TestCase {
 		$this->assertSame('Cannot open selected .pad file.', $response->getParams()['error']);
 	}
 
+	public function testRunUsesEndpointSpecificNotFoundMessageWhenProvided(): void {
+		$response = $this->buildMapper()->runForTemplate(
+			static fn (): never => throw new NotFoundException(),
+			static fn ($value) => $this->fail('unreachable'),
+			errorTitle: 'Unable to create pad',
+			notFoundMessage: 'Cannot resolve selected parent folder.',
+		);
+
+		$this->assertSame('Cannot resolve selected parent folder.', $response->getParams()['error']);
+		$this->assertSame('Unable to create pad', $response->getParams()['title']);
+	}
+
 	public function testRunMapsNotAPadFile(): void {
 		$response = $this->buildMapper()->runForTemplate(
 			static fn (): never => throw new NotAPadFileException('Selected file is not a .pad file.'),
