@@ -60,6 +60,90 @@ class PendingDeleteRetryServiceTest extends TestCase {
 		$this->assertSame(0, $result['failed']);
 	}
 
+	public function testUnclassifiedEtherpadErrorIsCountedAsFailureAndKeepsBinding(): void {
+		// Transient errors (network blip, 5xx, etc.) must NOT delete the binding
+		// row — the row stays in pending_delete so the next retry job picks it
+		// up. Only "pad already deleted" is treated as resolved.
+		$binding = $this->buildBindingService([
+			['file_id' => 13, 'pad_id' => 'pad-down'],
+		]);
+		$etherpad = $this->createMock(EtherpadClient::class);
+		$etherpad->method('deletePad')->willThrowException(new \RuntimeException('connection refused'));
+
+		$result = (new PendingDeleteRetryService(
+			$binding,
+			$etherpad,
+			$this->createMock(LoggerInterface::class),
+		))->retryByAge(0, 3600, 10);
+
+		$this->assertSame(0, $binding->deletedBindings);
+		$this->assertSame([
+			'attempted' => 1,
+			'resolved' => 0,
+			'failed' => 1,
+			'remaining' => 0,
+		], $result);
+	}
+
+	public function testRowsWithMissingFileIdOrPadIdAreSkippedSilently(): void {
+		// Defensive: malformed rows should be ignored, not counted as attempts.
+		$binding = $this->buildBindingService([
+			['file_id' => 0,  'pad_id' => 'pad-a'],   // invalid file_id
+			['file_id' => 14, 'pad_id' => ''],         // invalid pad_id
+			['file_id' => 15, 'pad_id' => 'pad-good'],
+		]);
+		$etherpad = $this->createMock(EtherpadClient::class);
+		$etherpad->expects($this->once())->method('deletePad')->with('pad-good');
+
+		$result = (new PendingDeleteRetryService(
+			$binding,
+			$etherpad,
+			$this->createMock(LoggerInterface::class),
+		))->retryByAge(0, null, 10);
+
+		$this->assertSame(1, $result['attempted']);
+		$this->assertSame(1, $result['resolved']);
+	}
+
+	public function testEmptyResultReturnsAllZeroes(): void {
+		$binding = $this->buildBindingService([]);
+		$etherpad = $this->createMock(EtherpadClient::class);
+		$etherpad->expects($this->never())->method('deletePad');
+
+		$result = (new PendingDeleteRetryService(
+			$binding,
+			$etherpad,
+			$this->createMock(LoggerInterface::class),
+		))->retryByAge(0, 3600, 10);
+
+		$this->assertSame([
+			'attempted' => 0,
+			'resolved' => 0,
+			'failed' => 0,
+			'remaining' => 0,
+		], $result);
+	}
+
+	public function testRetryWithoutAgeFilterStillWorksForLegacyCallers(): void {
+		// retry() preserves the older "no age filter" semantics so a queued
+		// legacy RetryPendingDeleteJob instance keeps working until removed.
+		$binding = $this->buildBindingServiceWithStateRows([
+			['file_id' => 16, 'pad_id' => 'pad-legacy'],
+		]);
+		$etherpad = $this->createMock(EtherpadClient::class);
+		$etherpad->expects($this->once())->method('deletePad')->with('pad-legacy');
+
+		$result = (new PendingDeleteRetryService(
+			$binding,
+			$etherpad,
+			$this->createMock(LoggerInterface::class),
+		))->retry(50);
+
+		$this->assertSame(50, $binding->lastStateLimit);
+		$this->assertSame(1, $result['attempted']);
+		$this->assertSame(1, $result['resolved']);
+	}
+
 	/** @param array<int,array<string,mixed>> $ageRows */
 	private function buildBindingService(array $ageRows): BindingService {
 		return new class (
@@ -89,6 +173,41 @@ class PendingDeleteRetryServiceTest extends TestCase {
 
 			public function deletePendingDeleteBinding(int $fileId, string $padId): bool {
 				$this->deletedBindings++;
+				return true;
+			}
+
+			public function countByState(string $state): int {
+				return 0;
+			}
+		};
+	}
+
+	/** @param array<int,array<string,mixed>> $stateRows */
+	private function buildBindingServiceWithStateRows(array $stateRows): BindingService {
+		return new class (
+			$this->createMock(IDBConnection::class),
+			$this->createMock(ITimeFactory::class),
+			$this->createMock(LoggerInterface::class),
+			$stateRows,
+		) extends BindingService {
+			public int $lastStateLimit = 0;
+
+			/** @param array<int,array<string,mixed>> $stateRows */
+			public function __construct(
+				IDBConnection $db,
+				ITimeFactory $timeFactory,
+				LoggerInterface $logger,
+				private array $stateRows,
+			) {
+				parent::__construct($db, $timeFactory, $logger);
+			}
+
+			public function findByState(string $state, int $limit = 100): array {
+				$this->lastStateLimit = $limit;
+				return $this->stateRows;
+			}
+
+			public function deletePendingDeleteBinding(int $fileId, string $padId): bool {
 				return true;
 			}
 
