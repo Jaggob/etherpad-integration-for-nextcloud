@@ -194,9 +194,13 @@ class PadCreationService {
 				}
 
 				$external = $this->etherpadClient->normalizeAndFetchExternalPublicPadTextOrEmpty($padUrl);
+				// External pads are no longer DB-bound, so the local marker only needs to
+				// distinguish them from managed internal pad IDs. The canonical remote
+				// identity remains pad_origin + remote_pad_id in the frontmatter.
+				$externalPadId = 'ext.' . $external['pad_id'];
 				$content = $this->padFileService->buildInitialDocument(
 					$fileId,
-					'ext.' . $external['pad_id'],
+					$externalPadId,
 					BindingService::ACCESS_PUBLIC,
 					'',
 					$external['pad_url'],
@@ -211,7 +215,7 @@ class PadCreationService {
 				return [
 					'file' => $path,
 					'file_id' => $fileId,
-					'pad_id' => 'ext.' . $external['pad_id'],
+					'pad_id' => $externalPadId,
 					'access_mode' => BindingService::ACCESS_PUBLIC,
 					'pad_url' => $external['pad_url'],
 				];
