@@ -13,12 +13,14 @@ use OCA\EtherpadNextcloud\Exception\BindingException;
 use OCA\EtherpadNextcloud\Exception\MissingBindingException;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\DataResponse;
+use OCP\IL10N;
 use OCP\IURLGenerator;
 
 class PadResponseService {
 	public function __construct(
 		private IURLGenerator $urlGenerator,
 		private AppConfigService $appConfigService,
+		private IL10N $l10n,
 	) {
 	}
 
@@ -69,7 +71,7 @@ class PadResponseService {
 	public function bindingErrorMessage(BindingException $e): string {
 		$message = trim($e->getMessage());
 		if ($e instanceof MissingBindingException) {
-			return 'This .pad file has no matching pad in this Nextcloud.';
+			return $this->l10n->t('This .pad file has no matching pad in this Nextcloud.');
 		}
 		return $message;
 	}

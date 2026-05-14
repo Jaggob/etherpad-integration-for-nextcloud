@@ -171,7 +171,9 @@ class PadControllerTest extends TestCase {
 			new SnapshotExtractor($padFileService, new SnapshotHtmlSanitizer()),
 			$logger,
 		);
-		$padResponseService = new PadResponseService($urlGenerator, $appConfigService);
+		$l10n = $this->createMock(\OCP\IL10N::class);
+		$l10n->method('t')->willReturnCallback(static fn (string $text, array $params = []): string => $text);
+		$padResponseService = new PadResponseService($urlGenerator, $appConfigService, $l10n);
 
 		$controller = new PadController(
 			'etherpad_nextcloud',
@@ -301,7 +303,9 @@ class PadControllerTest extends TestCase {
 			new SnapshotExtractor($padFileService, new SnapshotHtmlSanitizer()),
 			$logger,
 		);
-		$padResponseService = new PadResponseService($urlGenerator, $appConfigService);
+		$l10n = $this->createMock(\OCP\IL10N::class);
+		$l10n->method('t')->willReturnCallback(static fn (string $text, array $params = []): string => $text);
+		$padResponseService = new PadResponseService($urlGenerator, $appConfigService, $l10n);
 
 		$controller = new PadController(
 			'etherpad_nextcloud',
@@ -828,7 +832,9 @@ class PadControllerTest extends TestCase {
 			?? new PadLifecycleOperationService($padPaths, $userNodeResolver, $this->createMock(LifecycleService::class));
 		$urlGenerator = $this->createMock(IURLGenerator::class);
 		$appConfigService = $this->createMock(AppConfigService::class);
-		$padResponseService = new PadResponseService($urlGenerator, $appConfigService);
+		$l10n = $this->createMock(\OCP\IL10N::class);
+		$l10n->method('t')->willReturnCallback(static fn (string $text, array $params = []): string => $text);
+		$padResponseService = new PadResponseService($urlGenerator, $appConfigService, $l10n);
 		return new PadController(
 			'etherpad_nextcloud',
 			$request,
