@@ -69,7 +69,7 @@ class PadResponseService {
 	public function bindingErrorMessage(BindingException $e): string {
 		$message = trim($e->getMessage());
 		if ($e instanceof MissingBindingException) {
-			return 'This .pad file is not linked to a managed pad. It looks like a copied .pad file. Open the original .pad file or create a new pad.';
+			return 'This .pad file has no matching pad in this Nextcloud.';
 		}
 		return $message;
 	}

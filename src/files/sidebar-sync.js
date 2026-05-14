@@ -5,6 +5,7 @@
 import { APP_ID } from '../lib/constants.js'
 import { ocImagePath } from '../lib/oc-compat.js'
 import {
+	apiRecoverFromSnapshot,
 	apiResolvePadByFileId,
 	apiSyncByFileId,
 	apiSyncStatusByFileId,
@@ -144,6 +145,12 @@ const syncLabelForState = (state) => {
 	if (state === 'loading') {
 		return t(APP_ID, 'Checking sync status...')
 	}
+	if (state === 'recovery') {
+		return t(APP_ID, 'This .pad file has no matching pad in this Nextcloud.')
+	}
+	if (state === 'recovering') {
+		return t(APP_ID, 'Creating new pad...')
+	}
 	return t(APP_ID, 'Sync pending')
 }
 
@@ -159,6 +166,8 @@ const normalizeSyncStatus = (status) => {
 	}
 	return 'error'
 }
+
+const isMissingBindingError = (error) => Boolean(error) && error.code === 'missing_binding'
 
 export const computeNextSidebarSyncPollDelay = (status, currentDelayMs) => {
 	if (status === 'synced') {
@@ -217,6 +226,7 @@ export const createSidebarSyncController = () => {
 		const icon = panel.querySelector('[data-epnc-sidebar-sync-icon]')
 		const statusLabel = panel.querySelector('[data-epnc-sidebar-sync-label]')
 		const button = panel.querySelector('[data-epnc-sidebar-sync-button]')
+		const recoveryButton = panel.querySelector('[data-epnc-sidebar-recovery-button]')
 
 		panel.setAttribute('data-file-id', String(fileId))
 		panel.setAttribute('data-sync-state', state)
@@ -231,9 +241,15 @@ export const createSidebarSyncController = () => {
 				icon.style.backgroundImage = `url(${iconPath})`
 			}
 		}
+		const inRecoveryFlow = state === 'recovery' || state === 'recovering'
 		if (button instanceof HTMLButtonElement) {
-			button.disabled = syncInFlight || !syncEnabled || fileId <= 0
+			button.disabled = syncInFlight || !syncEnabled || fileId <= 0 || inRecoveryFlow
+			button.style.display = inRecoveryFlow ? 'none' : ''
 			button.setAttribute('aria-busy', syncInFlight ? 'true' : 'false')
+		}
+		if (recoveryButton instanceof HTMLButtonElement) {
+			recoveryButton.style.display = inRecoveryFlow ? '' : 'none'
+			recoveryButton.disabled = state === 'recovering' || fileId <= 0
 		}
 	}
 
@@ -282,6 +298,36 @@ export const createSidebarSyncController = () => {
 					const status = normalizeSyncStatus(syncStatus && syncStatus.status)
 					setSidebarSyncPanelState(panel, status, panelFileId, false, true)
 				} catch (error) {
+					if (isMissingBindingError(error)) {
+						setSidebarSyncPanelState(panel, 'recovery', panelFileId, false, true)
+					} else {
+						setSidebarSyncPanelState(panel, 'error', panelFileId, false, true)
+					}
+				}
+			})
+
+			const recoveryButton = document.createElement('button')
+			recoveryButton.type = 'button'
+			recoveryButton.className = 'button-vue button-vue--size-normal button-vue--vue-primary epnc-sidebar-sync-panel__button'
+			recoveryButton.setAttribute('data-epnc-sidebar-recovery-button', '1')
+			recoveryButton.textContent = t(APP_ID, 'Create new pad from this file')
+			recoveryButton.style.display = 'none'
+			recoveryButton.addEventListener('click', async (event) => {
+				event.preventDefault()
+				event.stopPropagation()
+				const panelFileId = Number(panel.getAttribute('data-file-id') || '')
+				if (!Number.isFinite(panelFileId) || panelFileId <= 0) {
+					return
+				}
+				setSidebarSyncPanelState(panel, 'recovering', panelFileId, false, true)
+				try {
+					await apiRecoverFromSnapshot(panelFileId)
+					setSidebarSyncPanelState(panel, 'loading', panelFileId, false, true)
+					const syncStatus = await apiSyncStatusByFileId(panelFileId)
+					const status = normalizeSyncStatus(syncStatus && syncStatus.status)
+					setSidebarSyncPanelState(panel, status, panelFileId, false, true)
+					startSidebarSyncStatusPoll(panel, panelFileId)
+				} catch (error) {
 					setSidebarSyncPanelState(panel, 'error', panelFileId, false, true)
 				}
 			})
@@ -304,6 +350,7 @@ export const createSidebarSyncController = () => {
 
 			panel.appendChild(header)
 			panel.appendChild(button)
+			panel.appendChild(recoveryButton)
 			panel.appendChild(openPublicButton)
 		}
 		if (panel.parentNode !== mountTarget) {
@@ -348,6 +395,13 @@ export const createSidebarSyncController = () => {
 				setSidebarSyncPanelState(panel, status, fileId, false, true)
 				nextDelayMs = computeNextSidebarSyncPollDelay(status, nextDelayMs)
 			} catch (error) {
+				if (isMissingBindingError(error)) {
+					setSidebarSyncPanelState(panel, 'recovery', fileId, false, true)
+					// Stop polling: the only way out of recovery is the user
+					// clicking the recover button.
+					clearSidebarSyncStatusPoll()
+					return
+				}
 				setSidebarSyncPanelState(panel, 'error', fileId, false, true)
 				nextDelayMs = SIDEBAR_SYNC_STATUS_POLL_ERROR_MS
 			}
@@ -421,6 +475,10 @@ export const createSidebarSyncController = () => {
 			startSidebarSyncStatusPoll(panel, fileId)
 		} catch (error) {
 			if (refreshToken !== sidebarSyncRefreshToken) {
+				return
+			}
+			if (isMissingBindingError(error)) {
+				setSidebarSyncPanelState(panel, 'recovery', fileId, false, true)
 				return
 			}
 			setSidebarSyncPanelState(panel, 'error', fileId, false, true)

@@ -3,6 +3,7 @@
  * Copyright (c) 2026 Jacob Bühler
  */
 import { APP_ID, MIME, VIEWER_HANDLER_ID } from './lib/constants.js'
+import { apiRecoverFromSnapshot } from './lib/api-client.js'
 import { ocGenerateUrl, ocRequestToken, translate } from './lib/oc-compat.js'
 import { buildPadFrameSrcdoc } from './lib/pad-frame-srcdoc.js'
 import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './lib/urls.js'
@@ -25,6 +26,8 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 				iframeSrc: '',
 				isLoading: true,
 				loadError: '',
+				canRecover: false,
+				isRecovering: false,
 				externalOpenUrl: '',
 				externalOpenMessage: '',
 				snapshotMode: '',
@@ -107,7 +110,11 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 				}, init))
 				const data = await response.json().catch(() => ({}))
 				if (!response.ok) {
-					throw new Error((data && data.message) || 'Pad open failed.')
+					const error = new Error((data && data.message) || 'Pad open failed.')
+					if (data && typeof data.code === 'string') {
+						error.code = data.code
+					}
+					throw error
 				}
 				if (!data || (data.is_readonly_snapshot !== true && (typeof data.url !== 'string' || data.url.trim() === ''))) {
 					throw new Error('Pad open API did not return a valid URL.')
@@ -228,6 +235,7 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 
 				this.isLoading = true
 				this.loadError = ''
+				this.canRecover = false
 				this.iframeSrc = ''
 				this.externalOpenUrl = ''
 				this.externalOpenMessage = ''
@@ -346,10 +354,31 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 				} catch (error) {
 					if (!isCurrent()) return
 					this.loadError = error instanceof Error ? error.message : 'Could not load pad.'
+					// Recovery is gated on having a fileId we can address. Public-share
+					// visitors don't get a recovery action — only the share owner.
+					this.canRecover = Boolean(error && error.code === 'missing_binding')
+						&& this.resolvedFileId !== null
+						&& !parsePublicShareTokenFromLocation()
 					this.markLoaded()
 				} finally {
 					if (!isCurrent()) return
 					this.isLoading = false
+				}
+			},
+			async recoverFromSnapshot() {
+				if (!this.canRecover || this.isRecovering || this.resolvedFileId === null) {
+					return
+				}
+				this.isRecovering = true
+				try {
+					await apiRecoverFromSnapshot(this.resolvedFileId)
+					this.loadError = ''
+					this.canRecover = false
+					await this.resolveOpenUrl()
+				} catch (error) {
+					this.loadError = error instanceof Error ? error.message : 'Could not load pad.'
+				} finally {
+					this.isRecovering = false
 				}
 			},
 			renderSnapshotView(createElement, options) {
@@ -394,11 +423,23 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 		},
 		render(createElement) {
 			if (this.loadError) {
+				const cardChildren = [
+					createElement('div', { class: 'epnc-native-error-title' }, translate('Unable to open pad')),
+					createElement('div', { class: 'epnc-native-error-message' }, this.loadError),
+				]
+				if (this.canRecover) {
+					cardChildren.push(
+						createElement('div', { class: 'epnc-native-error-message' },
+							translate('This can happen if the .pad file was copied or duplicated. If you have the original .pad file, open that one — its pad will load normally. Otherwise you can create a new pad from the text stored in this file; from then on, opening this file will load the new pad.')),
+						createElement('button', {
+							class: 'button primary',
+							attrs: { type: 'button', disabled: this.isRecovering },
+							on: { click: () => { void this.recoverFromSnapshot() } },
+						}, this.isRecovering ? translate('Creating new pad...') : translate('Create new pad from this file')),
+					)
+				}
 				return createElement('div', { class: 'epnc-native-status epnc-native-status--error' }, [
-					createElement('div', { class: 'epnc-native-error-card' }, [
-						createElement('div', { class: 'epnc-native-error-title' }, 'Unable to open pad'),
-						createElement('div', { class: 'epnc-native-error-message' }, this.loadError),
-					]),
+					createElement('div', { class: 'epnc-native-error-card' }, cardChildren),
 				])
 			}
 			if (this.snapshotMode === 'external') {
