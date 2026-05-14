@@ -28,6 +28,7 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 				loadError: '',
 				canRecover: false,
 				isRecovering: false,
+				isCheckingOriginal: false,
 				originalPad: null,
 				externalOpenUrl: '',
 				externalOpenMessage: '',
@@ -237,6 +238,7 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 				this.isLoading = true
 				this.loadError = ''
 				this.canRecover = false
+				this.isCheckingOriginal = false
 				this.originalPad = null
 				this.iframeSrc = ''
 				this.externalOpenUrl = ''
@@ -378,6 +380,7 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 				if (this.resolvedFileId === null) {
 					return
 				}
+				this.isCheckingOriginal = true
 				try {
 					const hint = await apiFindOriginalPad(this.resolvedFileId)
 					if (!isCurrent()) return
@@ -390,6 +393,10 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 				} catch {
 					// Silent: the recovery button stays available, we just
 					// don't surface the "Open the original" affordance.
+				} finally {
+					if (isCurrent()) {
+						this.isCheckingOriginal = false
+					}
 				}
 			},
 			async recoverFromSnapshot() {
@@ -455,12 +462,19 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 					createElement('div', { class: 'epnc-native-error-message' }, this.loadError),
 				]
 				if (this.canRecover) {
-					cardChildren.push(
-						createElement('div', { class: 'epnc-native-error-message' },
-							translate('This can happen if the .pad file was copied or duplicated. If you have the original .pad file, open that one — its pad will load normally. Otherwise you can create a new pad from the text stored in this file; from then on, opening this file will load the new pad.')),
-					)
-					if (this.originalPad) {
+					if (this.isCheckingOriginal) {
+						// Don't render any action button while the lookup is in
+						// flight: a slow connection could otherwise let the user
+						// click 'Create new pad' before we know that opening the
+						// original is the better default.
 						cardChildren.push(
+							createElement('div', { class: 'epnc-native-error-message' },
+								translate('Checking for the original pad...')),
+						)
+					} else if (this.originalPad) {
+						cardChildren.push(
+							createElement('div', { class: 'epnc-native-error-message' },
+								translate('This file looks like a copy of an existing .pad file in your account. Open the original to keep editing the linked pad, or create a new pad to fork the content stored in this file.')),
 							createElement('a', {
 								class: 'button primary epnc-native-error-action',
 								attrs: { href: this.originalPad.viewerUrl },
@@ -473,6 +487,8 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 						)
 					} else {
 						cardChildren.push(
+							createElement('div', { class: 'epnc-native-error-message' },
+								translate("We couldn't find a matching pad in this Nextcloud. You can create a new pad from the text stored in this file; from then on, opening this file will load the new pad.")),
 							createElement('button', {
 								class: 'button primary epnc-native-error-action',
 								attrs: { type: 'button', disabled: this.isRecovering },
