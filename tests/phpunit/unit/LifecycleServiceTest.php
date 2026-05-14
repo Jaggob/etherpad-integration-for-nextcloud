@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace OCA\EtherpadNextcloud\Tests\Unit;
 
+use OCA\EtherpadNextcloud\Exception\BindingException;
 use OCA\EtherpadNextcloud\Exception\BindingStateConflictException;
+use OCA\EtherpadNextcloud\Exception\LifecycleException;
 use OCA\EtherpadNextcloud\Exception\NotAPadFileException;
 use OCA\EtherpadNextcloud\Exception\PadAlreadyHasBindingException;
 use OCA\EtherpadNextcloud\Service\BindingService;
@@ -626,6 +628,65 @@ class LifecycleServiceTest extends TestCase {
 		// never the pad_id parroted back from the frontmatter.
 		$this->assertNotSame($oldPadId, $result['new_pad_id']);
 		$this->assertSame($newPadId, $result['new_pad_id']);
+	}
+
+	public function testRecoverFromSnapshotRollsBackWhenBindingRaceLosesToConcurrentRequest(): void {
+		// Two parallel recoveries both pass the findByFileId pre-check.
+		// The loser's createBinding hits the unique constraint and throws,
+		// and we must NOT proceed to overwrite the file (which by now
+		// belongs to the winner's recovery). The provisioned pad and any
+		// partially created binding row are cleaned up.
+		$fileId = 711;
+		$oldPadId = 'orphaned-pad';
+
+		$bindingService = $this->createMock(BindingService::class);
+		$bindingService->method('findByFileId')->with($fileId)->willReturn(null);
+		$bindingService->expects($this->once())
+			->method('createBinding')
+			->willThrowException(new BindingException('duplicate key on file_id'));
+		// File content must not be overwritten if we lose the race.
+		$bindingService->expects($this->never())->method('deleteByFileId');
+
+		$padFileService = $this->createMock(PadFileService::class);
+		$padFileService->method('parsePadFile')->willReturn([
+			'frontmatter' => ['pad_id' => $oldPadId, 'access_mode' => BindingService::ACCESS_PUBLIC],
+			'body' => '',
+		]);
+		$padFileService->method('extractPadMetadata')->willReturn([
+			'pad_id' => $oldPadId,
+			'access_mode' => BindingService::ACCESS_PUBLIC,
+			'pad_url' => '',
+		]);
+		$padFileService->method('isExternalFrontmatter')->willReturn(false);
+		$padFileService->method('getSnapshotPartsFromBody')->willReturn(['text' => 'content', 'html' => '']);
+		$padFileService->method('withStateAndSnapshot')->willReturn('doc-after');
+
+		$etherpadClient = $this->createMock(EtherpadClient::class);
+		$etherpadClient->expects($this->once())->method('createPad');
+		$etherpadClient->expects($this->once())->method('setText');
+		$etherpadClient->method('buildPadUrl')->willReturn('https://pad.example.test/p/x');
+		// Loser must clean up its freshly provisioned pad.
+		$etherpadClient->expects($this->once())->method('deletePad');
+
+		$secureRandom = $this->createMock(ISecureRandom::class);
+		$secureRandom->method('generate')->willReturn('race12345abc');
+
+		$file = $this->createMock(File::class);
+		$file->method('getId')->willReturn($fileId);
+		$file->method('getName')->willReturn('Orphan.pad');
+		$file->method('getContent')->willReturn('doc-before');
+		// Critical: we never touch the file when we lose the binding race.
+		$file->expects($this->never())->method('putContent');
+
+		$this->expectException(LifecycleException::class);
+		(new LifecycleService(
+			$bindingService,
+			$padFileService,
+			$etherpadClient,
+			$this->buildDeleteOnTrashEnabledConfig(),
+			$this->createMock(LoggerInterface::class),
+			$secureRandom,
+		))->recoverFromSnapshot($file);
 	}
 
 	public function testRecoverFromSnapshotRefusesWhenBindingAlreadyExists(): void {

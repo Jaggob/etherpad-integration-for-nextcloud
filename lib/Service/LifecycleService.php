@@ -359,6 +359,7 @@ class LifecycleService {
 		$currentContent = '';
 		$fileContentUpdated = false;
 		$managedPadCreated = false;
+		$bindingCreated = false;
 
 		try {
 			if ($this->isTestFaultActive(self::TEST_FAULT_RESTORE_READ_LOCK)) {
@@ -387,9 +388,15 @@ class LifecycleService {
 				null,
 				$this->etherpadClient->buildPadUrl($newPadId),
 			);
+			// Claim the binding row before touching the file. The unique
+			// constraint on file_id is our serialization point against a
+			// concurrent recovery for the same file — if another request
+			// got here first, createBinding throws and we abort cleanly
+			// without overwriting their .pad content.
+			$this->bindingService->createBinding($fileId, $newPadId, $accessMode);
+			$bindingCreated = true;
 			$this->writeRestoredContent($file, $updatedContent);
 			$fileContentUpdated = true;
-			$this->bindingService->createBinding($fileId, $newPadId, $accessMode);
 
 			return [
 				'status' => self::RESULT_RESTORED,
@@ -398,16 +405,15 @@ class LifecycleService {
 				'new_pad_id' => $newPadId,
 			];
 		} catch (\Throwable $e) {
-			if ($fileContentUpdated) {
+			if ($bindingCreated && !$fileContentUpdated) {
 				try {
-					$file->putContent($currentContent);
-				} catch (\Throwable $fileRollbackError) {
-					$this->logger->warning('Could not rollback .pad content after failed restore without binding.', [
+					$this->bindingService->deleteByFileId($fileId);
+				} catch (\Throwable $bindingRollbackError) {
+					$this->logger->warning('Could not rollback binding row after failed restore-without-binding write.', [
 						'app' => 'etherpad_nextcloud',
 						'fileId' => $fileId,
-						'oldPadId' => $oldPadId,
 						'newPadId' => $newPadId,
-						'exception' => $fileRollbackError,
+						'exception' => $bindingRollbackError,
 					]);
 				}
 			}
