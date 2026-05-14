@@ -89,6 +89,34 @@ class BindingService {
 		return max(0, (int)$row['cnt']);
 	}
 
+	/** @return array<int,array<string,mixed>> */
+	public function findPendingDeleteByAge(int $minAgeSeconds, ?int $maxAgeSeconds, int $limit = 100): array {
+		$now = time();
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from(self::TABLE)
+			->where($qb->expr()->eq('state', $qb->createNamedParameter(self::STATE_PENDING_DELETE)))
+			->andWhere($qb->expr()->isNotNull('deleted_at'))
+			->andWhere($qb->expr()->lte(
+				'deleted_at',
+				$qb->createNamedParameter($now - max(0, $minAgeSeconds), IQueryBuilder::PARAM_INT),
+			))
+			->orderBy('deleted_at', 'ASC')
+			->setMaxResults(max(1, $limit));
+
+		if ($maxAgeSeconds !== null) {
+			$qb->andWhere($qb->expr()->gt(
+				'deleted_at',
+				$qb->createNamedParameter($now - max(0, $maxAgeSeconds), IQueryBuilder::PARAM_INT),
+			));
+		}
+
+		$result = $qb->executeQuery();
+		$rows = $result->fetchAll();
+		$result->closeCursor();
+		return $rows;
+	}
+
 	public function hasFileCacheEntry(int $fileId): bool {
 		$qb = $this->db->getQueryBuilder();
 		$qb->selectAlias($qb->createFunction('COUNT(*)'), 'cnt')
