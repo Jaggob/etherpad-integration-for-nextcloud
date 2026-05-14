@@ -146,10 +146,10 @@ const syncLabelForState = (state) => {
 		return t(APP_ID, 'Checking sync status...')
 	}
 	if (state === 'recovery') {
-		return t(APP_ID, 'This .pad file is not linked to a managed pad.')
+		return t(APP_ID, 'This .pad file has no matching pad in this Nextcloud.')
 	}
 	if (state === 'recovering') {
-		return t(APP_ID, 'Recovering...')
+		return t(APP_ID, 'Creating new pad...')
 	}
 	return t(APP_ID, 'Sync pending')
 }
@@ -310,7 +310,7 @@ export const createSidebarSyncController = () => {
 			recoveryButton.type = 'button'
 			recoveryButton.className = 'button-vue button-vue--size-normal button-vue--vue-primary epnc-sidebar-sync-panel__button'
 			recoveryButton.setAttribute('data-epnc-sidebar-recovery-button', '1')
-			recoveryButton.textContent = t(APP_ID, 'Recover from snapshot')
+			recoveryButton.textContent = t(APP_ID, 'Create new pad from this file')
 			recoveryButton.style.display = 'none'
 			recoveryButton.addEventListener('click', async (event) => {
 				event.preventDefault()

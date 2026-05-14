@@ -74,6 +74,6 @@ class PadResponseServiceTest extends TestCase {
 			$this->createMock(AppConfigService::class),
 		))->bindingErrorMessage(new MissingBindingException('No binding exists for this file.'));
 
-		$this->assertSame('This .pad file is not linked to a managed pad. It looks like a copied .pad file. Open the original .pad file or create a new pad.', $message);
+		$this->assertSame('This .pad file has no matching pad in this Nextcloud.', $message);
 	}
 }

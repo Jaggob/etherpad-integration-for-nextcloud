@@ -430,12 +430,12 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 				if (this.canRecover) {
 					cardChildren.push(
 						createElement('div', { class: 'epnc-native-error-message' },
-							translate('You can create a new pad from the snapshot stored in this file.')),
+							translate('This can happen if the .pad file was copied or duplicated. If you have the original .pad file, open that one — its pad will load normally. Otherwise you can create a new pad from the text stored in this file; from then on, opening this file will load the new pad.')),
 						createElement('button', {
 							class: 'button primary',
 							attrs: { type: 'button', disabled: this.isRecovering },
 							on: { click: () => { void this.recoverFromSnapshot() } },
-						}, this.isRecovering ? translate('Recovering...') : translate('Recover from snapshot')),
+						}, this.isRecovering ? translate('Creating new pad...') : translate('Create new pad from this file')),
 					)
 				}
 				return createElement('div', { class: 'epnc-native-status epnc-native-status--error' }, [

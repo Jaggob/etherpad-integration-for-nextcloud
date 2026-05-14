@@ -95,7 +95,12 @@ OC.L10N.register(
     "Sync status: synced": "Sync-Status: synchronisiert",
     "Sync status: error": "Sync-Status: Fehler",
     "Sync status: pending": "Sync-Status: ausstehend",
-    "Sync status: unavailable": "Sync-Status: nicht verfügbar"
+    "Sync status: unavailable": "Sync-Status: nicht verfügbar",
+    "Unable to open pad": "Pad konnte nicht geöffnet werden",
+    "This .pad file has no matching pad in this Nextcloud.": "Für diese .pad-Datei existiert in dieser Nextcloud kein passendes Pad.",
+    "This can happen if the .pad file was copied or duplicated. If you have the original .pad file, open that one — its pad will load normally. Otherwise you can create a new pad from the text stored in this file; from then on, opening this file will load the new pad.": "Das kann z. B. passieren, wenn die .pad-Datei kopiert oder dupliziert wurde. Wenn du die ursprüngliche .pad-Datei hast, öffne lieber diese — ihr Pad lädt normal. Ansonsten kannst du aus dem in dieser Datei gespeicherten Text ein neues Pad erstellen; ab dann öffnet diese Datei das neue Pad.",
+    "Create new pad from this file": "Neues Pad aus dieser Datei erstellen",
+    "Creating new pad...": "Neues Pad wird erstellt ..."
 },
 	"nplurals=2; plural=(n != 1);"
 );
