@@ -86,7 +86,7 @@ class PadController extends Controller {
 			fn(array $result): DataResponse => new DataResponse($this->padResponses->withViewerUrl($result)),
 			[
 				'invalid_argument' => 'Invalid input.',
-				'binding_message' => 'Could not create external pad binding.',
+				'binding_message' => 'Could not create external pad file.',
 				'binding_status' => Http::STATUS_CONFLICT,
 				'generic' => 'External pad create failed.',
 			],

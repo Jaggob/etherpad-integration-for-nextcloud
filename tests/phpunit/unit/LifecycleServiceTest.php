@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace OCA\EtherpadNextcloud\Tests\Unit;
 
 use OCA\EtherpadNextcloud\Exception\BindingStateConflictException;
-use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
 use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
 use OCA\EtherpadNextcloud\Service\LifecycleService;
 use OCA\EtherpadNextcloud\Service\PadFileService;
-use OCA\EtherpadNextcloud\Util\ExternalPadBindingId;
 use OCP\Files\File;
 use OCP\IConfig;
 use OCP\Security\ISecureRandom;
@@ -192,19 +190,12 @@ class LifecycleServiceTest extends TestCase {
 				'access_mode' => BindingService::ACCESS_PUBLIC,
 				'state' => BindingService::STATE_ACTIVE,
 			]);
-		$bindingService->expects($this->once())->method('deleteByFileId')->with($fileId);
+		$bindingService->expects($this->never())->method('deleteByFileId');
 		$bindingService->expects($this->never())->method('markPendingDelete');
 
-		$frontmatter = [
-			'pad_id' => $padId,
-			'access_mode' => BindingService::ACCESS_PUBLIC,
-		];
 		$padFileService = $this->createMock(PadFileService::class);
-		$padFileService->method('parsePadFile')->with('doc-current')->willReturn([
-			'frontmatter' => $frontmatter,
-			'body' => '',
-		]);
-		$padFileService->method('isExternalFrontmatter')->with($frontmatter, $padId)->willReturn(false);
+		$padFileService->expects($this->never())->method('parsePadFile');
+		$padFileService->expects($this->never())->method('isExternalFrontmatter');
 		$padFileService->expects($this->never())->method('withExportSnapshot');
 
 		$etherpadClient = $this->createMock(EtherpadClient::class);
@@ -216,11 +207,11 @@ class LifecycleServiceTest extends TestCase {
 		$file = $this->createMock(File::class);
 		$file->method('getId')->willReturn($fileId);
 		$file->method('getName')->willReturn('External.pad');
-		$file->expects($this->once())->method('getContent')->willReturn('doc-current');
+		$file->expects($this->never())->method('getContent');
 		$file->expects($this->never())->method('putContent');
 
 		$logger = $this->createMock(LoggerInterface::class);
-		$logger->expects($this->once())->method('warning');
+		$logger->expects($this->never())->method('warning');
 
 		$result = (new LifecycleService(
 			$bindingService,
@@ -231,11 +222,10 @@ class LifecycleServiceTest extends TestCase {
 			$this->createMock(ISecureRandom::class),
 		))->handleTrash($file);
 
-		$this->assertSame(LifecycleService::RESULT_TRASHED, $result['status']);
+		$this->assertSame(LifecycleService::RESULT_SKIPPED, $result['status']);
+		$this->assertSame('external_pad', $result['reason']);
 		$this->assertSame($fileId, $result['file_id']);
 		$this->assertSame($padId, $result['pad_id']);
-		$this->assertFalse($result['snapshot_persisted']);
-		$this->assertFalse($result['delete_pending']);
 	}
 
 	public function testHandleRestoreFallsBackToTextWhenHtmlRestoreFails(): void {
@@ -387,19 +377,15 @@ class LifecycleServiceTest extends TestCase {
 		$this->assertSame($newPadId, $result['new_pad_id']);
 	}
 
-	public function testHandleRestoreWithoutBindingRecreatesExternalBindingOnly(): void {
+	public function testHandleRestoreWithoutBindingSkipsExternalPadFile(): void {
 		$fileId = 92;
 		$oldPadId = 'ext.old';
 		$origin = 'https://pad.remote.test';
 		$remotePadId = 'RemotePad';
 		$padUrl = $origin . '/p/' . $remotePadId;
-		$newPadId = ExternalPadBindingId::build($origin, $remotePadId, $fileId);
-
 		$bindingService = $this->createMock(BindingService::class);
 		$bindingService->expects($this->once())->method('findByFileId')->with($fileId)->willReturn(null);
-		$bindingService->expects($this->once())
-			->method('createBinding')
-			->with($fileId, $newPadId, BindingService::ACCESS_PUBLIC);
+		$bindingService->expects($this->never())->method('createBinding');
 
 		$frontmatter = [
 			'pad_id' => $oldPadId,
@@ -420,34 +406,21 @@ class LifecycleServiceTest extends TestCase {
 			'pad_url' => $padUrl,
 		]);
 		$padFileService->method('isExternalFrontmatter')->with($frontmatter, $oldPadId)->willReturn(true);
-		$padFileService->method('getSnapshotPartsFromBody')->willReturn([
-			'text' => 'external snapshot',
-			'html' => '',
-		]);
-		$padFileService->expects($this->once())
-			->method('withStateAndSnapshot')
-			->with('doc-before', BindingService::STATE_ACTIVE, 'external snapshot', $newPadId, null, $padUrl)
-			->willReturn('doc-after');
+		$padFileService->expects($this->never())->method('getSnapshotPartsFromBody');
+		$padFileService->expects($this->never())->method('withStateAndSnapshot');
 
 		$etherpadClient = $this->createMock(EtherpadClient::class);
-			$etherpadClient->expects($this->never())->method('createPad');
-			$etherpadClient->expects($this->never())->method('setText');
-			$etherpadClient->expects($this->never())->method('setHTML');
-			$etherpadClient->expects($this->never())->method('deletePad');
-			$etherpadClient->expects($this->once())
-				->method('normalizeAndValidateExternalPublicPadUrl')
-				->with($padUrl)
-				->willReturn([
-					'origin' => $origin,
-					'pad_id' => $remotePadId,
-					'pad_url' => $padUrl,
-				]);
+		$etherpadClient->expects($this->never())->method('createPad');
+		$etherpadClient->expects($this->never())->method('setText');
+		$etherpadClient->expects($this->never())->method('setHTML');
+		$etherpadClient->expects($this->never())->method('deletePad');
+		$etherpadClient->expects($this->never())->method('normalizeAndValidateExternalPublicPadUrl');
 
 		$file = $this->createMock(File::class);
 		$file->method('getId')->willReturn($fileId);
 		$file->method('getName')->willReturn('External.pad');
 		$file->expects($this->once())->method('getContent')->willReturn('doc-before');
-		$file->expects($this->once())->method('putContent')->with('doc-after');
+		$file->expects($this->never())->method('putContent');
 
 		$result = (new LifecycleService(
 			$bindingService,
@@ -458,10 +431,10 @@ class LifecycleServiceTest extends TestCase {
 			$this->createMock(ISecureRandom::class),
 		))->handleRestore($file);
 
-		$this->assertSame(LifecycleService::RESULT_RESTORED, $result['status']);
+		$this->assertSame(LifecycleService::RESULT_SKIPPED, $result['status']);
+		$this->assertSame('external_pad', $result['reason']);
 		$this->assertSame($fileId, $result['file_id']);
-		$this->assertSame($oldPadId, $result['old_pad_id']);
-		$this->assertSame($newPadId, $result['new_pad_id']);
+		$this->assertSame($oldPadId, $result['pad_id']);
 	}
 
 	public function testHandleRestoreWithoutBindingSkipsExtPrefixWithIncompleteMetadata(): void {
@@ -497,10 +470,10 @@ class LifecycleServiceTest extends TestCase {
 
 		$etherpadClient = $this->createMock(EtherpadClient::class);
 		$etherpadClient->expects($this->never())->method('createPad');
-			$etherpadClient->expects($this->never())->method('setText');
-			$etherpadClient->expects($this->never())->method('setHTML');
-			$etherpadClient->expects($this->never())->method('deletePad');
-			$etherpadClient->expects($this->never())->method('normalizeAndValidateExternalPublicPadUrl');
+		$etherpadClient->expects($this->never())->method('setText');
+		$etherpadClient->expects($this->never())->method('setHTML');
+		$etherpadClient->expects($this->never())->method('deletePad');
+		$etherpadClient->expects($this->never())->method('normalizeAndValidateExternalPublicPadUrl');
 
 		$file = $this->createMock(File::class);
 		$file->method('getId')->willReturn($fileId);
@@ -518,7 +491,7 @@ class LifecycleServiceTest extends TestCase {
 		))->handleRestore($file);
 
 		$this->assertSame(LifecycleService::RESULT_SKIPPED, $result['status']);
-		$this->assertSame('invalid_external_frontmatter', $result['reason']);
+		$this->assertSame('external_pad', $result['reason']);
 		$this->assertSame($fileId, $result['file_id']);
 		$this->assertSame($oldPadId, $result['pad_id']);
 	}
@@ -564,10 +537,7 @@ class LifecycleServiceTest extends TestCase {
 		$etherpadClient->expects($this->never())->method('setText');
 		$etherpadClient->expects($this->never())->method('setHTML');
 		$etherpadClient->expects($this->never())->method('deletePad');
-		$etherpadClient->expects($this->once())
-			->method('normalizeAndValidateExternalPublicPadUrl')
-			->with($padUrl)
-			->willThrowException(new EtherpadClientException('External pads are disabled.'));
+		$etherpadClient->expects($this->never())->method('normalizeAndValidateExternalPublicPadUrl');
 
 		$file = $this->createMock(File::class);
 		$file->method('getId')->willReturn($fileId);
@@ -585,7 +555,7 @@ class LifecycleServiceTest extends TestCase {
 		))->handleRestore($file);
 
 		$this->assertSame(LifecycleService::RESULT_SKIPPED, $result['status']);
-		$this->assertSame('invalid_external_frontmatter', $result['reason']);
+		$this->assertSame('external_pad', $result['reason']);
 		$this->assertSame($fileId, $result['file_id']);
 		$this->assertSame($oldPadId, $result['pad_id']);
 	}

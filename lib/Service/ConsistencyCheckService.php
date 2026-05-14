@@ -105,22 +105,7 @@ class ConsistencyCheckService {
 	}
 
 	private function countPadFilesWithoutBinding(): int {
-		$qb = $this->db->getQueryBuilder();
-		$qb->selectAlias($qb->createFunction('COUNT(*)'), 'cnt')
-			->from('filecache', 'fc')
-			->leftJoin('fc', BindingService::TABLE, 'b', $qb->expr()->eq('fc.fileid', 'b.file_id'))
-			->where($qb->expr()->isNull('b.file_id'))
-			->andWhere($qb->expr()->like('fc.path', $qb->createNamedParameter('files/%')))
-			->andWhere($qb->expr()->like('fc.name', $qb->createNamedParameter('%.pad')));
-
-		$result = $qb->executeQuery();
-		$row = $result->fetch();
-		$result->closeCursor();
-
-		if (!is_array($row) || !isset($row['cnt'])) {
-			return 0;
-		}
-		return max(0, (int)$row['cnt']);
+		return count($this->findManagedPadFilesWithoutBinding(null));
 	}
 
 	/** @return array<int,array<string,mixed>> */
@@ -141,6 +126,11 @@ class ConsistencyCheckService {
 
 	/** @return array<int,array<string,mixed>> */
 	private function samplePadFilesWithoutBinding(int $limit): array {
+		return array_slice($this->findManagedPadFilesWithoutBinding($limit), 0, max(1, $limit));
+	}
+
+	/** @return array<int,array{file_id:int,path:string}> */
+	private function findManagedPadFilesWithoutBinding(?int $limit): array {
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('fc.fileid', 'fc.path')
 			->from('filecache', 'fc')
@@ -148,8 +138,7 @@ class ConsistencyCheckService {
 			->where($qb->expr()->isNull('b.file_id'))
 			->andWhere($qb->expr()->like('fc.path', $qb->createNamedParameter('files/%')))
 			->andWhere($qb->expr()->like('fc.name', $qb->createNamedParameter('%.pad')))
-			->orderBy('fc.fileid', 'ASC')
-			->setMaxResults(max(1, $limit));
+			->orderBy('fc.fileid', 'ASC');
 
 		$result = $qb->executeQuery();
 		$rows = $result->fetchAll();
@@ -164,12 +153,42 @@ class ConsistencyCheckService {
 			if (!is_array($row)) {
 				continue;
 			}
+			$fileId = (int)($row['fileid'] ?? 0);
+			$path = '/' . ltrim((string)($row['path'] ?? ''), '/');
+			if ($fileId <= 0 || $this->isExternalPadFile($fileId)) {
+				continue;
+			}
 			$samples[] = [
-				'file_id' => (int)($row['fileid'] ?? 0),
-				'path' => '/' . ltrim((string)($row['path'] ?? ''), '/'),
+				'file_id' => $fileId,
+				'path' => $path,
 			];
+			if ($limit !== null && count($samples) >= max(1, $limit)) {
+				break;
+			}
 		}
 		return $samples;
+	}
+
+	private function isExternalPadFile(int $fileId): bool {
+		$fileNode = $this->resolvePadFileNode($fileId);
+		if ($fileNode === null) {
+			return false;
+		}
+
+		try {
+			$parsed = $this->padFileService->parsePadFile((string)$fileNode->getContent());
+			$frontmatter = $parsed['frontmatter'];
+			$meta = $this->padFileService->extractPadMetadata($frontmatter);
+			return str_starts_with($meta['pad_id'], 'ext.')
+				|| $this->padFileService->isExternalFrontmatter($frontmatter, $meta['pad_id']);
+		} catch (\Throwable $e) {
+			$this->logger->debug('Consistency check could not classify unbound .pad file.', [
+				'app' => 'etherpad_nextcloud',
+				'fileId' => $fileId,
+				'exception' => $e,
+			]);
+			return false;
+		}
 	}
 
 	/**

@@ -61,7 +61,9 @@ class PadSyncService {
 			$accessMode = $meta['access_mode'];
 			$padUrl = $meta['pad_url'];
 			$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
-			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
+			if (!$isExternal) {
+				$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
+			}
 
 			if ($isExternal) {
 				return $this->syncExternalPad($node, $fileId, $padId, $padUrl, (string)$currentContent, $force);
@@ -101,9 +103,10 @@ class PadSyncService {
 			$meta = $this->padFileService->extractPadMetadata($frontmatter);
 			$padId = $meta['pad_id'];
 			$accessMode = $meta['access_mode'];
-			$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
-
 			$isExternal = $this->padFileService->isExternalFrontmatter($frontmatter, $padId);
+			if (!$isExternal) {
+				$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);
+			}
 			if ($isExternal) {
 				return [
 					'status' => self::STATUS_UNAVAILABLE,

@@ -265,9 +265,7 @@ class PadControllerTest extends TestCase {
 			->willReturn('<h1>External</h1><script>bad()</script>');
 
 		$bindingService = $this->createMock(BindingService::class);
-		$bindingService->expects($this->once())
-			->method('assertConsistentMapping')
-			->with(138, 'ext.abc123', BindingService::ACCESS_PUBLIC);
+		$bindingService->expects($this->never())->method('assertConsistentMapping');
 
 		$etherpadClient = $this->createMock(EtherpadClient::class);
 		$etherpadClient->expects($this->once())

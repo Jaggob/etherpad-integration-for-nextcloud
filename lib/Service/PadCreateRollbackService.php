@@ -9,7 +9,6 @@ declare(strict_types=1);
 
 namespace OCA\EtherpadNextcloud\Service;
 
-use OCA\EtherpadNextcloud\Util\ExternalPadBindingId;
 use OCP\Files\IRootFolder;
 use Psr\Log\LoggerInterface;
 
@@ -64,10 +63,6 @@ class PadCreateRollbackService {
 				'exception' => $cleanupError,
 			]);
 		}
-	}
-
-	public function buildExternalBindingPadId(string $origin, string $remotePadId, int $fileId): string {
-		return ExternalPadBindingId::build($origin, $remotePadId, $fileId);
 	}
 
 	private function deleteUserNodeIfExists(string $uid, string $absolutePath): void {

@@ -194,10 +194,13 @@ class PadCreationService {
 				}
 
 				$external = $this->etherpadClient->normalizeAndFetchExternalPublicPadTextOrEmpty($padUrl);
-				$bindingPadId = $this->rollbackService->buildExternalBindingPadId($external['origin'], $external['pad_id'], $fileId);
+				// External pads are no longer DB-bound, so the local marker only needs to
+				// distinguish them from managed internal pad IDs. The canonical remote
+				// identity remains pad_origin + remote_pad_id in the frontmatter.
+				$externalPadId = 'ext.' . $external['pad_id'];
 				$content = $this->padFileService->buildInitialDocument(
 					$fileId,
-					$bindingPadId,
+					$externalPadId,
 					BindingService::ACCESS_PUBLIC,
 					'',
 					$external['pad_url'],
@@ -209,12 +212,10 @@ class PadCreationService {
 				$content = $this->padFileService->withExportSnapshot($content, $external['text'], '', 0, false);
 				$fileNode->putContent($content);
 
-				$this->bindingService->createBinding($fileId, $bindingPadId, BindingService::ACCESS_PUBLIC);
-
 				return [
 					'file' => $path,
 					'file_id' => $fileId,
-					'pad_id' => $bindingPadId,
+					'pad_id' => $externalPadId,
 					'access_mode' => BindingService::ACCESS_PUBLIC,
 					'pad_url' => $external['pad_url'],
 				];
@@ -222,18 +223,7 @@ class PadCreationService {
 			function () use ($uid, $path, &$fileCreated): void {
 				$this->rollbackService->rollbackExternalCreate($uid, $path, $fileCreated);
 			},
-			function (\Throwable $e) use ($path, $padUrl, &$external): ?array {
-				if ($e instanceof BindingException) {
-					return [
-						'message' => 'External pad URL already linked',
-						'context' => [
-							'file' => $path,
-							'origin' => is_array($external) ? $external['origin'] : '',
-							'remotePadId' => is_array($external) ? $external['pad_id'] : '',
-						],
-					];
-				}
-
+			function (\Throwable $e) use ($path, $padUrl): ?array {
 				if ($e instanceof EtherpadClientException) {
 					return [
 						'message' => 'External pad URL validation failed',

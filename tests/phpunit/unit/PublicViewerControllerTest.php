@@ -157,9 +157,7 @@ class PublicViewerControllerTest extends TestCase {
 			->willReturn('<h2>External</h2><script>bad()</script>');
 
 		$bindingService = $this->createMock(BindingService::class);
-		$bindingService->expects($this->once())
-			->method('assertConsistentMapping')
-			->with(77, 'ext.abc123', BindingService::ACCESS_PUBLIC);
+		$bindingService->expects($this->never())->method('assertConsistentMapping');
 
 		$etherpadClient = $this->createMock(EtherpadClient::class);
 		$etherpadClient->expects($this->once())
@@ -237,9 +235,7 @@ class PublicViewerControllerTest extends TestCase {
 			->willReturn(true);
 
 		$bindingService = $this->createMock(BindingService::class);
-		$bindingService->expects($this->once())
-			->method('assertConsistentMapping')
-			->with(42, 'ext.123', BindingService::ACCESS_PROTECTED);
+		$bindingService->expects($this->never())->method('assertConsistentMapping');
 
 		$etherpadClient = $this->createMock(EtherpadClient::class);
 		$etherpadClient->expects($this->never())->method('normalizeAndValidateExternalPublicPadUrl');

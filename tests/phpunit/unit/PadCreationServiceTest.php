@@ -107,7 +107,7 @@ class PadCreationServiceTest extends TestCase {
 			->createInParent('alice', 99, 'Test', BindingService::ACCESS_PUBLIC);
 	}
 
-	public function testCreateFromUrlBuildsExternalBinding(): void {
+	public function testCreateFromUrlBuildsExternalPadFileWithoutBinding(): void {
 		$fileNode = $this->createMock(File::class);
 		$fileNode->method('getId')->willReturn(321);
 		$fileNode->expects($this->once())->method('putContent')->with('external-frontmatter');
@@ -117,7 +117,6 @@ class PadCreationServiceTest extends TestCase {
 		$fileCreator = $this->createMock(PadFileCreator::class);
 		$fileCreator->method('createUserFile')->with('alice', '/External.pad')->willReturn($fileNode);
 		$rollbackService = $this->createMock(PadCreateRollbackService::class);
-		$rollbackService->method('buildExternalBindingPadId')->with('https://pad.remote.test', 'RemotePad', 321)->willReturn('ext.hash');
 
 		$etherpadClient = $this->createMock(EtherpadClient::class);
 		$etherpadClient->method('normalizeAndFetchExternalPublicPadTextOrEmpty')
@@ -134,7 +133,7 @@ class PadCreationServiceTest extends TestCase {
 			->method('buildInitialDocument')
 			->with(
 				321,
-				'ext.hash',
+				'ext.RemotePad',
 				BindingService::ACCESS_PUBLIC,
 				'',
 				'https://pad.remote.test/p/RemotePad',
@@ -150,9 +149,7 @@ class PadCreationServiceTest extends TestCase {
 			->willReturn('external-frontmatter');
 
 		$bindingService = $this->createMock(BindingService::class);
-		$bindingService->expects($this->once())
-			->method('createBinding')
-			->with(321, 'ext.hash', BindingService::ACCESS_PUBLIC);
+		$bindingService->expects($this->never())->method('createBinding');
 
 		$result = $this->buildService($padFileService, $padPaths, $fileCreator, null, $rollbackService, $bindingService, $etherpadClient)
 			->createFromUrl('alice', '/External', 'https://pad.remote.test/p/RemotePad');
@@ -160,13 +157,13 @@ class PadCreationServiceTest extends TestCase {
 		$this->assertSame([
 			'file' => '/External.pad',
 			'file_id' => 321,
-			'pad_id' => 'ext.hash',
+			'pad_id' => 'ext.RemotePad',
 			'access_mode' => BindingService::ACCESS_PUBLIC,
 			'pad_url' => 'https://pad.remote.test/p/RemotePad',
 		], $result);
 	}
 
-	public function testCreateFromUrlBuildsExternalBindingWithoutInitialSnapshot(): void {
+	public function testCreateFromUrlBuildsExternalPadFileWithoutInitialSnapshot(): void {
 		$fileNode = $this->createMock(File::class);
 		$fileNode->method('getId')->willReturn(321);
 		$fileNode->expects($this->once())->method('putContent')->with('external-frontmatter');
@@ -176,7 +173,6 @@ class PadCreationServiceTest extends TestCase {
 		$fileCreator = $this->createMock(PadFileCreator::class);
 		$fileCreator->method('createUserFile')->with('alice', '/External.pad')->willReturn($fileNode);
 		$rollbackService = $this->createMock(PadCreateRollbackService::class);
-		$rollbackService->method('buildExternalBindingPadId')->with('https://pad.remote.test', 'RemotePad', 321)->willReturn('ext.hash');
 
 		$etherpadClient = $this->createMock(EtherpadClient::class);
 		$etherpadClient->method('normalizeAndFetchExternalPublicPadTextOrEmpty')
@@ -196,9 +192,7 @@ class PadCreationServiceTest extends TestCase {
 			->willReturn('external-frontmatter');
 
 		$bindingService = $this->createMock(BindingService::class);
-		$bindingService->expects($this->once())
-			->method('createBinding')
-			->with(321, 'ext.hash', BindingService::ACCESS_PUBLIC);
+		$bindingService->expects($this->never())->method('createBinding');
 
 		$result = $this->buildService($padFileService, $padPaths, $fileCreator, null, $rollbackService, $bindingService, $etherpadClient)
 			->createFromUrl('alice', '/External', 'https://pad.remote.test/p/RemotePad');
@@ -206,7 +200,7 @@ class PadCreationServiceTest extends TestCase {
 		$this->assertSame([
 			'file' => '/External.pad',
 			'file_id' => 321,
-			'pad_id' => 'ext.hash',
+			'pad_id' => 'ext.RemotePad',
 			'access_mode' => BindingService::ACCESS_PUBLIC,
 			'pad_url' => 'https://pad.remote.test/p/RemotePad',
 		], $result);
