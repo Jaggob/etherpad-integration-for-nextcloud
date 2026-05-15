@@ -30,8 +30,17 @@ class EtherpadHealthCheckService {
 				$settings->etherpadApiVersion,
 			);
 		} catch (EtherpadClientException $e) {
+			// EtherpadClient::apiCall wraps low-level transport failures in
+			// a generic 'Etherpad API request failed: <method>' exception
+			// with the real cause stored as previous. We surface both so
+			// the user sees the actionable detail and the hint matcher has
+			// the inner text to work with.
 			$detail = $e->getMessage();
-			$hint = $this->hintForFailure($e);
+			$previous = $e->getPrevious();
+			if ($previous instanceof \Throwable && $previous->getMessage() !== '') {
+				$detail .= ' (' . $previous->getMessage() . ')';
+			}
+			$hint = $this->hintForFailureMessage($detail);
 			if ($hint !== '') {
 				$detail .= ' ' . $hint;
 			}
@@ -62,17 +71,17 @@ class EtherpadHealthCheckService {
 	}
 
 	/**
-	 * Map an EtherpadClientException onto an actionable hint string. Returns
-	 * an empty string when no hint applies — the bare error stays in the
-	 * detail field in that case.
+	 * Map the full failure message (including inner-exception text) onto an
+	 * actionable hint string. Returns an empty string when no hint applies —
+	 * the bare error stays in the detail field in that case.
 	 *
 	 * Matching is intentionally on substrings rather than exception subtypes
 	 * because the upstream library bundles many failure shapes into the same
 	 * message. If upstream wording changes the hint just drops; the error
 	 * itself still surfaces.
 	 */
-	private function hintForFailure(EtherpadClientException $e): string {
-		$message = strtolower($e->getMessage());
+	private function hintForFailureMessage(string $rawMessage): string {
+		$message = strtolower($rawMessage);
 
 		if (str_contains($message, 'no or wrong api key')
 			|| str_contains($message, 'wrong api key')

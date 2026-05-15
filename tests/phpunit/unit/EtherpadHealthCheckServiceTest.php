@@ -151,6 +151,27 @@ class EtherpadHealthCheckServiceTest extends TestCase {
 		}
 	}
 
+	public function testCheckMatchesHintAgainstWrappedPreviousException(): void {
+		// EtherpadClient::apiCall wraps transport-level failures as
+		// 'Etherpad API request failed: <method>' with the real cause as
+		// previous. The hint matcher must read through the chain.
+		$inner = new EtherpadClientException('Etherpad transport error: php_network_getaddresses: getaddrinfo for pad.does-not-exist.invalid failed');
+		$wrapped = new EtherpadClientException('Etherpad API request failed: listAllPads', 0, $inner);
+
+		$etherpad = $this->createMock(EtherpadClient::class);
+		$etherpad->method('healthCheck')->willThrowException($wrapped);
+
+		try {
+			(new EtherpadHealthCheckService($etherpad, $this->createMock(PendingDeleteRetryService::class), $this->buildL10n()))
+				->check($this->settings());
+			$this->fail('Expected health check exception.');
+		} catch (AdminHealthCheckException $e) {
+			$this->assertStringContainsString('Etherpad API request failed: listAllPads', $e->getMessage());
+			$this->assertStringContainsString('getaddrinfo', $e->getMessage());
+			$this->assertStringContainsString('did not resolve', $e->getMessage());
+		}
+	}
+
 	public function testCheckAttachesNoHintForUnrecognisedFailureShape(): void {
 		$etherpad = $this->createMock(EtherpadClient::class);
 		$etherpad->method('healthCheck')->willThrowException(new EtherpadClientException('something completely unexpected happened'));
