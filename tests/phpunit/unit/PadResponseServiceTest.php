@@ -49,11 +49,20 @@ class PadResponseServiceTest extends TestCase {
 		$appConfigService = $this->createMock(AppConfigService::class);
 		$appConfigService->method('getSyncIntervalSeconds')->willReturn(45);
 
-		$response = (new PadResponseService($urlGenerator, $appConfigService, $this->l10nEcho()))->openResponse([
-			'file_id' => 42,
-			'url' => 'https://pad.example.test/p/test',
-			'cookie_header' => 'sessionID=s.test; Path=/',
-		]);
+		$target = new \OCA\EtherpadNextcloud\Service\PadOpenTarget(
+			file: '/Test.pad',
+			fileId: 42,
+			padId: 'test',
+			accessMode: 'protected',
+			padUrl: 'https://pad.example.test/p/test',
+			isExternal: false,
+			originalPadUrl: '',
+			snapshotText: '',
+			snapshotHtml: '',
+			url: 'https://pad.example.test/p/test',
+			cookieHeader: 'sessionID=s.test; Path=/',
+		);
+		$response = (new PadResponseService($urlGenerator, $appConfigService, $this->l10nEcho()))->openResponse($target);
 
 		$data = $response->getData();
 		$this->assertArrayNotHasKey('cookie_header', $data);

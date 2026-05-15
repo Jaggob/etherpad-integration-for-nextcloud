@@ -32,10 +32,9 @@ class PadOpenService {
 	}
 
 	/**
-	 * @return array{file:string,file_id:int,pad_id:string,access_mode:string,pad_url:string,is_external:bool,original_pad_url:string,snapshot_text:string,snapshot_html:string,url:string,cookie_header:string}
 	 * @throws NotFoundException
 	 */
-	public function openByPath(string $uid, string $displayName, string $file): array {
+	public function openByPath(string $uid, string $displayName, string $file): PadOpenTarget {
 		$path = $this->padPaths->normalizeViewerFilePath($file);
 		if ($path === '') {
 			throw new \InvalidArgumentException('Invalid file path.');
@@ -46,23 +45,21 @@ class PadOpenService {
 	}
 
 	/**
-	 * @return array{file:string,file_id:int,pad_id:string,access_mode:string,pad_url:string,is_external:bool,original_pad_url:string,snapshot_text:string,snapshot_html:string,url:string,cookie_header:string}
 	 * @throws NotFoundException
 	 */
-	public function openById(string $uid, string $displayName, int $fileId): array {
+	public function openById(string $uid, string $displayName, int $fileId): PadOpenTarget {
 		$node = $this->userNodeResolver->resolveUserFileNodeById($uid, $fileId);
 		$absolutePath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
 		return $this->openNode($uid, $displayName, $node, $absolutePath);
 	}
 
 	/**
-	 * @return array{file:string,file_id:int,pad_id:string,access_mode:string,pad_url:string,is_external:bool,original_pad_url:string,snapshot_text:string,snapshot_html:string,url:string,cookie_header:string}
 	 * @throws BindingException
 	 * @throws EtherpadClientException
 	 * @throws LockedException
 	 * @throws PadFileFormatException
 	 */
-	private function openNode(string $uid, string $displayName, File $node, string $absolutePath): array {
+	private function openNode(string $uid, string $displayName, File $node, string $absolutePath): PadOpenTarget {
 		try {
 			$content = $this->lockRetryService->readContentWithOpenLockRetry($node);
 			$fileId = (int)$node->getId();
@@ -107,7 +104,6 @@ class PadOpenService {
 		}
 	}
 
-	/** @return array{file:string,file_id:int,pad_id:string,access_mode:string,pad_url:string,is_external:bool,original_pad_url:string,snapshot_text:string,snapshot_html:string,url:string,cookie_header:string} */
 	private function buildOpenContext(
 		string $uid,
 		string $displayName,
@@ -119,7 +115,7 @@ class PadOpenService {
 		bool $isExternal = false,
 		string $snapshotText = '',
 		string $snapshotHtml = ''
-	): array {
+	): PadOpenTarget {
 		if ($isExternal && $accessMode !== BindingService::ACCESS_PUBLIC) {
 			throw new EtherpadClientException('External pad metadata requires public access_mode.');
 		}
@@ -149,18 +145,18 @@ class PadOpenService {
 			$url = $effectivePadUrl;
 		}
 
-		return [
-			'file' => $path,
-			'file_id' => $fileId,
-			'pad_id' => $padId,
-			'access_mode' => $accessMode,
-			'pad_url' => $effectivePadUrl,
-			'is_external' => $isExternal,
-			'original_pad_url' => $originalPadUrl,
-			'snapshot_text' => $isExternal ? $snapshotText : '',
-			'snapshot_html' => $isExternal ? $snapshotHtml : '',
-			'url' => $url,
-			'cookie_header' => $cookieHeader,
-		];
+		return new PadOpenTarget(
+			file: $path,
+			fileId: $fileId,
+			padId: $padId,
+			accessMode: $accessMode,
+			padUrl: $effectivePadUrl,
+			isExternal: $isExternal,
+			originalPadUrl: $originalPadUrl,
+			snapshotText: $isExternal ? $snapshotText : '',
+			snapshotHtml: $isExternal ? $snapshotHtml : '',
+			url: $url,
+			cookieHeader: $cookieHeader,
+		);
 	}
 }

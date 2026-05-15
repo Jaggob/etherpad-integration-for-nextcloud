@@ -17,6 +17,7 @@ use OCA\EtherpadNextcloud\Service\PadInitializationService;
 use OCA\EtherpadNextcloud\Service\PadLifecycleOperationService;
 use OCA\EtherpadNextcloud\Service\PadMetadataService;
 use OCA\EtherpadNextcloud\Service\PadOpenService;
+use OCA\EtherpadNextcloud\Service\PadOpenTarget;
 use OCA\EtherpadNextcloud\Service\PadResponseService;
 use OCA\EtherpadNextcloud\Service\PadSyncService;
 use OCP\AppFramework\Controller;
@@ -96,8 +97,8 @@ class PadController extends Controller {
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	public function open(string $file): DataResponse {
 		return $this->runForUser(
-			fn(IUser $user): array => $this->padOpenService->openByPath($user->getUID(), $user->getDisplayName(), $file),
-			fn(array $result): DataResponse => $this->padResponses->openResponse($result),
+			fn(IUser $user): PadOpenTarget => $this->padOpenService->openByPath($user->getUID(), $user->getDisplayName(), $file),
+			fn(PadOpenTarget $result): DataResponse => $this->padResponses->openResponse($result),
 			[
 				'invalid_argument' => $this->l10n->t('Invalid file path.'),
 				'not_found' => $this->l10n->t('Cannot open selected .pad file.'),
@@ -109,8 +110,8 @@ class PadController extends Controller {
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	public function openById(int $fileId): DataResponse {
 		return $this->runForUser(
-			fn(IUser $user): array => $this->padOpenService->openById($user->getUID(), $user->getDisplayName(), $this->requireFileId($fileId)),
-			fn(array $result): DataResponse => $this->padResponses->openResponse($result),
+			fn(IUser $user): PadOpenTarget => $this->padOpenService->openById($user->getUID(), $user->getDisplayName(), $this->requireFileId($fileId)),
+			fn(PadOpenTarget $result): DataResponse => $this->padResponses->openResponse($result),
 			[
 				'not_found' => $this->l10n->t('Cannot open selected .pad file.'),
 				'generic' => $this->l10n->t('Could not open pad.'),

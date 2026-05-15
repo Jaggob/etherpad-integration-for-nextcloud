@@ -51,19 +51,26 @@ class PadResponseService {
 		return new DataResponse($data, $status);
 	}
 
-	/** @param array<string,mixed> $data */
-	public function openResponse(array $data): DataResponse {
-		$cookieHeader = (string)($data['cookie_header'] ?? '');
-		unset($data['cookie_header']);
+	public function openResponse(PadOpenTarget $target): DataResponse {
+		$payload = [
+			'file' => $target->file,
+			'file_id' => $target->fileId,
+			'pad_id' => $target->padId,
+			'access_mode' => $target->accessMode,
+			'pad_url' => $target->padUrl,
+			'is_external' => $target->isExternal,
+			'original_pad_url' => $target->originalPadUrl,
+			'snapshot_text' => $target->snapshotText,
+			'snapshot_html' => $target->snapshotHtml,
+			'url' => $target->url,
+			'sync_url' => $this->urlGenerator->linkToRoute('etherpad_nextcloud.pad.syncById', ['fileId' => $target->fileId]),
+			'sync_status_url' => $this->urlGenerator->linkToRoute('etherpad_nextcloud.pad.syncStatusById', ['fileId' => $target->fileId]),
+			'sync_interval_seconds' => $this->appConfigService->getSyncIntervalSeconds(),
+		];
 
-		$fileId = (int)$data['file_id'];
-		$data['sync_url'] = $this->urlGenerator->linkToRoute('etherpad_nextcloud.pad.syncById', ['fileId' => $fileId]);
-		$data['sync_status_url'] = $this->urlGenerator->linkToRoute('etherpad_nextcloud.pad.syncStatusById', ['fileId' => $fileId]);
-		$data['sync_interval_seconds'] = $this->appConfigService->getSyncIntervalSeconds();
-
-		$response = new DataResponse($data);
-		if ($cookieHeader !== '') {
-			$response->addHeader('Set-Cookie', $cookieHeader);
+		$response = new DataResponse($payload);
+		if ($target->cookieHeader !== '') {
+			$response->addHeader('Set-Cookie', $target->cookieHeader);
 		}
 		return $response;
 	}
