@@ -52,18 +52,16 @@ class PadMetadataServiceTest extends TestCase {
 		$result = $this->buildService($padFileService, userNodeResolver: $userNodeResolver, lockRetryService: $lockRetryService, etherpadClient: $etherpadClient)
 			->metaById('alice', 138);
 
-		$this->assertSame([
-			'is_pad' => true,
-			'is_pad_mime' => true,
-			'file_id' => 138,
-			'name' => 'External.pad',
-			'path' => '/External.pad',
-			'access_mode' => BindingService::ACCESS_PUBLIC,
-			'is_external' => true,
-			'pad_id' => 'ext.remote',
-			'pad_url' => 'https://pad.example.test/p/External',
-			'public_open_url' => 'https://pad.example.test/p/External',
-		], $result);
+		$this->assertTrue($result->isPad);
+		$this->assertTrue($result->isPadMime);
+		$this->assertSame(138, $result->fileId);
+		$this->assertSame('External.pad', $result->name);
+		$this->assertSame('/External.pad', $result->path);
+		$this->assertSame(BindingService::ACCESS_PUBLIC, $result->accessMode);
+		$this->assertTrue($result->isExternal);
+		$this->assertSame('ext.remote', $result->padId);
+		$this->assertSame('https://pad.example.test/p/External', $result->padUrl);
+		$this->assertSame('https://pad.example.test/p/External', $result->publicOpenUrl);
 	}
 
 	public function testResolveReturnsFalseWhenFileIdIsMissing(): void {
@@ -75,7 +73,8 @@ class PadMetadataServiceTest extends TestCase {
 		$result = $this->buildService(userNodeResolver: $userNodeResolver)
 			->resolve('alice', 404);
 
-		$this->assertSame(['is_pad' => false, 'file_id' => 404], $result);
+		$this->assertFalse($result->isPad);
+		$this->assertSame(404, $result->fileId);
 	}
 
 	public function testResolveReturnsPublicOpenUrlForInternalPublicPad(): void {
@@ -110,15 +109,13 @@ class PadMetadataServiceTest extends TestCase {
 		$result = $this->buildService($padFileService, userNodeResolver: $userNodeResolver, etherpadClient: $etherpadClient)
 			->resolve('alice', 138);
 
-		$this->assertSame([
-			'is_pad' => true,
-			'is_pad_mime' => true,
-			'file_id' => 138,
-			'path' => '/Public.pad',
-			'access_mode' => BindingService::ACCESS_PUBLIC,
-			'is_external' => false,
-			'public_open_url' => 'https://pad.example.test/p/g.ABC$pad',
-		], $result);
+		$this->assertTrue($result->isPad);
+		$this->assertTrue($result->isPadMime);
+		$this->assertSame(138, $result->fileId);
+		$this->assertSame('/Public.pad', $result->path);
+		$this->assertSame(BindingService::ACCESS_PUBLIC, $result->accessMode);
+		$this->assertFalse($result->isExternal);
+		$this->assertSame('https://pad.example.test/p/g.ABC$pad', $result->publicOpenUrl);
 	}
 
 	public function testFindOriginalForCopyReturnsFoundWhenBoundFileIsReadableByRequester(): void {
@@ -148,7 +145,9 @@ class PadMetadataServiceTest extends TestCase {
 			bindingService: $bindingService,
 		)->findOriginalForCopy('alice', 701);
 
-		$this->assertSame(['found' => true, 'file_id' => 42, 'path' => '/Folder/Original.pad'], $result);
+		$this->assertTrue($result->found);
+		$this->assertSame(42, $result->fileId);
+		$this->assertSame('/Folder/Original.pad', $result->path);
 	}
 
 	public function testFindOriginalForCopyMissesWhenBoundFileNotInRequestersUserspace(): void {
@@ -182,7 +181,7 @@ class PadMetadataServiceTest extends TestCase {
 			bindingService: $bindingService,
 		)->findOriginalForCopy('alice', 702);
 
-		$this->assertSame(['found' => false], $result);
+		$this->assertFalse($result->found);
 	}
 
 	public function testFindOriginalForCopyMissesWhenNoBindingForPadId(): void {
@@ -203,7 +202,7 @@ class PadMetadataServiceTest extends TestCase {
 			bindingService: $bindingService,
 		)->findOriginalForCopy('alice', 703);
 
-		$this->assertSame(['found' => false], $result);
+		$this->assertFalse($result->found);
 	}
 
 	public function testFindOriginalForCopyMissesForExternalPadId(): void {
@@ -226,7 +225,7 @@ class PadMetadataServiceTest extends TestCase {
 			bindingService: $bindingService,
 		)->findOriginalForCopy('alice', 704);
 
-		$this->assertSame(['found' => false], $result);
+		$this->assertFalse($result->found);
 	}
 
 	public function testFindOriginalForCopyMissesForNonPadFile(): void {
@@ -245,7 +244,7 @@ class PadMetadataServiceTest extends TestCase {
 			bindingService: $bindingService,
 		)->findOriginalForCopy('alice', 705);
 
-		$this->assertSame(['found' => false], $result);
+		$this->assertFalse($result->found);
 	}
 
 	public function testFindOriginalForCopyMissesWhenOrphanResolverThrows(): void {
@@ -260,7 +259,7 @@ class PadMetadataServiceTest extends TestCase {
 			bindingService: $bindingService,
 		)->findOriginalForCopy('alice', 706);
 
-		$this->assertSame(['found' => false], $result);
+		$this->assertFalse($result->found);
 	}
 
 	public function testFindOriginalForCopyMissesWhenBindingPointsAtSameFile(): void {
@@ -284,7 +283,7 @@ class PadMetadataServiceTest extends TestCase {
 			bindingService: $bindingService,
 		)->findOriginalForCopy('alice', 707);
 
-		$this->assertSame(['found' => false], $result);
+		$this->assertFalse($result->found);
 	}
 
 	private function buildPadNode(int $fileId, string $name, string $content): File {

@@ -38,17 +38,15 @@ class PadMetadataService {
 	 * it is only emitted when the requester can already read the bound file
 	 * (gated by UserNodeResolver). This means a crafted frontmatter cannot
 	 * be used to probe for `.pad` files in other users' accounts.
-	 *
-	 * @return array{found:false}|array{found:true,file_id:int,path:string}
 	 */
-	public function findOriginalForCopy(string $uid, int $fileId): array {
+	public function findOriginalForCopy(string $uid, int $fileId): PadOriginalLookup {
 		try {
 			$node = $this->userNodeResolver->resolveUserFileNodeById($uid, $fileId);
 		} catch (NotFoundException) {
-			return ['found' => false];
+			return new PadOriginalLookup(found: false);
 		}
 		if (!str_ends_with(strtolower($node->getName()), '.pad')) {
-			return ['found' => false];
+			return new PadOriginalLookup(found: false);
 		}
 
 		$padId = '';
@@ -58,55 +56,53 @@ class PadMetadataService {
 			$meta = $this->padFileService->extractPadMetadata($parsed['frontmatter']);
 			$padId = (string)($meta['pad_id'] ?? '');
 		} catch (\Throwable) {
-			return ['found' => false];
+			return new PadOriginalLookup(found: false);
 		}
 		if ($padId === '' || str_starts_with($padId, 'ext.')) {
-			return ['found' => false];
+			return new PadOriginalLookup(found: false);
 		}
 
 		$binding = $this->bindingService->findByPadId($padId, BindingService::STATE_ACTIVE);
 		if ($binding === null) {
-			return ['found' => false];
+			return new PadOriginalLookup(found: false);
 		}
 
 		$boundFileId = (int)$binding['file_id'];
 		if ($boundFileId <= 0 || $boundFileId === $fileId) {
-			return ['found' => false];
+			return new PadOriginalLookup(found: false);
 		}
 
 		try {
 			$originalNode = $this->userNodeResolver->resolveUserFileNodeById($uid, $boundFileId);
 		} catch (NotFoundException) {
-			return ['found' => false];
+			return new PadOriginalLookup(found: false);
 		}
 
-		return [
-			'found' => true,
-			'file_id' => $boundFileId,
-			'path' => $this->userNodeResolver->toUserAbsolutePath($uid, $originalNode),
-		];
+		return new PadOriginalLookup(
+			found: true,
+			fileId: $boundFileId,
+			path: $this->userNodeResolver->toUserAbsolutePath($uid, $originalNode),
+		);
 	}
 
 	/**
-	 * @return array{is_pad:false,file_id:int,name:string,path:string}|array{is_pad:true,is_pad_mime:bool,file_id:int,name:string,path:string,access_mode:string,is_external:bool,pad_id:string,pad_url:string,public_open_url:string}
 	 * @throws NotFoundException
 	 * @throws LockedException
 	 */
-	public function metaById(string $uid, int $fileId): array {
+	public function metaById(string $uid, int $fileId): PadMeta {
 		$node = $this->userNodeResolver->resolveUserFileNodeById($uid, $fileId);
 		$absolutePath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
 		return $this->buildMeta($node, $absolutePath);
 	}
 
-	/** @return array{is_pad:false,file_id?:int,path?:string}|array{is_pad:true,is_pad_mime:bool,file_id:int,path:string,access_mode:string,is_external:bool,public_open_url:string} */
-	public function resolve(string $uid, int $fileId = 0, string $file = ''): array {
+	public function resolve(string $uid, int $fileId = 0, string $file = ''): PadResolution {
 		$resolvedFileId = $fileId;
 		if ($resolvedFileId > 0) {
 			try {
 				$node = $this->userNodeResolver->resolveUserFileNodeById($uid, $resolvedFileId);
 				$normalizedPath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
 			} catch (NotFoundException) {
-				return ['is_pad' => false, 'file_id' => $resolvedFileId];
+				return new PadResolution(isPad: false, fileId: $resolvedFileId);
 			}
 		} else {
 			$requestedPath = $this->padPaths->normalizeViewerFilePath($file);
@@ -117,71 +113,69 @@ class PadMetadataService {
 			try {
 				$node = $this->userNodeResolver->resolveUserFileNodeByPath($uid, $requestedPath);
 			} catch (NotFoundException) {
-				return ['is_pad' => false, 'path' => $requestedPath];
+				return new PadResolution(isPad: false, path: $requestedPath);
 			}
 
 			$resolvedFileId = (int)$node->getId();
 			if ($resolvedFileId <= 0) {
-				return ['is_pad' => false, 'path' => $requestedPath];
+				return new PadResolution(isPad: false, path: $requestedPath);
 			}
 			$normalizedPath = $this->userNodeResolver->toUserAbsolutePath($uid, $node);
 		}
 
 		if (!str_ends_with(strtolower($normalizedPath), '.pad')) {
-			return ['is_pad' => false, 'file_id' => $resolvedFileId, 'path' => $normalizedPath];
+			return new PadResolution(isPad: false, fileId: $resolvedFileId, path: $normalizedPath);
 		}
 
 		return $this->buildResolve($node, $resolvedFileId, $normalizedPath);
 	}
 
 	/**
-	 * @return array{is_pad:false,file_id:int,name:string,path:string}|array{is_pad:true,is_pad_mime:bool,file_id:int,name:string,path:string,access_mode:string,is_external:bool,pad_id:string,pad_url:string,public_open_url:string}
 	 * @throws LockedException
 	 */
-	private function buildMeta(File $node, string $absolutePath): array {
+	private function buildMeta(File $node, string $absolutePath): PadMeta {
 		$fileId = (int)$node->getId();
 		if ($fileId <= 0) {
 			throw new \RuntimeException('Could not resolve file ID.');
 		}
 
 		if (!str_ends_with(strtolower($absolutePath), '.pad')) {
-			return [
-				'is_pad' => false,
-				'file_id' => $fileId,
-				'name' => $node->getName(),
-				'path' => $absolutePath,
-			];
+			return new PadMeta(
+				isPad: false,
+				fileId: $fileId,
+				name: $node->getName(),
+				path: $absolutePath,
+			);
 		}
 
 		$metadata = $this->readPadMetadata($node, $fileId, $absolutePath, true, 'Pad meta parse skipped');
 
-		return [
-			'is_pad' => true,
-			'is_pad_mime' => (string)$node->getMimeType() === 'application/x-etherpad-nextcloud',
-			'file_id' => $fileId,
-			'name' => $node->getName(),
-			'path' => $absolutePath,
-			'access_mode' => $metadata['access_mode'],
-			'is_external' => $metadata['is_external'],
-			'pad_id' => $metadata['pad_id'],
-			'pad_url' => $metadata['pad_url'],
-			'public_open_url' => $metadata['public_open_url'],
-		];
+		return new PadMeta(
+			isPad: true,
+			fileId: $fileId,
+			name: $node->getName(),
+			path: $absolutePath,
+			isPadMime: (string)$node->getMimeType() === 'application/x-etherpad-nextcloud',
+			accessMode: $metadata['access_mode'],
+			isExternal: $metadata['is_external'],
+			padId: $metadata['pad_id'],
+			padUrl: $metadata['pad_url'],
+			publicOpenUrl: $metadata['public_open_url'],
+		);
 	}
 
-	/** @return array{is_pad:true,is_pad_mime:bool,file_id:int,path:string,access_mode:string,is_external:bool,public_open_url:string} */
-	private function buildResolve(File $node, int $fileId, string $absolutePath): array {
+	private function buildResolve(File $node, int $fileId, string $absolutePath): PadResolution {
 		$metadata = $this->readPadMetadata($node, $fileId, $absolutePath, false, 'Pad resolve metadata parse skipped');
 
-		return [
-			'is_pad' => true,
-			'is_pad_mime' => (string)$node->getMimeType() === 'application/x-etherpad-nextcloud',
-			'file_id' => $fileId,
-			'path' => $absolutePath,
-			'access_mode' => $metadata['access_mode'],
-			'is_external' => $metadata['is_external'],
-			'public_open_url' => $metadata['public_open_url'],
-		];
+		return new PadResolution(
+			isPad: true,
+			fileId: $fileId,
+			path: $absolutePath,
+			isPadMime: (string)$node->getMimeType() === 'application/x-etherpad-nextcloud',
+			accessMode: $metadata['access_mode'],
+			isExternal: $metadata['is_external'],
+			publicOpenUrl: $metadata['public_open_url'],
+		);
 	}
 
 	/** @return array{access_mode:string,is_external:bool,pad_id:string,pad_url:string,public_open_url:string} */

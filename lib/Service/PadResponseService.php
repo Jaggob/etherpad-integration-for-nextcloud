@@ -51,19 +51,141 @@ class PadResponseService {
 		return new DataResponse($data, $status);
 	}
 
-	/** @param array<string,mixed> $data */
-	public function openResponse(array $data): DataResponse {
-		$cookieHeader = (string)($data['cookie_header'] ?? '');
-		unset($data['cookie_header']);
+	/** @return array<string,mixed> */
+	public function metaResponse(PadMeta $meta): array {
+		if (!$meta->isPad) {
+			return [
+				'is_pad' => false,
+				'file_id' => $meta->fileId,
+				'name' => $meta->name,
+				'path' => $meta->path,
+			];
+		}
+		return $this->withViewerAndEmbedUrls([
+			'is_pad' => true,
+			'is_pad_mime' => $meta->isPadMime,
+			'file_id' => $meta->fileId,
+			'name' => $meta->name,
+			'path' => $meta->path,
+			'access_mode' => $meta->accessMode,
+			'is_external' => $meta->isExternal,
+			'pad_id' => $meta->padId,
+			'pad_url' => $meta->padUrl,
+			'public_open_url' => $meta->publicOpenUrl,
+		]);
+	}
 
-		$fileId = (int)$data['file_id'];
-		$data['sync_url'] = $this->urlGenerator->linkToRoute('etherpad_nextcloud.pad.syncById', ['fileId' => $fileId]);
-		$data['sync_status_url'] = $this->urlGenerator->linkToRoute('etherpad_nextcloud.pad.syncStatusById', ['fileId' => $fileId]);
-		$data['sync_interval_seconds'] = $this->appConfigService->getSyncIntervalSeconds();
+	/** @return array<string,mixed> */
+	public function resolveResponse(PadResolution $resolution): array {
+		if (!$resolution->isPad) {
+			$payload = ['is_pad' => false];
+			if ($resolution->fileId !== null) {
+				$payload['file_id'] = $resolution->fileId;
+			}
+			if ($resolution->path !== null) {
+				$payload['path'] = $resolution->path;
+			}
+			return $payload;
+		}
+		return $this->withViewerUrl([
+			'is_pad' => true,
+			'is_pad_mime' => $resolution->isPadMime,
+			'file_id' => $resolution->fileId
+				?? throw new \LogicException('PadResolution::fileId must be set when isPad is true.'),
+			'path' => $resolution->path
+				?? throw new \LogicException('PadResolution::path must be set when isPad is true.'),
+			'access_mode' => $resolution->accessMode,
+			'is_external' => $resolution->isExternal,
+			'public_open_url' => $resolution->publicOpenUrl,
+		]);
+	}
 
-		$response = new DataResponse($data);
-		if ($cookieHeader !== '') {
-			$response->addHeader('Set-Cookie', $cookieHeader);
+	/** @return array<string,mixed> */
+	public function originalLookupResponse(PadOriginalLookup $lookup): array {
+		if (!$lookup->found) {
+			return ['found' => false];
+		}
+		return $this->withViewerAndEmbedUrls([
+			'found' => true,
+			'file_id' => $lookup->fileId
+				?? throw new \LogicException('PadOriginalLookup::fileId must be set when found is true.'),
+			'path' => $lookup->path
+				?? throw new \LogicException('PadOriginalLookup::path must be set when found is true.'),
+		]);
+	}
+
+	/** @return array<string,mixed> */
+	public function syncStatusResponse(PadSyncStatus $status): array {
+		$payload = ['status' => $status->status];
+		// Emitted unconditionally — the viewer treats null as a distinct state.
+		$payload['in_sync'] = $status->inSync;
+		if ($status->snapshotRev !== null) {
+			$payload['snapshot_rev'] = $status->snapshotRev;
+		}
+		if ($status->currentRev !== null) {
+			$payload['current_rev'] = $status->currentRev;
+		}
+		if ($status->reason !== null) {
+			$payload['reason'] = $status->reason;
+		}
+		return $payload;
+	}
+
+	/** @return array<string,mixed> */
+	public function syncResponse(PadSyncResult $result): array {
+		$payload = [
+			'status' => $result->status,
+			'file_id' => $result->fileId,
+			'pad_id' => $result->padId,
+			'external' => $result->external,
+			'forced' => $result->forced,
+		];
+		if ($result->snapshotRev !== null) {
+			$payload['snapshot_rev'] = $result->snapshotRev;
+		}
+		if ($result->currentRev !== null) {
+			$payload['current_rev'] = $result->currentRev;
+		}
+		if ($result->lockRetries !== null) {
+			$payload['lock_retries'] = $result->lockRetries;
+		}
+		if ($result->retryable) {
+			$payload['retryable'] = true;
+		}
+		return $payload;
+	}
+
+	/** @return array<string,mixed> */
+	public function initializationResponse(PadInitializationResult $result): array {
+		return [
+			'status' => $result->status,
+			'file' => $result->file,
+			'file_id' => $result->fileId,
+			'pad_id' => $result->padId,
+			'access_mode' => $result->accessMode,
+		];
+	}
+
+	public function openResponse(PadOpenTarget $target): DataResponse {
+		$payload = [
+			'file' => $target->file,
+			'file_id' => $target->fileId,
+			'pad_id' => $target->padId,
+			'access_mode' => $target->accessMode,
+			'pad_url' => $target->padUrl,
+			'is_external' => $target->isExternal,
+			'original_pad_url' => $target->originalPadUrl,
+			'snapshot_text' => $target->snapshotText,
+			'snapshot_html' => $target->snapshotHtml,
+			'url' => $target->url,
+			'sync_url' => $this->urlGenerator->linkToRoute('etherpad_nextcloud.pad.syncById', ['fileId' => $target->fileId]),
+			'sync_status_url' => $this->urlGenerator->linkToRoute('etherpad_nextcloud.pad.syncStatusById', ['fileId' => $target->fileId]),
+			'sync_interval_seconds' => $this->appConfigService->getSyncIntervalSeconds(),
+		];
+
+		$response = new DataResponse($payload);
+		if ($target->cookieHeader !== '') {
+			$response->addHeader('Set-Cookie', $target->cookieHeader);
 		}
 		return $response;
 	}

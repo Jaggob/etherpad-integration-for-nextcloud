@@ -27,10 +27,9 @@ class PadInitializationService {
 	}
 
 	/**
-	 * @return array{status:string,file:string,file_id:int,pad_id:string,access_mode:string}
 	 * @throws NotFoundException
 	 */
-	public function initializeByPath(string $uid, string $file): array {
+	public function initializeByPath(string $uid, string $file): PadInitializationResult {
 		$path = $this->padPaths->normalizeViewerFilePath($file);
 		if ($path === '') {
 			throw new \InvalidArgumentException('Invalid file path.');
@@ -41,16 +40,14 @@ class PadInitializationService {
 	}
 
 	/**
-	 * @return array{status:string,file:string,file_id:int,pad_id:string,access_mode:string}
 	 * @throws NotFoundException
 	 */
-	public function initializeById(string $uid, int $fileId): array {
+	public function initializeById(string $uid, int $fileId): PadInitializationResult {
 		$node = $this->userNodeResolver->resolveUserFileNodeById($uid, $fileId);
 		return $this->initializeNode($uid, $node);
 	}
 
-	/** @return array{status:string,file:string,file_id:int,pad_id:string,access_mode:string} */
-	private function initializeNode(string $uid, File $node): array {
+	private function initializeNode(string $uid, File $node): PadInitializationResult {
 		$fileId = (int)$node->getId();
 		if ($fileId <= 0) {
 			throw new \RuntimeException('Could not resolve file ID.');
@@ -59,20 +56,19 @@ class PadInitializationService {
 		return $this->initialize($uid, $node, (string)$node->getContent());
 	}
 
-	/** @return array{status:string,file:string,file_id:int,pad_id:string,access_mode:string} */
-	public function initialize(string $uid, File $file, string $content): array {
+	public function initialize(string $uid, File $file, string $content): PadInitializationResult {
 		$fileId = (int)$file->getId();
 		$path = $this->userNodeResolver->toUserAbsolutePath($uid, $file);
 		try {
 			$parsed = $this->padFileService->parsePadFile($content);
 			$meta = $parsed['frontmatter'];
-			return [
-				'status' => self::STATUS_ALREADY_INITIALIZED,
-				'file' => $path,
-				'file_id' => $fileId,
-				'pad_id' => (string)$meta['pad_id'],
-				'access_mode' => (string)$meta['access_mode'],
-			];
+			return new PadInitializationResult(
+				status: self::STATUS_ALREADY_INITIALIZED,
+				file: $path,
+				fileId: $fileId,
+				padId: (string)$meta['pad_id'],
+				accessMode: (string)$meta['access_mode'],
+			);
 		} catch (MissingFrontmatterException) {
 			// Explicitly continue with bootstrap flow for legacy or empty .pad files.
 		} catch (PadFileFormatException $e) {
@@ -84,12 +80,12 @@ class PadInitializationService {
 		$parsed = $this->padFileService->parsePadFile((string)$updatedContent);
 		$meta = $parsed['frontmatter'];
 
-		return [
-			'status' => self::STATUS_INITIALIZED,
-			'file' => $path,
-			'file_id' => $fileId,
-			'pad_id' => (string)$meta['pad_id'],
-			'access_mode' => (string)$meta['access_mode'],
-		];
+		return new PadInitializationResult(
+			status: self::STATUS_INITIALIZED,
+			file: $path,
+			fileId: $fileId,
+			padId: (string)$meta['pad_id'],
+			accessMode: (string)$meta['access_mode'],
+		);
 	}
 }

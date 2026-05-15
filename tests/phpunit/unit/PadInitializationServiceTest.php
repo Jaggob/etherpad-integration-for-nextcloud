@@ -50,9 +50,9 @@ class PadInitializationServiceTest extends TestCase {
 		$result = (new PadInitializationService($padFileService, $padPaths, $userNodeResolver, $bootstrap))
 			->initializeByPath('alice', '/Existing.pad');
 
-		$this->assertSame(PadInitializationService::STATUS_ALREADY_INITIALIZED, $result['status']);
-		$this->assertSame('/Existing.pad', $result['file']);
-		$this->assertSame(42, $result['file_id']);
+		$this->assertSame(PadInitializationService::STATUS_ALREADY_INITIALIZED, $result->status);
+		$this->assertSame('/Existing.pad', $result->file);
+		$this->assertSame(42, $result->fileId);
 	}
 
 	public function testInitializeByIdResolvesFileAndReadsContent(): void {
@@ -85,9 +85,9 @@ class PadInitializationServiceTest extends TestCase {
 		$result = (new PadInitializationService($padFileService, $this->createMock(PadPathService::class), $userNodeResolver, $bootstrap))
 			->initializeById('alice', 42);
 
-		$this->assertSame(PadInitializationService::STATUS_ALREADY_INITIALIZED, $result['status']);
-		$this->assertSame('/Existing.pad', $result['file']);
-		$this->assertSame(42, $result['file_id']);
+		$this->assertSame(PadInitializationService::STATUS_ALREADY_INITIALIZED, $result->status);
+		$this->assertSame('/Existing.pad', $result->file);
+		$this->assertSame(42, $result->fileId);
 	}
 
 	public function testInitializeByPathRejectsEmptyPath(): void {
@@ -130,13 +130,11 @@ class PadInitializationServiceTest extends TestCase {
 		$result = (new PadInitializationService($padFileService, $this->createMock(PadPathService::class), $userNodeResolver, $bootstrap))
 			->initialize('alice', $file, 'content');
 
-		$this->assertSame([
-			'status' => PadInitializationService::STATUS_ALREADY_INITIALIZED,
-			'file' => '/Existing.pad',
-			'file_id' => 42,
-			'pad_id' => 'g.ABC$pad',
-			'access_mode' => BindingService::ACCESS_PUBLIC,
-		], $result);
+		$this->assertSame(PadInitializationService::STATUS_ALREADY_INITIALIZED, $result->status);
+		$this->assertSame('/Existing.pad', $result->file);
+		$this->assertSame(42, $result->fileId);
+		$this->assertSame('g.ABC$pad', $result->padId);
+		$this->assertSame(BindingService::ACCESS_PUBLIC, $result->accessMode);
 	}
 
 	public function testInitializeBootstrapsMissingFrontmatter(): void {
@@ -173,12 +171,10 @@ class PadInitializationServiceTest extends TestCase {
 		$result = (new PadInitializationService($padFileService, $this->createMock(PadPathService::class), $userNodeResolver, $bootstrap))
 			->initialize('alice', $file, 'legacy-content');
 
-		$this->assertSame([
-			'status' => PadInitializationService::STATUS_INITIALIZED,
-			'file' => '/Legacy.pad',
-			'file_id' => 42,
-			'pad_id' => 'g.XYZ$pad',
-			'access_mode' => BindingService::ACCESS_PROTECTED,
-		], $result);
+		$this->assertSame(PadInitializationService::STATUS_INITIALIZED, $result->status);
+		$this->assertSame('/Legacy.pad', $result->file);
+		$this->assertSame(42, $result->fileId);
+		$this->assertSame('g.XYZ$pad', $result->padId);
+		$this->assertSame(BindingService::ACCESS_PROTECTED, $result->accessMode);
 	}
 }
