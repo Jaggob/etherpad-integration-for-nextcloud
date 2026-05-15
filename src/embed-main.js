@@ -396,7 +396,7 @@ import { fetchJsonWithTimeout as fetchJson } from './lib/fetch-helpers.js'
 		return button
 	}
 
-	const showRecoveryWithOriginal = (originalViewerUrl, errorMessage) => {
+	const showRecoveryWithOriginal = (originalEmbedUrl, errorMessage) => {
 		if (!(recoveryNode instanceof HTMLElement)) return
 		hideAllPanels()
 		recoveryNode.hidden = false
@@ -405,11 +405,9 @@ import { fetchJsonWithTimeout as fetchJson } from './lib/fetch-helpers.js'
 		if (recoveryActionsNode instanceof HTMLElement) {
 			const openLink = document.createElement('a')
 			openLink.className = 'epnc-embed__recovery-button epnc-embed__recovery-button--primary'
-			openLink.href = originalViewerUrl
-			// Open in a new tab so we don't navigate the host page; this matches
-			// how the external-pad snapshot link behaves above.
-			openLink.target = '_blank'
-			openLink.rel = 'noopener noreferrer'
+			// Stay in embed mode: load the original's embed page in the same
+			// frame so a host iframe doesn't need to deal with a new tab.
+			openLink.href = originalEmbedUrl
 			openLink.textContent = recoveryOpenOriginalText
 			recoveryActionsNode.replaceChildren(
 				openLink,
@@ -484,8 +482,8 @@ import { fetchJsonWithTimeout as fetchJson } from './lib/fetch-helpers.js'
 		const lookupUrl = findOriginalUrlTemplate.replace('__FILE_ID__', encodeURIComponent(String(fileId)))
 		try {
 			const hint = await fetchJson(lookupUrl, { method: 'GET' })
-			if (hint && hint.found === true && typeof hint.viewer_url === 'string' && hint.viewer_url !== '') {
-				showRecoveryWithOriginal(hint.viewer_url, errorMessage)
+			if (hint && hint.found === true && typeof hint.embed_url === 'string' && hint.embed_url !== '') {
+				showRecoveryWithOriginal(hint.embed_url, errorMessage)
 				return
 			}
 		} catch {

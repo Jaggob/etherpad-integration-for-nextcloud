@@ -238,7 +238,7 @@ class PadController extends Controller {
 			),
 			fn(array $data): DataResponse => new DataResponse(
 				($data['found'] ?? false) === true
-					? $this->padResponses->withViewerUrl($data)
+					? $this->padResponses->withViewerAndEmbedUrls($data)
 					: $data
 			),
 			[

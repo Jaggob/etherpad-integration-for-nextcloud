@@ -690,6 +690,7 @@ class PadControllerTest extends TestCase {
 		$this->assertSame(42, $data['file_id']);
 		$this->assertSame('/Folder/Original.pad', $data['path']);
 		$this->assertNotEmpty($data['viewer_url']);
+		$this->assertNotEmpty($data['embed_url']);
 	}
 
 	public function testFindOriginalByFileIdReturnsFoundFalseUniformlyOnMiss(): void {
@@ -831,6 +832,17 @@ class PadControllerTest extends TestCase {
 		$padLifecycleOperations = $padLifecycleOperations
 			?? new PadLifecycleOperationService($padPaths, $userNodeResolver, $this->createMock(LifecycleService::class));
 		$urlGenerator = $this->createMock(IURLGenerator::class);
+		$urlGenerator->method('linkToRoute')->willReturnCallback(
+			static function (string $route, array $params = []): string {
+				if ($route === 'files.view.index') {
+					return '/apps/files';
+				}
+				if ($route === 'etherpad_nextcloud.embed.showById') {
+					return '/apps/etherpad_nextcloud/embed/by-id/' . ($params['fileId'] ?? '');
+				}
+				return '/' . $route;
+			}
+		);
 		$appConfigService = $this->createMock(AppConfigService::class);
 		$l10n = $this->createMock(\OCP\IL10N::class);
 		$l10n->method('t')->willReturnCallback(static fn (string $text, array $params = []): string => $text);
