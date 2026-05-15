@@ -117,11 +117,7 @@ class PadResponseService {
 	/** @return array<string,mixed> */
 	public function syncStatusResponse(PadSyncStatus $status): array {
 		$payload = ['status' => $status->status];
-		// inSync is intentionally emitted unconditionally: the viewer's
-		// polling loop branches on `in_sync === null` to distinguish the
-		// "no revision available" status (external / unavailable) from the
-		// regular synced/out-of-sync states. Serializing null preserves
-		// that signal.
+		// Emitted unconditionally — the viewer treats null as a distinct state.
 		$payload['in_sync'] = $status->inSync;
 		if ($status->snapshotRev !== null) {
 			$payload['snapshot_rev'] = $status->snapshotRev;
