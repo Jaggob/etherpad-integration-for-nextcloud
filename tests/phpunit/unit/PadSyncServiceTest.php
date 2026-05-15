@@ -42,11 +42,9 @@ class PadSyncServiceTest extends TestCase {
 		$result = $this->buildService($padFileService, $userNodeResolver, $bindingService)
 			->syncStatusById('alice', 138);
 
-		$this->assertSame([
-			'status' => PadSyncService::STATUS_UNAVAILABLE,
-			'in_sync' => null,
-			'reason' => 'external_no_revision',
-		], $result);
+		$this->assertSame(PadSyncService::STATUS_UNAVAILABLE, $result->status);
+		$this->assertNull($result->inSync);
+		$this->assertSame('external_no_revision', $result->reason);
 	}
 
 	public function testSyncStatusReportsOutOfSyncInternalPad(): void {
@@ -85,12 +83,10 @@ class PadSyncServiceTest extends TestCase {
 		$result = $this->buildService($padFileService, $userNodeResolver, $bindingService, $etherpadClient)
 			->syncStatusById('alice', 138);
 
-		$this->assertSame([
-			'status' => PadSyncService::STATUS_OUT_OF_SYNC,
-			'in_sync' => false,
-			'snapshot_rev' => 3,
-			'current_rev' => 5,
-		], $result);
+		$this->assertSame(PadSyncService::STATUS_OUT_OF_SYNC, $result->status);
+		$this->assertFalse($result->inSync);
+		$this->assertSame(3, $result->snapshotRev);
+		$this->assertSame(5, $result->currentRev);
 	}
 
 	public function testSyncExternalPadStoresOnlyTextSnapshot(): void {
@@ -151,15 +147,13 @@ class PadSyncServiceTest extends TestCase {
 		$result = $this->buildService($padFileService, $userNodeResolver, $bindingService, $etherpadClient, $lockRetryService)
 			->syncById('alice', 138, true);
 
-		$this->assertSame([
-			'status' => PadSyncService::STATUS_UPDATED,
-			'file_id' => 138,
-			'pad_id' => 'ext.remote',
-			'external' => true,
-			'forced' => true,
-			'snapshot_rev' => 5,
-			'lock_retries' => 1,
-		], $result);
+		$this->assertSame(PadSyncService::STATUS_UPDATED, $result->status);
+		$this->assertSame(138, $result->fileId);
+		$this->assertSame('ext.remote', $result->padId);
+		$this->assertTrue($result->external);
+		$this->assertTrue($result->forced);
+		$this->assertSame(5, $result->snapshotRev);
+		$this->assertSame(1, $result->lockRetries);
 	}
 
 	private function buildService(

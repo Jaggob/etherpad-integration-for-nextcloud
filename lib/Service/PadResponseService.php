@@ -111,6 +111,46 @@ class PadResponseService {
 	}
 
 	/** @return array<string,mixed> */
+	public function syncStatusResponse(PadSyncStatus $status): array {
+		$payload = ['status' => $status->status];
+		$payload['in_sync'] = $status->inSync;
+		if ($status->snapshotRev !== null) {
+			$payload['snapshot_rev'] = $status->snapshotRev;
+		}
+		if ($status->currentRev !== null) {
+			$payload['current_rev'] = $status->currentRev;
+		}
+		if ($status->reason !== null) {
+			$payload['reason'] = $status->reason;
+		}
+		return $payload;
+	}
+
+	/** @return array<string,mixed> */
+	public function syncResponse(PadSyncResult $result): array {
+		$payload = [
+			'status' => $result->status,
+			'file_id' => $result->fileId,
+			'pad_id' => $result->padId,
+			'external' => $result->external,
+			'forced' => $result->forced,
+		];
+		if ($result->snapshotRev !== null) {
+			$payload['snapshot_rev'] = $result->snapshotRev;
+		}
+		if ($result->currentRev !== null) {
+			$payload['current_rev'] = $result->currentRev;
+		}
+		if ($result->lockRetries !== null) {
+			$payload['lock_retries'] = $result->lockRetries;
+		}
+		if ($result->retryable) {
+			$payload['retryable'] = true;
+		}
+		return $payload;
+	}
+
+	/** @return array<string,mixed> */
 	public function initializationResponse(PadInitializationResult $result): array {
 		return [
 			'status' => $result->status,

@@ -23,6 +23,8 @@ use OCA\EtherpadNextcloud\Service\PadOpenTarget;
 use OCA\EtherpadNextcloud\Service\PadOriginalLookup;
 use OCA\EtherpadNextcloud\Service\PadResolution;
 use OCA\EtherpadNextcloud\Service\PadResponseService;
+use OCA\EtherpadNextcloud\Service\PadSyncResult;
+use OCA\EtherpadNextcloud\Service\PadSyncStatus;
 use OCA\EtherpadNextcloud\Service\PadSyncService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
@@ -188,8 +190,8 @@ class PadController extends Controller {
 		$force = in_array(strtolower($forceParam), ['1', 'true', 'yes'], true);
 
 		return $this->runForUser(
-			fn(IUser $user): array => $this->padSyncService->syncById($user->getUID(), $this->requireFileId($fileId), $force),
-			fn(array $result): DataResponse => new DataResponse($result),
+			fn(IUser $user): PadSyncResult => $this->padSyncService->syncById($user->getUID(), $this->requireFileId($fileId), $force),
+			fn(PadSyncResult $result): DataResponse => new DataResponse($this->padResponses->syncResponse($result)),
 			[
 				'not_found' => $this->l10n->t('Cannot resolve file path for file ID.'),
 				'generic' => $this->l10n->t('Could not sync pad content.'),
@@ -201,8 +203,8 @@ class PadController extends Controller {
 	#[\OCP\AppFramework\Http\Attribute\NoCSRFRequired]
 	public function syncStatusById(int $fileId): DataResponse {
 		return $this->runForUser(
-			fn(IUser $user): array => $this->padSyncService->syncStatusById($user->getUID(), $this->requireFileId($fileId)),
-			fn(array $result): DataResponse => new DataResponse($result),
+			fn(IUser $user): PadSyncStatus => $this->padSyncService->syncStatusById($user->getUID(), $this->requireFileId($fileId)),
+			fn(PadSyncStatus $result): DataResponse => new DataResponse($this->padResponses->syncStatusResponse($result)),
 			[
 				'not_found' => $this->l10n->t('Cannot read selected .pad file.'),
 				'generic' => $this->l10n->t('Could not check pad sync status.'),
