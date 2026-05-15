@@ -51,6 +51,17 @@ class PadResponseService {
 		return new DataResponse($data, $status);
 	}
 
+	/** @return array<string,mixed> */
+	public function initializationResponse(PadInitializationResult $result): array {
+		return [
+			'status' => $result->status,
+			'file' => $result->file,
+			'file_id' => $result->fileId,
+			'pad_id' => $result->padId,
+			'access_mode' => $result->accessMode,
+		];
+	}
+
 	public function openResponse(PadOpenTarget $target): DataResponse {
 		$payload = [
 			'file' => $target->file,

@@ -13,6 +13,7 @@ use OCA\EtherpadNextcloud\Exception\ControllerBadRequestException;
 use OCA\EtherpadNextcloud\Exception\UnauthorizedRequestException;
 use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\PadCreationService;
+use OCA\EtherpadNextcloud\Service\PadInitializationResult;
 use OCA\EtherpadNextcloud\Service\PadInitializationService;
 use OCA\EtherpadNextcloud\Service\PadLifecycleOperationService;
 use OCA\EtherpadNextcloud\Service\PadMetadataService;
@@ -122,8 +123,8 @@ class PadController extends Controller {
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	public function initialize(string $file): DataResponse {
 		return $this->runForUser(
-			fn(IUser $user): array => $this->padInitializationService->initializeByPath($user->getUID(), $file),
-			fn(array $result): DataResponse => new DataResponse($result),
+			fn(IUser $user): PadInitializationResult => $this->padInitializationService->initializeByPath($user->getUID(), $file),
+			fn(PadInitializationResult $result): DataResponse => new DataResponse($this->padResponses->initializationResponse($result)),
 			[
 				'invalid_argument' => $this->l10n->t('Invalid file path.'),
 				'not_found' => $this->l10n->t('Cannot open selected .pad file.'),
@@ -139,8 +140,8 @@ class PadController extends Controller {
 	#[\OCP\AppFramework\Http\Attribute\NoAdminRequired]
 	public function initializeById(int $fileId): DataResponse {
 		return $this->runForUser(
-			fn(IUser $user): array => $this->padInitializationService->initializeById($user->getUID(), $this->requireFileId($fileId)),
-			fn(array $result): DataResponse => new DataResponse($result),
+			fn(IUser $user): PadInitializationResult => $this->padInitializationService->initializeById($user->getUID(), $this->requireFileId($fileId)),
+			fn(PadInitializationResult $result): DataResponse => new DataResponse($this->padResponses->initializationResponse($result)),
 			[
 				'not_found' => $this->l10n->t('Cannot open selected .pad file.'),
 				'generic' => $this->l10n->t('Could not initialize pad file.'),
