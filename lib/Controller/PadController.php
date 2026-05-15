@@ -22,6 +22,7 @@ use OCA\EtherpadNextcloud\Service\PadSyncService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\DataResponse;
+use OCP\IL10N;
 use OCP\IRequest;
 use OCP\IUser;
 use OCP\IUserSession;
@@ -33,6 +34,7 @@ class PadController extends Controller {
 		IRequest $request,
 		private IUserSession $userSession,
 		private LoggerInterface $logger,
+		private IL10N $l10n,
 		private PadCreationService $padCreationService,
 		private PadInitializationService $padInitializationService,
 		private PadMetadataService $padMetadataService,
@@ -51,10 +53,10 @@ class PadController extends Controller {
 			fn(IUser $user): array => $this->padCreationService->create($user->getUID(), $file, $this->requireAccessMode($accessMode)),
 			fn(array $result): DataResponse => new DataResponse($this->padResponses->withViewerUrl($result)),
 			[
-				'invalid_argument' => 'Invalid file path.',
-				'binding_message' => 'A file with this name already exists.',
+				'invalid_argument' => $this->l10n->t('Invalid file path.'),
+				'binding_message' => $this->l10n->t('A file with this name already exists.'),
 				'binding_status' => Http::STATUS_CONFLICT,
-				'generic' => 'Pad creation failed.',
+				'generic' => $this->l10n->t('Could not create pad.'),
 			],
 		);
 	}
@@ -70,11 +72,11 @@ class PadController extends Controller {
 			),
 			fn(array $result): DataResponse => new DataResponse($this->padResponses->withViewerAndEmbedUrls($result)),
 			[
-				'invalid_argument' => 'Invalid pad name.',
-				'not_found' => 'Cannot resolve selected parent folder.',
-				'binding_message' => 'A file with this name already exists.',
+				'invalid_argument' => $this->l10n->t('Invalid pad name.'),
+				'not_found' => $this->l10n->t('Cannot resolve selected parent folder.'),
+				'binding_message' => $this->l10n->t('A file with this name already exists.'),
 				'binding_status' => Http::STATUS_CONFLICT,
-				'generic' => 'Pad creation failed.',
+				'generic' => $this->l10n->t('Could not create pad.'),
 			],
 		);
 	}
@@ -85,8 +87,8 @@ class PadController extends Controller {
 			fn(IUser $user): array => $this->padCreationService->createFromUrl($user->getUID(), $file, $padUrl),
 			fn(array $result): DataResponse => new DataResponse($this->padResponses->withViewerUrl($result)),
 			[
-				'invalid_argument' => 'Invalid input.',
-				'generic' => 'External pad create failed.',
+				'invalid_argument' => $this->l10n->t('Invalid input.'),
+				'generic' => $this->l10n->t('Could not import external pad.'),
 			],
 		);
 	}
@@ -97,9 +99,9 @@ class PadController extends Controller {
 			fn(IUser $user): array => $this->padOpenService->openByPath($user->getUID(), $user->getDisplayName(), $file),
 			fn(array $result): DataResponse => $this->padResponses->openResponse($result),
 			[
-				'invalid_argument' => 'Invalid file path.',
-				'not_found' => 'Cannot open selected .pad file.',
-				'generic' => 'Pad open failed.',
+				'invalid_argument' => $this->l10n->t('Invalid file path.'),
+				'not_found' => $this->l10n->t('Cannot open selected .pad file.'),
+				'generic' => $this->l10n->t('Could not open pad.'),
 			],
 		);
 	}
@@ -110,8 +112,8 @@ class PadController extends Controller {
 			fn(IUser $user): array => $this->padOpenService->openById($user->getUID(), $user->getDisplayName(), $this->requireFileId($fileId)),
 			fn(array $result): DataResponse => $this->padResponses->openResponse($result),
 			[
-				'not_found' => 'Cannot open selected .pad file.',
-				'generic' => 'Pad open failed.',
+				'not_found' => $this->l10n->t('Cannot open selected .pad file.'),
+				'generic' => $this->l10n->t('Could not open pad.'),
 			],
 		);
 	}
@@ -122,9 +124,9 @@ class PadController extends Controller {
 			fn(IUser $user): array => $this->padInitializationService->initializeByPath($user->getUID(), $file),
 			fn(array $result): DataResponse => new DataResponse($result),
 			[
-				'invalid_argument' => 'Invalid file path.',
-				'not_found' => 'Cannot open selected .pad file.',
-				'generic' => 'Pad initialization failed.',
+				'invalid_argument' => $this->l10n->t('Invalid file path.'),
+				'not_found' => $this->l10n->t('Cannot open selected .pad file.'),
+				'generic' => $this->l10n->t('Could not initialize pad file.'),
 				'on_throwable' => fn(\Throwable $e) => $this->logError('Pad frontmatter initialization failed in API initialize', [
 					'file' => $file,
 					'exception' => $e,
@@ -139,8 +141,8 @@ class PadController extends Controller {
 			fn(IUser $user): array => $this->padInitializationService->initializeById($user->getUID(), $this->requireFileId($fileId)),
 			fn(array $result): DataResponse => new DataResponse($result),
 			[
-				'not_found' => 'Cannot open selected .pad file.',
-				'generic' => 'Pad initialization failed.',
+				'not_found' => $this->l10n->t('Cannot open selected .pad file.'),
+				'generic' => $this->l10n->t('Could not initialize pad file.'),
 				'on_throwable' => fn(\Throwable $e) => $this->logError('Pad frontmatter initialization failed in API initialize-by-id', [
 					'fileId' => $fileId,
 					'exception' => $e,
@@ -160,8 +162,8 @@ class PadController extends Controller {
 					: $data
 			),
 			[
-				'not_found' => 'Cannot resolve selected .pad file.',
-				'generic' => 'Pad meta failed.',
+				'not_found' => $this->l10n->t('Cannot resolve selected .pad file.'),
+				'generic' => $this->l10n->t('Could not read pad metadata.'),
 			],
 		);
 	}
@@ -177,8 +179,8 @@ class PadController extends Controller {
 					: $data
 			),
 			[
-				'invalid_argument' => 'Invalid file path.',
-				'generic' => 'Pad resolve failed.',
+				'invalid_argument' => $this->l10n->t('Invalid file path.'),
+				'generic' => $this->l10n->t('Could not resolve pad file.'),
 			],
 		);
 	}
@@ -192,8 +194,8 @@ class PadController extends Controller {
 			fn(IUser $user): array => $this->padSyncService->syncById($user->getUID(), $this->requireFileId($fileId), $force),
 			fn(array $result): DataResponse => new DataResponse($result),
 			[
-				'not_found' => 'Cannot resolve file path for file ID.',
-				'generic' => 'Pad sync failed.',
+				'not_found' => $this->l10n->t('Cannot resolve file path for file ID.'),
+				'generic' => $this->l10n->t('Could not sync pad content.'),
 			],
 		);
 	}
@@ -205,8 +207,8 @@ class PadController extends Controller {
 			fn(IUser $user): array => $this->padSyncService->syncStatusById($user->getUID(), $this->requireFileId($fileId)),
 			fn(array $result): DataResponse => new DataResponse($result),
 			[
-				'not_found' => 'Cannot read selected .pad file.',
-				'generic' => 'Sync status check failed.',
+				'not_found' => $this->l10n->t('Cannot read selected .pad file.'),
+				'generic' => $this->l10n->t('Could not check pad sync status.'),
 			],
 		);
 	}
@@ -217,9 +219,9 @@ class PadController extends Controller {
 			fn(IUser $user): array => $this->padLifecycleOperations->trashByPath($user->getUID(), $file),
 			fn(array $result): DataResponse => $this->padResponses->lifecycleResponse($result),
 			[
-				'invalid_argument' => 'Invalid file path.',
-				'not_found' => 'Pad file not found.',
-				'generic' => 'Trash failed.',
+				'invalid_argument' => $this->l10n->t('Invalid file path.'),
+				'not_found' => $this->l10n->t('Pad file not found.'),
+				'generic' => $this->l10n->t('Could not move pad to trash.'),
 				'on_throwable' => fn(\Throwable $e) => $this->logError('Pad trash API failed', [
 					'file' => $file,
 					'exception' => $e,
@@ -242,7 +244,7 @@ class PadController extends Controller {
 					: $data
 			),
 			[
-				'generic' => 'Lookup failed.',
+				'generic' => $this->l10n->t('Could not look up the original pad.'),
 			],
 		);
 	}
@@ -253,8 +255,8 @@ class PadController extends Controller {
 			fn(IUser $user): array => $this->padLifecycleOperations->recoverByFileId($user->getUID(), $this->requireFileId($fileId)),
 			fn(array $result): DataResponse => $this->padResponses->lifecycleResponse($result),
 			[
-				'not_found' => 'Pad file not found.',
-				'generic' => 'Recovery failed.',
+				'not_found' => $this->l10n->t('Pad file not found.'),
+				'generic' => $this->l10n->t('Could not recover pad from this file.'),
 				'on_throwable' => fn(\Throwable $e) => $this->logError('Pad recovery API failed', [
 					'fileId' => $fileId,
 					'exception' => $e,
@@ -269,9 +271,9 @@ class PadController extends Controller {
 			fn(IUser $user): array => $this->padLifecycleOperations->restoreByPath($user->getUID(), $file),
 			fn(array $result): DataResponse => $this->padResponses->lifecycleResponse($result),
 			[
-				'invalid_argument' => 'Invalid file path.',
-				'not_found' => 'Pad file not found.',
-				'generic' => 'Restore failed.',
+				'invalid_argument' => $this->l10n->t('Invalid file path.'),
+				'not_found' => $this->l10n->t('Pad file not found.'),
+				'generic' => $this->l10n->t('Could not restore pad from trash.'),
 				'on_throwable' => fn(\Throwable $e) => $this->logError('Pad restore API failed', [
 					'file' => $file,
 					'exception' => $e,

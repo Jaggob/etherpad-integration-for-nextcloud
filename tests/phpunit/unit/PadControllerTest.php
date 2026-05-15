@@ -180,6 +180,7 @@ class PadControllerTest extends TestCase {
 			$this->createMock(IRequest::class),
 			$userSession,
 			$logger,
+			$l10n,
 			$this->createMock(PadCreationService::class),
 			$this->createMock(PadInitializationService::class),
 			$this->createMock(PadMetadataService::class),
@@ -312,6 +313,7 @@ class PadControllerTest extends TestCase {
 			$this->createMock(IRequest::class),
 			$userSession,
 			$logger,
+			$l10n,
 			$this->createMock(PadCreationService::class),
 			$this->createMock(PadInitializationService::class),
 			$this->createMock(PadMetadataService::class),
@@ -382,7 +384,7 @@ class PadControllerTest extends TestCase {
 		$response = $controller->resolveById(138);
 
 		$this->assertSame(Http::STATUS_INTERNAL_SERVER_ERROR, $response->getStatus());
-		$this->assertSame('Pad resolve failed.', $response->getData()['message']);
+		$this->assertSame('Could not resolve pad file.', $response->getData()['message']);
 	}
 
 	public function testSyncByIdRejectsInvalidFileId(): void {
@@ -852,6 +854,7 @@ class PadControllerTest extends TestCase {
 			$request,
 			$userSession,
 			$logger,
+			$l10n,
 			$this->createMock(PadCreationService::class),
 			$this->createMock(PadInitializationService::class),
 			$padMetadataService,
