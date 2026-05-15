@@ -52,6 +52,65 @@ class PadResponseService {
 	}
 
 	/** @return array<string,mixed> */
+	public function metaResponse(PadMeta $meta): array {
+		if (!$meta->isPad) {
+			return [
+				'is_pad' => false,
+				'file_id' => $meta->fileId,
+				'name' => $meta->name,
+				'path' => $meta->path,
+			];
+		}
+		return $this->withViewerAndEmbedUrls([
+			'is_pad' => true,
+			'is_pad_mime' => $meta->isPadMime,
+			'file_id' => $meta->fileId,
+			'name' => $meta->name,
+			'path' => $meta->path,
+			'access_mode' => $meta->accessMode,
+			'is_external' => $meta->isExternal,
+			'pad_id' => $meta->padId,
+			'pad_url' => $meta->padUrl,
+			'public_open_url' => $meta->publicOpenUrl,
+		]);
+	}
+
+	/** @return array<string,mixed> */
+	public function resolveResponse(PadResolution $resolution): array {
+		if (!$resolution->isPad) {
+			$payload = ['is_pad' => false];
+			if ($resolution->fileId !== null) {
+				$payload['file_id'] = $resolution->fileId;
+			}
+			if ($resolution->path !== null) {
+				$payload['path' ] = $resolution->path;
+			}
+			return $payload;
+		}
+		return $this->withViewerUrl([
+			'is_pad' => true,
+			'is_pad_mime' => $resolution->isPadMime,
+			'file_id' => (int)$resolution->fileId,
+			'path' => (string)$resolution->path,
+			'access_mode' => $resolution->accessMode,
+			'is_external' => $resolution->isExternal,
+			'public_open_url' => $resolution->publicOpenUrl,
+		]);
+	}
+
+	/** @return array<string,mixed> */
+	public function originalLookupResponse(PadOriginalLookup $lookup): array {
+		if (!$lookup->found) {
+			return ['found' => false];
+		}
+		return $this->withViewerAndEmbedUrls([
+			'found' => true,
+			'file_id' => (int)$lookup->fileId,
+			'path' => (string)$lookup->path,
+		]);
+	}
+
+	/** @return array<string,mixed> */
 	public function initializationResponse(PadInitializationResult $result): array {
 		return [
 			'status' => $result->status,

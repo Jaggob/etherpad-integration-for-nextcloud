@@ -16,9 +16,12 @@ use OCA\EtherpadNextcloud\Service\PadCreationService;
 use OCA\EtherpadNextcloud\Service\PadInitializationResult;
 use OCA\EtherpadNextcloud\Service\PadInitializationService;
 use OCA\EtherpadNextcloud\Service\PadLifecycleOperationService;
+use OCA\EtherpadNextcloud\Service\PadMeta;
 use OCA\EtherpadNextcloud\Service\PadMetadataService;
 use OCA\EtherpadNextcloud\Service\PadOpenService;
 use OCA\EtherpadNextcloud\Service\PadOpenTarget;
+use OCA\EtherpadNextcloud\Service\PadOriginalLookup;
+use OCA\EtherpadNextcloud\Service\PadResolution;
 use OCA\EtherpadNextcloud\Service\PadResponseService;
 use OCA\EtherpadNextcloud\Service\PadSyncService;
 use OCP\AppFramework\Controller;
@@ -157,12 +160,8 @@ class PadController extends Controller {
 	#[\OCP\AppFramework\Http\Attribute\NoCSRFRequired]
 	public function metaById(int $fileId): DataResponse {
 		return $this->runForUser(
-			fn(IUser $user): array => $this->padMetadataService->metaById($user->getUID(), $this->requireFileId($fileId)),
-			fn(array $data): DataResponse => new DataResponse(
-				($data['is_pad'] ?? false) === true
-					? $this->padResponses->withViewerAndEmbedUrls($data)
-					: $data
-			),
+			fn(IUser $user): PadMeta => $this->padMetadataService->metaById($user->getUID(), $this->requireFileId($fileId)),
+			fn(PadMeta $meta): DataResponse => new DataResponse($this->padResponses->metaResponse($meta)),
 			[
 				'not_found' => $this->l10n->t('Cannot resolve selected .pad file.'),
 				'generic' => $this->l10n->t('Could not read pad metadata.'),
@@ -174,12 +173,8 @@ class PadController extends Controller {
 	#[\OCP\AppFramework\Http\Attribute\NoCSRFRequired]
 	public function resolveById(int $fileId = 0, string $file = ''): DataResponse {
 		return $this->runForUser(
-			fn(IUser $user): array => $this->padMetadataService->resolve($user->getUID(), $fileId, $file),
-			fn(array $data): DataResponse => new DataResponse(
-				($data['is_pad'] ?? false) === true
-					? $this->padResponses->withViewerUrl($data)
-					: $data
-			),
+			fn(IUser $user): PadResolution => $this->padMetadataService->resolve($user->getUID(), $fileId, $file),
+			fn(PadResolution $resolution): DataResponse => new DataResponse($this->padResponses->resolveResponse($resolution)),
 			[
 				'invalid_argument' => $this->l10n->t('Invalid file path.'),
 				'generic' => $this->l10n->t('Could not resolve pad file.'),
@@ -236,15 +231,11 @@ class PadController extends Controller {
 	#[\OCP\AppFramework\Http\Attribute\NoCSRFRequired]
 	public function findOriginalByFileId(int $fileId): DataResponse {
 		return $this->runForUser(
-			fn(IUser $user): array => $this->padMetadataService->findOriginalForCopy(
+			fn(IUser $user): PadOriginalLookup => $this->padMetadataService->findOriginalForCopy(
 				$user->getUID(),
 				$this->requireFileId($fileId),
 			),
-			fn(array $data): DataResponse => new DataResponse(
-				($data['found'] ?? false) === true
-					? $this->padResponses->withViewerAndEmbedUrls($data)
-					: $data
-			),
+			fn(PadOriginalLookup $lookup): DataResponse => new DataResponse($this->padResponses->originalLookupResponse($lookup)),
 			[
 				'generic' => $this->l10n->t('Could not look up the original pad.'),
 			],
