@@ -31,8 +31,9 @@ class EtherpadHealthCheckService {
 			);
 		} catch (EtherpadClientException $e) {
 			$detail = $e->getMessage();
-			if ($this->isLikelyAuthMethodMismatch($e)) {
-				$detail .= ' ' . $this->l10n->t('Hint: In Etherpad settings.json set "authenticationMethod": "apikey".');
+			$hint = $this->hintForFailure($e);
+			if ($hint !== '') {
+				$detail .= ' ' . $hint;
 			}
 			throw new AdminHealthCheckException(
 				$this->l10n->t('Health check failed: {detail}', ['detail' => $detail]),
@@ -52,13 +53,60 @@ class EtherpadHealthCheckService {
 		);
 	}
 
-	private function isLikelyAuthMethodMismatch(EtherpadClientException $e): bool {
-		// Etherpad returns these strings for API auth failures in supported versions.
-		// If upstream wording changes, the health check still fails; only the hint drops.
+	/**
+	 * Map an EtherpadClientException onto an actionable hint string. Returns
+	 * an empty string when no hint applies — the bare error stays in the
+	 * detail field in that case.
+	 *
+	 * Matching is intentionally on substrings rather than exception subtypes
+	 * because the upstream library bundles many failure shapes into the same
+	 * message. If upstream wording changes the hint just drops; the error
+	 * itself still surfaces.
+	 */
+	private function hintForFailure(EtherpadClientException $e): string {
 		$message = strtolower($e->getMessage());
-		return str_contains($message, 'no or wrong api key')
+
+		if (str_contains($message, 'no or wrong api key')
 			|| str_contains($message, 'wrong api key')
-			|| str_contains($message, 'invalid apikey');
+			|| str_contains($message, 'invalid apikey')) {
+			return $this->l10n->t('Hint: In Etherpad settings.json set "authenticationMethod": "apikey".');
+		}
+
+		// HTTP status hints come before transport hints because they
+		// distinguish "Etherpad reachable but unhappy" from "can't reach
+		// Etherpad at all".
+		if (str_contains($message, 'http error (401)') || str_contains($message, 'http error (403)')) {
+			return $this->l10n->t('Hint: Etherpad rejected the API key. Check that the key matches Etherpad\'s APIKEY.txt.');
+		}
+		if (str_contains($message, 'http error (404)')) {
+			return $this->l10n->t('Hint: API endpoint not found. Check the API host and that the configured API version is supported by your Etherpad.');
+		}
+		if (preg_match('/http error \(5\d{2}\)/', $message) === 1) {
+			return $this->l10n->t('Hint: Etherpad returned a server error. Check the Etherpad server logs.');
+		}
+
+		// Transport-level — file_get_contents / curl wrapper failures.
+		if (str_contains($message, 'transport error')) {
+			if (str_contains($message, 'getaddrinfo') || str_contains($message, 'name or service not known') || str_contains($message, 'could not resolve host')) {
+				return $this->l10n->t('Hint: The configured Etherpad host did not resolve. Check the hostname for typos and that DNS reaches it from this server.');
+			}
+			if (str_contains($message, 'connection refused')) {
+				return $this->l10n->t('Hint: Connection refused. Etherpad does not appear to be running on the configured host and port.');
+			}
+			if (str_contains($message, 'timed out') || str_contains($message, 'timeout')) {
+				return $this->l10n->t('Hint: Connection timed out. Check that this server can reach the Etherpad host (firewall, network).');
+			}
+			if (str_contains($message, 'ssl') || str_contains($message, 'tls') || str_contains($message, 'certificate')) {
+				return $this->l10n->t('Hint: TLS handshake failed. Check the Etherpad certificate and that the configured URL uses the right scheme.');
+			}
+			return $this->l10n->t('Hint: Could not reach Etherpad. Check the API host and that this server can connect to it.');
+		}
+
+		if (str_contains($message, 'invalid json response')) {
+			return $this->l10n->t('Hint: Etherpad returned non-JSON. Likely a reverse proxy or HTML error page in front of the API host.');
+		}
+
+		return '';
 	}
 
 	protected function now(): float {

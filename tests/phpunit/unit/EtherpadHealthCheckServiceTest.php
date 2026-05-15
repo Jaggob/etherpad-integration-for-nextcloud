@@ -88,15 +88,79 @@ class EtherpadHealthCheckServiceTest extends TestCase {
 
 	public function testCheckDoesNotAddAuthHintForUnrelatedFailures(): void {
 		$etherpad = $this->createMock(EtherpadClient::class);
-		$etherpad->method('healthCheck')->willThrowException(new EtherpadClientException('connection refused'));
+		$etherpad->method('healthCheck')->willThrowException(new EtherpadClientException('Etherpad transport error: getaddrinfo for pad.bogus failed'));
 
 		try {
 			(new EtherpadHealthCheckService($etherpad, $this->createMock(PendingDeleteRetryService::class), $this->buildL10n()))
 				->check($this->settings());
 			$this->fail('Expected health check exception.');
 		} catch (AdminHealthCheckException $e) {
-			$this->assertStringContainsString('connection refused', $e->getMessage());
+			$this->assertStringContainsString('getaddrinfo', $e->getMessage());
 			$this->assertStringNotContainsString('authenticationMethod', $e->getMessage());
+		}
+	}
+
+	/** @return iterable<string,array{0:string,1:string}> */
+	public static function hintCaseProvider(): iterable {
+		yield 'dns failure' => [
+			'Etherpad transport error: php_network_getaddresses: getaddrinfo for pad.example failed',
+			'did not resolve',
+		];
+		yield 'connection refused' => [
+			'Etherpad transport error: Connection refused',
+			'Etherpad does not appear to be running',
+		];
+		yield 'timeout' => [
+			'Etherpad transport error: stream_socket_client(): timed out',
+			'Connection timed out',
+		];
+		yield 'tls handshake' => [
+			'Etherpad transport error: SSL operation failed with code 1. OpenSSL Error',
+			'TLS handshake failed',
+		];
+		yield 'http 401' => [
+			'Etherpad API HTTP error (401)',
+			'rejected the API key',
+		];
+		yield 'http 404' => [
+			'Etherpad API HTTP error (404)',
+			'API endpoint not found',
+		];
+		yield 'http 502' => [
+			'Etherpad API HTTP error (502)',
+			'server error',
+		];
+		yield 'invalid json' => [
+			'Invalid JSON response from Etherpad API.',
+			'non-JSON',
+		];
+	}
+
+	#[\PHPUnit\Framework\Attributes\DataProvider('hintCaseProvider')]
+	public function testCheckAttachesActionableHintForKnownFailures(string $clientMessage, string $expectedHintFragment): void {
+		$etherpad = $this->createMock(EtherpadClient::class);
+		$etherpad->method('healthCheck')->willThrowException(new EtherpadClientException($clientMessage));
+
+		try {
+			(new EtherpadHealthCheckService($etherpad, $this->createMock(PendingDeleteRetryService::class), $this->buildL10n()))
+				->check($this->settings());
+			$this->fail('Expected health check exception.');
+		} catch (AdminHealthCheckException $e) {
+			$this->assertStringContainsString($clientMessage, $e->getMessage());
+			$this->assertStringContainsString($expectedHintFragment, $e->getMessage());
+		}
+	}
+
+	public function testCheckAttachesNoHintForUnrecognisedFailureShape(): void {
+		$etherpad = $this->createMock(EtherpadClient::class);
+		$etherpad->method('healthCheck')->willThrowException(new EtherpadClientException('something completely unexpected happened'));
+
+		try {
+			(new EtherpadHealthCheckService($etherpad, $this->createMock(PendingDeleteRetryService::class), $this->buildL10n()))
+				->check($this->settings());
+			$this->fail('Expected health check exception.');
+		} catch (AdminHealthCheckException $e) {
+			$this->assertSame('Health check failed: something completely unexpected happened', $e->getMessage());
 		}
 	}
 
