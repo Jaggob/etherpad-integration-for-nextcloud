@@ -35,8 +35,16 @@ class EtherpadHealthCheckService {
 			if ($hint !== '') {
 				$detail .= ' ' . $hint;
 			}
+			// We render the template ourselves and pass a plain string into
+			// the exception instead of relying on IL10N's placeholder
+			// substitution: the Exception constructor coerces non-strings
+			// via __toString, but at least on Nextcloud 30 the L10NString
+			// path leaks the literal '{detail}' through to consumers in
+			// some catalog setups. Doing the substitution here removes that
+			// surface area.
+			$template = (string)$this->l10n->t('Health check failed: {detail}');
 			throw new AdminHealthCheckException(
-				$this->l10n->t('Health check failed: {detail}', ['detail' => $detail]),
+				str_replace('{detail}', $detail, $template),
 				0,
 				$e,
 			);
