@@ -125,7 +125,20 @@ OC.L10N.register(
     "Hint: Connection timed out. Check that this server can reach the Etherpad host (firewall, network).": "Hinweis: Zeitüberschreitung bei der Verbindung. Prüfe, ob dieser Server den Etherpad-Host erreichen kann (Firewall, Netzwerk).",
     "Hint: TLS handshake failed. Check the Etherpad certificate and that the configured URL uses the right scheme.": "Hinweis: TLS-Handshake fehlgeschlagen. Prüfe das Etherpad-Zertifikat und ob die konfigurierte URL das richtige Schema verwendet.",
     "Hint: Could not reach Etherpad. Check the API host and that this server can connect to it.": "Hinweis: Etherpad konnte nicht erreicht werden. Prüfe den API-Host und ob dieser Server eine Verbindung herstellen kann.",
-    "Hint: Etherpad returned non-JSON. Likely a reverse proxy or HTML error page in front of the API host.": "Hinweis: Etherpad hat keine JSON-Antwort zurückgegeben. Wahrscheinlich steht ein Reverse-Proxy oder eine HTML-Fehlerseite vor dem API-Host."
+    "Hint: Etherpad returned non-JSON. Likely a reverse proxy or HTML error page in front of the API host.": "Hinweis: Etherpad hat keine JSON-Antwort zurückgegeben. Wahrscheinlich steht ein Reverse-Proxy oder eine HTML-Fehlerseite vor dem API-Host.",
+    "Invalid file ID.": "Ungültige Datei-ID.",
+    "Invalid file path.": "Ungültiger Dateipfad.",
+    "Invalid pad name.": "Ungültiger Pad-Name.",
+    "Invalid input.": "Ungültige Eingabe.",
+    "Invalid parentFolderId.": "Ungültige Ordner-ID.",
+    "Invalid accessMode. Use public or protected.": "Ungültiger Zugriffsmodus. Verwende public oder protected.",
+    "Cannot resolve selected parent folder.": "Ausgewählter Zielordner konnte nicht aufgelöst werden.",
+    "Cannot open selected .pad file.": "Ausgewählte .pad-Datei konnte nicht geöffnet werden.",
+    "Cannot resolve selected .pad file.": "Ausgewählte .pad-Datei konnte nicht aufgelöst werden.",
+    "Cannot read selected .pad file.": "Ausgewählte .pad-Datei konnte nicht gelesen werden.",
+    "Cannot resolve file path for file ID.": "Dateipfad zur Datei-ID konnte nicht ermittelt werden.",
+    "Pad file not found.": "Pad-Datei nicht gefunden.",
+    "A file with this name already exists.": "Eine Datei mit diesem Namen existiert bereits."
 },
 	"nplurals=2; plural=(n != 1);"
 );
