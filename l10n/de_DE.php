@@ -55,7 +55,6 @@ $TRANSLATIONS = [
 	"Sync interval must be between 5 and 3600 seconds." => "Das Intervall muss zwischen 5 und 3600 Sekunden liegen.",
 	"External allowlist contains invalid host: {host}" => "Die externe Allowlist enthält einen ungültigen Host: {host}",
 	"External allowlist URL must use https: {host}" => "Externe Allowlist-URL muss HTTPS verwenden: {host}",
-	"Frontmatter validation result is partial (scan limit/time budget reached)." => "Frontmatter-Validierung ist unvollständig (Scan-Limit/Zeitbudget erreicht).",
 	"Test fault cleared." => "Testfehler zurückgesetzt.",
 	"Test fault set: {fault}" => "Testfehler gesetzt: {fault}",
 	"Unsupported test fault." => "Nicht unterstützter Testfehler.",

@@ -27,10 +27,7 @@ use OCP\IRequest;
 use OCP\IUserSession;
 
 class AdminController extends Controller {
-	private const CONSISTENCY_FRONTMATTER_SCAN_LIMIT = 1500;
 	private const CONSISTENCY_SAMPLE_LIMIT = 25;
-	private const CONSISTENCY_FRONTMATTER_CHUNK_SIZE = 200;
-	private const CONSISTENCY_FRONTMATTER_TIME_BUDGET_MS = 3000;
 	private const PENDING_DELETE_RETRY_BATCH_SIZE = 500;
 
 	public function __construct(
@@ -128,12 +125,7 @@ class AdminController extends Controller {
 		return $this->errors->run(
 			function (): array {
 				$this->requireAdmin();
-				return $this->consistencyCheckService->run(
-					self::CONSISTENCY_FRONTMATTER_SCAN_LIMIT,
-					self::CONSISTENCY_SAMPLE_LIMIT,
-					self::CONSISTENCY_FRONTMATTER_CHUNK_SIZE,
-					self::CONSISTENCY_FRONTMATTER_TIME_BUDGET_MS,
-				);
+				return $this->consistencyCheckService->run(self::CONSISTENCY_SAMPLE_LIMIT);
 			},
 			fn(array $result): DataResponse => new DataResponse($this->consistencyResponseBuilder->build($result)),
 			[

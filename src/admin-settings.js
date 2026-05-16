@@ -232,39 +232,8 @@
 			try {
 				const data = await postJson(consistencyUrl, {})
 				const bindingWithoutFile = Number(data.binding_without_file_count || 0)
-				const fileWithoutBinding = Number(data.file_without_binding_count || 0)
-				const invalidFrontmatter = Number(data.invalid_frontmatter_count || 0)
-				const scanned = Number(data.frontmatter_scanned || 0)
-				const skipped = Number(data.frontmatter_skipped || 0)
-				const partialByLimit = data.frontmatter_scan_limit_reached === true
-				const partialByBudget = data.frontmatter_time_budget_exceeded === true
-				const budgetMs = Number(data.frontmatter_time_budget_ms || 0)
-				const chunkSize = Number(data.frontmatter_chunk_size || 0)
-				const issueCount = bindingWithoutFile + fileWithoutBinding + invalidFrontmatter
-				const details = [
-					`binding_without_file=${String(bindingWithoutFile)}`,
-					`file_without_binding=${String(fileWithoutBinding)}`,
-					`invalid_frontmatter=${String(invalidFrontmatter)}`,
-					`scanned=${String(scanned)}`,
-					`skipped=${String(skipped)}`,
-				]
-				if (chunkSize > 0) {
-					details.push(`chunk=${String(chunkSize)}`)
-				}
-				if (budgetMs > 0) {
-					details.push(`time_budget=${String(budgetMs)}ms`)
-				}
-				if (partialByLimit || partialByBudget) {
-					details.push('partial=yes')
-					if (partialByLimit) {
-						details.push('partial_reason=scan_limit')
-					}
-					if (partialByBudget) {
-						details.push('partial_reason=time_budget')
-					}
-				}
-				const message = `${String(data.message || l10n.consistencyOk)} ${details.join(' | ')}`
-				setStatus(message, issueCount > 0 ? 'error' : 'success')
+				const message = `${String(data.message || l10n.consistencyOk)} binding_without_file=${String(bindingWithoutFile)}`
+				setStatus(message, bindingWithoutFile > 0 ? 'error' : 'success')
 			} catch (error) {
 				setStatus(error instanceof Error ? error.message : l10n.consistencyFailed, 'error')
 			}

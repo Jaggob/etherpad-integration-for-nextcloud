@@ -54,7 +54,6 @@
         "Sync interval must be between 5 and 3600 seconds.": "El intervalo de sincronizacion debe estar entre 5 y 3600 segundos.",
         "External allowlist contains invalid host: {host}": "La lista de permitidos externa contiene un host no valido: {host}",
         "External allowlist URL must use https: {host}": "La URL de la lista de permitidos externa debe usar HTTPS: {host}",
-        "Frontmatter validation result is partial (scan limit/time budget reached).": "El resultado de validacion del frontmatter es parcial (se alcanzo el limite de escaneo/tiempo).",
         "Test fault cleared.": "Fallo de prueba limpiado.",
         "Test fault set: {fault}": "Fallo de prueba establecido: {fault}",
         "Unsupported test fault.": "Fallo de prueba no compatible.",
