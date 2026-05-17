@@ -17,5 +17,9 @@ if (!interface_exists(File::class)) {
 		public function getContent();
 
 		public function putContent($data): void;
+
+		public function getParent(): Folder;
+
+		public function move(string $targetPath): void;
 	}
 }

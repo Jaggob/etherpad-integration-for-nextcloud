@@ -27,6 +27,7 @@ $stubFiles = [
 	__DIR__ . '/stubs/OCP/Files/Folder.php',
 	__DIR__ . '/stubs/OCP/Files/IRootFolder.php',
 	__DIR__ . '/stubs/OCP/Files/NotFoundException.php',
+	__DIR__ . '/stubs/OCP/Files/Template/FileCreatedFromTemplateEvent.php',
 	__DIR__ . '/stubs/OCP/IRequest.php',
 	__DIR__ . '/stubs/OCP/Security/ISecureRandom.php',
 	__DIR__ . '/stubs/OCP/IConfig.php',
