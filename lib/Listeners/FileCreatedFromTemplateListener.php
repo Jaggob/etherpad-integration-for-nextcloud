@@ -17,7 +17,6 @@ use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use OCP\Files\File;
 use OCP\Files\Template\FileCreatedFromTemplateEvent;
-use OCP\IUser;
 use OCP\IUserSession;
 use Psr\Log\LoggerInterface;
 
@@ -46,8 +45,6 @@ class FileCreatedFromTemplateListener implements IEventListener {
 		}
 		$template = $event->getTemplate();
 		if (!$template instanceof File) {
-			// Blank template (no source) — leave the file empty so the
-			// regular missing-frontmatter initialize path handles it.
 			return;
 		}
 
@@ -60,6 +57,9 @@ class FileCreatedFromTemplateListener implements IEventListener {
 				'templateFileId' => (int)$template->getId(),
 				'exception' => $e,
 			]);
+			// Wipe whatever NC byte-copied so the new file becomes a regular
+			// empty .pad and the next open initialises frontmatter normally.
+			$this->resetTargetToEmpty($target);
 		}
 	}
 
@@ -70,15 +70,19 @@ class FileCreatedFromTemplateListener implements IEventListener {
 			return;
 		}
 
-		$parsed = $this->padFileService->parsePadFile($content);
-		$frontmatter = $parsed['frontmatter'];
-		$meta = $this->padFileService->extractPadMetadata($frontmatter);
+		try {
+			$parsed = $this->padFileService->parsePadFile($content);
+			$frontmatter = $parsed['frontmatter'];
+			$meta = $this->padFileService->extractPadMetadata($frontmatter);
+		} catch (\Throwable) {
+			$this->resetTargetToEmpty($target);
+			return;
+		}
+
 		$sourcePadId = (string)($meta['pad_id'] ?? '');
 		if ($sourcePadId === '' || str_starts_with($sourcePadId, 'ext.')
 			|| $this->padFileService->isExternalFrontmatter($frontmatter, $sourcePadId)) {
-			// External / unparseable templates carry no usable body for a
-			// managed-pad clone. Skip and let the empty target initialize
-			// normally on first open.
+			$this->resetTargetToEmpty($target);
 			return;
 		}
 
@@ -92,7 +96,6 @@ class FileCreatedFromTemplateListener implements IEventListener {
 		$resolvedHtml = $this->placeholderResolver->apply($snapshot['html'], $user);
 
 		$newPadId = $this->padBootstrapService->provisionPadId($accessMode);
-		$padCreated = true;
 
 		try {
 			$this->padBootstrapService->pushInitialSnapshot($newPadId, $resolvedText, $resolvedHtml);
@@ -115,21 +118,29 @@ class FileCreatedFromTemplateListener implements IEventListener {
 			);
 			$target->putContent($withSnapshot);
 			$this->bindingService->createBinding($targetFileId, $newPadId, $accessMode);
-			$padCreated = false;
 		} catch (\Throwable $e) {
-			if ($padCreated) {
-				try {
-					$this->etherpadClient->deletePad($newPadId);
-				} catch (\Throwable $cleanupError) {
-					$this->logger->warning('Could not cleanup Etherpad pad after template materialization failed.', [
-						'app' => 'etherpad_nextcloud',
-						'padId' => $newPadId,
-						'exception' => $cleanupError,
-					]);
-				}
+			try {
+				$this->etherpadClient->deletePad($newPadId);
+			} catch (\Throwable $cleanupError) {
+				$this->logger->warning('Could not cleanup Etherpad pad after template materialization failed.', [
+					'app' => 'etherpad_nextcloud',
+					'padId' => $newPadId,
+					'exception' => $cleanupError,
+				]);
 			}
 			throw $e;
 		}
 	}
 
+	private function resetTargetToEmpty(File $target): void {
+		try {
+			$target->putContent('');
+		} catch (\Throwable $e) {
+			$this->logger->warning('Could not reset target file content after rejected template.', [
+				'app' => 'etherpad_nextcloud',
+				'fileId' => (int)$target->getId(),
+				'exception' => $e,
+			]);
+		}
+	}
 }

@@ -122,10 +122,15 @@ class FileCreatedFromTemplateListenerTest extends TestCase {
 			->handle(new FileCreatedFromTemplateEvent($template, $target));
 	}
 
-	public function testSkipsExternalTemplateGracefully(): void {
+	public function testWipesTargetWhenTemplateIsExternal(): void {
+		// NC has already byte-copied the external template's frontmatter
+		// (with ext.* pad_id) into the new file. Leaving it there would
+		// confuse the open flow and leak the source's external pad URL.
+		// Reset the target to empty so the regular missing-frontmatter
+		// init creates a clean managed pad on first open.
 		$template = $this->file(7, 'External.pad', 'tpl');
 		$target = $this->file(99, 'New.pad', '');
-		$target->expects($this->never())->method('putContent');
+		$target->expects($this->once())->method('putContent')->with('');
 
 		$padFileService = $this->createMock(PadFileService::class);
 		$padFileService->method('parsePadFile')->willReturn([
@@ -142,6 +147,60 @@ class FileCreatedFromTemplateListenerTest extends TestCase {
 
 		$this->buildListener($bindingService, $padFileService, $bootstrap)
 			->handle(new FileCreatedFromTemplateEvent($template, $target));
+	}
+
+	public function testWipesTargetWhenTemplateFrontmatterIsUnparseable(): void {
+		$template = $this->file(7, 'Broken.pad', 'tpl');
+		$target = $this->file(99, 'New.pad', '');
+		$target->expects($this->once())->method('putContent')->with('');
+
+		$padFileService = $this->createMock(PadFileService::class);
+		$padFileService->method('parsePadFile')->willThrowException(new \RuntimeException('not yaml'));
+
+		$bootstrap = $this->createMock(PadBootstrapService::class);
+		$bootstrap->expects($this->never())->method('provisionPadId');
+
+		$bindingService = $this->createMock(BindingService::class);
+		$bindingService->expects($this->never())->method('createBinding');
+
+		$this->buildListener($bindingService, $padFileService, $bootstrap)
+			->handle(new FileCreatedFromTemplateEvent($template, $target));
+	}
+
+	public function testWipesTargetAndDeletesPadWhenBindingFails(): void {
+		// createBinding can fail (unique-constraint race, DB error). The
+		// freshly provisioned Etherpad pad must be deleted and the target
+		// file wiped so the user gets a clean state instead of a .pad
+		// pointing at a deleted pad_id.
+		$template = $this->file(7, 'Tpl.pad', 'tpl');
+		$target = $this->file(99, 'New.pad', '');
+		$putCalls = [];
+		$target->method('putContent')->willReturnCallback(
+			static function (string $content) use (&$putCalls): void {
+				$putCalls[] = $content;
+			}
+		);
+
+		$padFileService = $this->minimalPadFileService();
+		$bootstrap = $this->createMock(PadBootstrapService::class);
+		$bootstrap->method('provisionPadId')->willReturn('p-doomed');
+		$bootstrap->method('pushInitialSnapshot');
+
+		$bindingService = $this->createMock(BindingService::class);
+		$bindingService->method('createBinding')->willThrowException(new \RuntimeException('binding race'));
+
+		$etherpadClient = $this->createMock(EtherpadClient::class);
+		$etherpadClient->method('buildPadUrl')->willReturn('https://pad.example.test/p/p-doomed');
+		// Cleanup: the freshly provisioned pad has to be deleted.
+		$etherpadClient->expects($this->once())->method('deletePad')->with('p-doomed');
+
+		$this->buildListener($bindingService, $padFileService, $bootstrap, $etherpadClient)
+			->handle(new FileCreatedFromTemplateEvent($template, $target));
+
+		// First putContent wrote the template payload; second wiped it back
+		// to empty after the binding race surfaced via the handle() catch.
+		$this->assertCount(2, $putCalls);
+		$this->assertSame('', end($putCalls));
 	}
 
 	private function buildListener(

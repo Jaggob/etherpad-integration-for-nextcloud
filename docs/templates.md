@@ -6,7 +6,6 @@ Users can pre-fill new `.pad` files with content from a template they prepared o
 
 1. Create or copy a `.pad` file into `/Templates`. Any `.pad` file there counts as a template.
 2. Edit the pad and write the boilerplate you want every new copy to start with.
-3. Optionally rename the template file with placeholders in the name (see "Filename templates" below).
 
 ## Using a template
 
@@ -20,7 +19,7 @@ If the user picks "Blank" instead of a template, the new file is empty and behav
 
 ## Placeholder syntax
 
-Placeholders in the **body** and the **filename** are resolved when the new pad is created. Syntax: `{{<resolver>[:<arg>][|<format>]}}`.
+Placeholders in the **body** are resolved when the new pad is created. The template's filename is **not** rewritten — see the next section. Syntax: `{{<resolver>[:<arg>][|<format>]}}`.
 
 | Token | Result | Example |
 |---|---|---|
@@ -34,14 +33,15 @@ Placeholders in the **body** and the **filename** are resolved when the new pad 
 
 Unknown directives stay as literal text (`{{forecast}}` → `{{forecast}}`). Unparseable date expressions also stay as literal so the user can fix the template without losing the file.
 
-## Filename templates (not supported in v1)
+## Filename templates (not supported)
 
-Placeholders in the template's filename are **not** rewritten today. Nextcloud's `+ New pad` flow asks the user for a filename **before** showing the template picker, and `TemplateManager::createFromTemplate` re-fetches the new file by that user-typed path *after* our event fires. Renaming during the event causes a `NotFoundException` and NC returns 403 to the client.
+Placeholders in the template's filename are **not** rewritten. Nextcloud's `+ New pad` flow asks the user for a filename **before** showing the template picker, and `TemplateManager::createFromTemplate` re-fetches the new file by that user-typed path *after* our event fires. Renaming during the event causes NC's lookup to throw `NotFoundException` and the create call returns 403 to the client.
 
-Realistic workaround for now: type a meaningful filename when prompted. The body still gets its `{{date}}` / `{{user}}` placeholders resolved.
+The new file ends up at the name the user types into NC's filename dialog. Body placeholders still get resolved.
 
 ## Caveats
 
-- **External pads (`ext.*`)** can't be used as templates — they hold only a snapshot, not Etherpad-side content. The listener skips them and the new file behaves like an empty pad.
+- **External pads (`ext.*`)** can't be used as templates — they hold only a snapshot, not Etherpad-side content. The new file is reset to empty and the user gets a clean blank pad instead.
+- **Failed template materialisation falls back to a blank pad.** If anything in the listener throws (binding race, Etherpad unreachable, malformed template), the byte-copy NC made is wiped and the new file behaves like a normal empty `.pad` — the regular missing-frontmatter init kicks in on first open.
 - **Placeholder substitution applies to both the plain-text and the HTML snapshot in the body**. If a placeholder ends up inside an HTML attribute (`<a href="{{date}}">`), it gets resolved too — keep placeholders in human-readable locations to avoid surprises.
 - **No template registry** — every `.pad` in `/Templates` is a candidate. There's no separate "is a template" flag.
