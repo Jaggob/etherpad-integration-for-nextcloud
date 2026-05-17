@@ -23,6 +23,27 @@ class PadBootstrapService {
 	) {
 	}
 
+	/**
+	 * Seeds a freshly provisioned pad with content. Tries setHTML first
+	 * (preserves formatting) and falls back to plain-text setText if the
+	 * HTML import fails.
+	 */
+	public function pushInitialSnapshot(string $padId, string $text, string $html): void {
+		if (trim($html) !== '') {
+			try {
+				$this->etherpadClient->setHTML($padId, $html);
+				return;
+			} catch (\Throwable $htmlError) {
+				$this->logger->warning('Initial HTML push failed, falling back to plain text.', [
+					'app' => 'etherpad_nextcloud',
+					'padId' => $padId,
+					'exception' => $htmlError,
+				]);
+			}
+		}
+		$this->etherpadClient->setText($padId, $text);
+	}
+
 	public function provisionPadId(string $accessMode): string {
 		if ($accessMode === BindingService::ACCESS_PUBLIC) {
 			$padId = 'nc-' . $this->secureRandom->generate(24, ISecureRandom::CHAR_LOWER . ISecureRandom::CHAR_DIGITS);
