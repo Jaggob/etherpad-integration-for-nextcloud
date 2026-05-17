@@ -103,7 +103,11 @@ class FileCreatedFromTemplateListenerTest extends TestCase {
 			->handle(new FileCreatedFromTemplateEvent($template, $target));
 	}
 
-	public function testRenamesTargetWhenFilenameContainsPlaceholder(): void {
+	public function testRenamesTargetWhenTemplateFilenameContainsPlaceholder(): void {
+		// NC asks the user for a target filename *before* showing the
+		// template picker, so the target ends up with whatever they typed
+		// ("Untitled.pad"). The placeholder lives in the template's filename
+		// and must be applied to the target after the copy.
 		$template = $this->file(7, 'Protokoll {{date:next monday|d.m.Y}}.pad', 'tpl');
 		$targetParent = $this->createMock(Folder::class);
 		$targetParent->method('getPath')->willReturn('/alice/files/Meetings');
@@ -111,10 +115,24 @@ class FileCreatedFromTemplateListenerTest extends TestCase {
 			->method('getNonExistingName')
 			->with('Protokoll 18.05.2026.pad')
 			->willReturn('Protokoll 18.05.2026.pad');
-		$target = $this->file(99, 'Protokoll {{date:next monday|d.m.Y}}.pad', '', $targetParent);
+		$target = $this->file(99, 'Untitled.pad', '', $targetParent);
 		$target->expects($this->once())
 			->method('move')
 			->with('/alice/files/Meetings/Protokoll 18.05.2026.pad');
+
+		$padFileService = $this->minimalPadFileService();
+		$bootstrap = $this->minimalBootstrap();
+		$bindingService = $this->createMock(BindingService::class);
+		$bindingService->method('createBinding');
+
+		$this->buildListener($bindingService, $padFileService, $bootstrap)
+			->handle(new FileCreatedFromTemplateEvent($template, $target));
+	}
+
+	public function testLeavesTargetNameAloneWhenTemplateHasNoPlaceholder(): void {
+		$template = $this->file(7, 'Plain-Template.pad', 'tpl');
+		$target = $this->file(99, 'My Notes.pad', '');
+		$target->expects($this->never())->method('move');
 
 		$padFileService = $this->minimalPadFileService();
 		$bootstrap = $this->minimalBootstrap();

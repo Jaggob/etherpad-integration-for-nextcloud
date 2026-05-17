@@ -42,9 +42,11 @@ Placeholders work in the template's filename too. A template named:
 Protokoll {{date:next monday|d.m.Y}}.pad
 ```
 
-…produces a new file `Protokoll 18.05.2026.pad` when used on a Sunday. Nextcloud's template picker pre-fills the filename input with the source basename so the user usually just hits Enter. Manual overrides at creation time bypass the placeholder rewrite (whatever the user types is what the file is named).
+…produces a new file `Protokoll 18.05.2026.pad` when used on a Sunday — **regardless** of what filename the user types when Nextcloud first asks for one. Nextcloud's flow is filename-first, template-picker-second, so the user types some placeholder name (`Untitled`, or whatever the picker pre-fills), then picks the template. After the copy, the plugin renames the target to the resolved template filename.
 
-If the placeholder-rewritten name collides with an existing file in the target folder, Nextcloud's standard `(1)`, `(2)` suffix kicks in.
+If the resolved name collides with an existing file in the target folder, Nextcloud's standard `(1)`, `(2)` suffix kicks in.
+
+If the template's filename contains no `{{...}}` token, the user's typed filename is kept as-is.
 
 ## Caveats
 

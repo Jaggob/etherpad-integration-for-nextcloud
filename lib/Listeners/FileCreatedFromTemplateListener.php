@@ -117,7 +117,7 @@ class FileCreatedFromTemplateListener implements IEventListener {
 			$this->bindingService->createBinding($targetFileId, $newPadId, $accessMode);
 			$padCreated = false;
 
-			$this->maybeRenameByPlaceholder($target, $user);
+			$this->maybeRenameByPlaceholder($target, $template, $user);
 		} catch (\Throwable $e) {
 			if ($padCreated) {
 				try {
@@ -134,24 +134,31 @@ class FileCreatedFromTemplateListener implements IEventListener {
 		}
 	}
 
-	private function maybeRenameByPlaceholder(File $target, ?IUser $user): void {
-		$current = $target->getName();
-		if (!str_contains($current, '{{')) {
+	private function maybeRenameByPlaceholder(File $target, File $template, ?IUser $user): void {
+		// The placeholder lives in the *template's* filename. NC asks the user
+		// for a target filename before showing the template picker, so the
+		// target name is whatever the user typed and never carries `{{...}}`.
+		$templateName = $template->getName();
+		if (!str_contains($templateName, '{{')) {
 			return;
 		}
-		$rendered = $this->placeholderResolver->apply($current, $user);
-		if ($rendered === '' || $rendered === $current) {
+		$rendered = $this->placeholderResolver->apply($templateName, $user);
+		if ($rendered === '' || $rendered === $templateName) {
 			return;
 		}
 		$parent = $target->getParent();
 		$candidate = $parent->getNonExistingName($rendered);
+		$currentName = $target->getName();
+		if ($candidate === $currentName) {
+			return;
+		}
 		try {
 			$target->move($parent->getPath() . '/' . $candidate);
 		} catch (\Throwable $e) {
 			$this->logger->warning('Could not rename pad after template-placeholder substitution.', [
 				'app' => 'etherpad_nextcloud',
 				'fileId' => (int)$target->getId(),
-				'from' => $current,
+				'from' => $currentName,
 				'to' => $candidate,
 				'exception' => $e,
 			]);
