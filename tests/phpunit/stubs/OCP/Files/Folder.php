@@ -13,5 +13,7 @@ if (!interface_exists(Folder::class)) {
 		public function newFile(string $name): mixed;
 
 		public function isCreatable(): bool;
+
+		public function getPath(): string;
 	}
 }

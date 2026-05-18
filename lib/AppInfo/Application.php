@@ -17,6 +17,7 @@ use OCP\AppFramework\Bootstrap\IBootstrap;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
 use OCP\BackgroundJob\IJobList;
 use OCP\Files\IMimeTypeDetector;
+use OCP\Files\Template\FileCreatedFromTemplateEvent;
 use OCP\Files\Template\RegisterTemplateCreatorEvent;
 use OCP\Security\CSP\AddContentSecurityPolicyEvent;
 
@@ -45,6 +46,12 @@ class Application extends App implements IBootstrap {
 			$context->registerEventListener(
 				RegisterTemplateCreatorEvent::class,
 				\OCA\EtherpadNextcloud\Listeners\RegisterTemplateCreatorListener::class,
+			);
+		}
+		if (class_exists(FileCreatedFromTemplateEvent::class)) {
+			$context->registerEventListener(
+				FileCreatedFromTemplateEvent::class,
+				\OCA\EtherpadNextcloud\Listeners\FileCreatedFromTemplateListener::class,
 			);
 		}
 		if (class_exists('OCA\\Viewer\\Event\\LoadViewer')) {
