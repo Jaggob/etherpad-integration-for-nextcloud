@@ -274,7 +274,7 @@ class PadCreationService {
 	 * @return array{file:string,file_id:int,pad_id:string,access_mode:string,pad_url:string}
 	 */
 	public function createFromTemplate(string $uid, string $targetFile, int $templateFileId, ?IUser $user): array {
-		$resolvedTargetFile = $this->placeholderResolver->apply($targetFile, $user);
+		$resolvedTargetFile = $this->placeholderResolver->applyForPath($targetFile, $user);
 		$path = $this->padPaths->normalizeCreatePath($resolvedTargetFile);
 
 		$templateNode = $this->userNodeResolver->resolveUserFileNodeById($uid, $templateFileId);
@@ -363,8 +363,8 @@ class PadCreationService {
 		}
 
 		$snapshot = $this->padFileService->getSnapshotPartsFromBody((string)$parsed['body']);
-		$resolvedText = $this->placeholderResolver->apply($snapshot['text'], $user);
-		$resolvedHtml = $this->placeholderResolver->apply($snapshot['html'], $user);
+		$resolvedText = $this->placeholderResolver->applyForContent($snapshot['text'], $user);
+		$resolvedHtml = $this->placeholderResolver->applyForContent($snapshot['html'], $user);
 
 		$fileId = (int)$target->getId();
 		if ($fileId <= 0) {

@@ -13,53 +13,53 @@ class PadPlaceholderResolverTest extends TestCase {
 	private const FIXED_NOW = 1778976000; // 2026-05-17 (Sunday) 00:00 UTC
 
 	public function testReplacesDateWithDefaultFormat(): void {
-		$result = $this->resolver()->apply('Heute ist {{date}}.', $this->user('Jacob Bühler'));
+		$result = $this->resolver()->applyForContent('Heute ist {{date}}.', $this->user('Jacob Bühler'));
 		$this->assertSame('Heute ist 2026-05-17.', $result);
 	}
 
 	public function testReplacesDateWithCustomFormat(): void {
-		$result = $this->resolver()->apply('Stempel: {{date|d.m.Y}}', $this->user('Jacob Bühler'));
+		$result = $this->resolver()->applyForContent('Stempel: {{date|d.m.Y}}', $this->user('Jacob Bühler'));
 		$this->assertSame('Stempel: 17.05.2026', $result);
 	}
 
 	public function testReplacesDateRelativeNextMonday(): void {
-		$result = $this->resolver()->apply('Sitzung {{date:next monday|d.m.Y}}', $this->user('Jacob Bühler'));
+		$result = $this->resolver()->applyForContent('Sitzung {{date:next monday|d.m.Y}}', $this->user('Jacob Bühler'));
 		// 2026-05-17 is Sunday → next monday is 2026-05-18
 		$this->assertSame('Sitzung 18.05.2026', $result);
 	}
 
 	public function testReplacesDateOffset(): void {
-		$result = $this->resolver()->apply('In sieben Tagen: {{date:+7 days}}', $this->user('Jacob Bühler'));
+		$result = $this->resolver()->applyForContent('In sieben Tagen: {{date:+7 days}}', $this->user('Jacob Bühler'));
 		$this->assertSame('In sieben Tagen: 2026-05-24', $result);
 	}
 
 	public function testReplacesUserDisplayName(): void {
-		$result = $this->resolver()->apply('Autor: {{user}}', $this->user('Jacob Bühler'));
+		$result = $this->resolver()->applyForContent('Autor: {{user}}', $this->user('Jacob Bühler'));
 		$this->assertSame('Autor: Jacob Bühler', $result);
 	}
 
 	public function testReplacesUserUid(): void {
-		$result = $this->resolver()->apply('UID: {{user.uid}}', $this->user('Jacob Bühler', 'jaggob'));
+		$result = $this->resolver()->applyForContent('UID: {{user.uid}}', $this->user('Jacob Bühler', 'jaggob'));
 		$this->assertSame('UID: jaggob', $result);
 	}
 
 	public function testLeavesUnknownDirectivesAsLiteral(): void {
-		$result = $this->resolver()->apply('Weather: {{forecast}}', $this->user('x'));
+		$result = $this->resolver()->applyForContent('Weather: {{forecast}}', $this->user('x'));
 		$this->assertSame('Weather: {{forecast}}', $result);
 	}
 
 	public function testLeavesUnknownUserPropertyAsLiteral(): void {
-		$result = $this->resolver()->apply('Whoami: {{user.phone}}', $this->user('x'));
+		$result = $this->resolver()->applyForContent('Whoami: {{user.phone}}', $this->user('x'));
 		$this->assertSame('Whoami: {{user.phone}}', $result);
 	}
 
 	public function testLeavesUnparseableDateExpressionAsLiteral(): void {
-		$result = $this->resolver()->apply('Datum: {{date:complete-nonsense-xyz}}', $this->user('x'));
+		$result = $this->resolver()->applyForContent('Datum: {{date:complete-nonsense-xyz}}', $this->user('x'));
 		$this->assertSame('Datum: {{date:complete-nonsense-xyz}}', $result);
 	}
 
 	public function testReplacesMultiplePlaceholdersInOneLine(): void {
-		$result = $this->resolver()->apply(
+		$result = $this->resolver()->applyForContent(
 			'# Protokoll {{date:next monday|d.m.Y}} ({{user}})',
 			$this->user('Jacob Bühler'),
 		);
@@ -67,7 +67,7 @@ class PadPlaceholderResolverTest extends TestCase {
 	}
 
 	public function testTolerantToWhitespaceInsideBraces(): void {
-		$result = $this->resolver()->apply('{{ date | Y }}', $this->user('x'));
+		$result = $this->resolver()->applyForContent('{{ date | Y }}', $this->user('x'));
 		$this->assertSame('2026', $result);
 	}
 
@@ -78,7 +78,7 @@ class PadPlaceholderResolverTest extends TestCase {
 		$previous = date_default_timezone_get();
 		date_default_timezone_set('America/Los_Angeles');
 		try {
-			$result = $this->resolver()->apply(
+			$result = $this->resolver()->applyForContent(
 				'{{date}} | {{date:next monday|d.m.Y}} | {{date:+7 days}}',
 				$this->user('x'),
 			);
@@ -88,18 +88,26 @@ class PadPlaceholderResolverTest extends TestCase {
 		}
 	}
 
-	public function testStripsPathSeparatorsFromDisplayName(): void {
+	public function testApplyForPathStripsSeparatorsFromDisplayName(): void {
 		// Defense-in-depth: a display name containing "/" or ".." must not
 		// expand into a path-traversal payload when interpolated into a
 		// user-supplied target file path.
-		$result = $this->resolver()->apply('{{user}}', $this->user('../etc/passwd'));
+		$result = $this->resolver()->applyForPath('{{user}}', $this->user('../etc/passwd'));
 		$this->assertSame('etc passwd', $result);
+	}
+
+	public function testApplyForContentPreservesSlashesInDisplayName(): void {
+		// In body / snapshot context the display name must reach the user
+		// verbatim — stripping `/` from "AC/DC" would silently mangle visible
+		// document content. Only `applyForPath` sanitizes.
+		$result = $this->resolver()->applyForContent('Band: {{user}}', $this->user('AC/DC'));
+		$this->assertSame('Band: AC/DC', $result);
 	}
 
 	public function testNoUserSilentlySkipsUserDirectives(): void {
 		// Public-share / anonymous context: user is null. Leave the directive
 		// alone rather than render the empty string.
-		$result = $this->resolver()->apply('Autor: {{user}}, Datum: {{date}}', null);
+		$result = $this->resolver()->applyForContent('Autor: {{user}}, Datum: {{date}}', null);
 		$this->assertSame('Autor: {{user}}, Datum: 2026-05-17', $result);
 	}
 
