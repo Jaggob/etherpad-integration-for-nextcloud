@@ -24,15 +24,20 @@ class PadBootstrapService {
 	}
 
 	/**
-	 * Seeds a freshly provisioned pad with content. Tries setHTML first
-	 * (preserves formatting) and falls back to plain-text setText if the
-	 * HTML import fails.
+	 * Seeds a freshly provisioned pad with content. Imports the HTML snapshot
+	 * (so formatting survives) and, when that succeeded, also pushes the
+	 * resolved plain-text via setText so Etherpad's `getText` returns the same
+	 * string we recorded as the file's text snapshot — otherwise Etherpad
+	 * derives plain text from the HTML, which can drift from what the `.pad`
+	 * frontmatter claims. When HTML import fails or no HTML snapshot is
+	 * provided, setText alone seeds the pad.
 	 */
 	public function pushInitialSnapshot(string $padId, string $text, string $html): void {
+		$htmlSucceeded = false;
 		if (trim($html) !== '') {
 			try {
 				$this->etherpadClient->setHTML($padId, $html);
-				return;
+				$htmlSucceeded = true;
 			} catch (\Throwable $htmlError) {
 				$this->logger->warning('Initial HTML push failed, falling back to plain text.', [
 					'app' => 'etherpad_nextcloud',
@@ -41,7 +46,26 @@ class PadBootstrapService {
 				]);
 			}
 		}
-		$this->etherpadClient->setText($padId, $text);
+
+		if ($htmlSucceeded && trim($text) === '') {
+			// HTML carried the content and the text snapshot is empty — nothing
+			// to add on top.
+			return;
+		}
+
+		try {
+			$this->etherpadClient->setText($padId, $text);
+		} catch (\Throwable $textError) {
+			if (!$htmlSucceeded) {
+				throw $textError;
+			}
+			// HTML already seeded the pad — log the divergence but don't fail.
+			$this->logger->warning('Initial setText after setHTML failed; pad text may diverge from .pad snapshot.', [
+				'app' => 'etherpad_nextcloud',
+				'padId' => $padId,
+				'exception' => $textError,
+			]);
+		}
 	}
 
 	public function provisionPadId(string $accessMode): string {

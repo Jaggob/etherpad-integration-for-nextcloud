@@ -71,6 +71,31 @@ class PadPlaceholderResolverTest extends TestCase {
 		$this->assertSame('2026', $result);
 	}
 
+	public function testRelativeDatesAreDeterministicUnderWesternTimezone(): void {
+		// Regression: strtotime/date previously depended on
+		// date_default_timezone_get(), so "today" and "next monday" drifted on
+		// hosts west of UTC. Resolver now pins to UTC internally.
+		$previous = date_default_timezone_get();
+		date_default_timezone_set('America/Los_Angeles');
+		try {
+			$result = $this->resolver()->apply(
+				'{{date}} | {{date:next monday|d.m.Y}} | {{date:+7 days}}',
+				$this->user('x'),
+			);
+			$this->assertSame('2026-05-17 | 18.05.2026 | 2026-05-24', $result);
+		} finally {
+			date_default_timezone_set($previous);
+		}
+	}
+
+	public function testStripsPathSeparatorsFromDisplayName(): void {
+		// Defense-in-depth: a display name containing "/" or ".." must not
+		// expand into a path-traversal payload when interpolated into a
+		// user-supplied target file path.
+		$result = $this->resolver()->apply('{{user}}', $this->user('../etc/passwd'));
+		$this->assertSame('etc passwd', $result);
+	}
+
 	public function testNoUserSilentlySkipsUserDirectives(): void {
 		// Public-share / anonymous context: user is null. Leave the directive
 		// alone rather than render the empty string.

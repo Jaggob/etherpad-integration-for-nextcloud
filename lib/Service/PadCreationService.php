@@ -14,6 +14,7 @@ use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
 use OCA\EtherpadNextcloud\Exception\NotAPadFileException;
 use OCA\EtherpadNextcloud\Exception\PadFileAlreadyExistsException;
 use OCA\EtherpadNextcloud\Exception\PadParentFolderNotWritableException;
+use OCP\Files\File;
 use OCP\IUser;
 use Psr\Log\LoggerInterface;
 
@@ -277,10 +278,72 @@ class PadCreationService {
 		$path = $this->padPaths->normalizeCreatePath($resolvedTargetFile);
 
 		$templateNode = $this->userNodeResolver->resolveUserFileNodeById($uid, $templateFileId);
-		if (!str_ends_with(strtolower($templateNode->getName()), '.pad')) {
+
+		$padId = '';
+		$fileCreated = false;
+
+		return $this->withCreateRollback(
+			function () use ($uid, $path, $templateNode, $user, &$padId, &$fileCreated): array {
+				$fileNode = $this->padFileCreator->createUserFile($uid, $path);
+				$fileCreated = true;
+
+				$result = $this->materializeTemplateInto($fileNode, $templateNode, $user);
+				$padId = $result['pad_id'];
+
+				return [
+					'file' => $path,
+					'file_id' => $result['file_id'],
+					'pad_id' => $result['pad_id'],
+					'access_mode' => $result['access_mode'],
+					'pad_url' => $result['pad_url'],
+				];
+			},
+			function () use ($uid, $path, &$padId, &$fileCreated): void {
+				$this->rollbackService->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
+			},
+			function (\Throwable $e) use ($path, &$padId): ?array {
+				if ($e instanceof BindingException) {
+					return [
+						'message' => 'Pad create-from-template hit existing binding',
+						'context' => [
+							'file' => $path,
+							'padId' => $padId,
+						],
+					];
+				}
+				return null;
+			},
+			function () use ($path, $templateFileId, &$padId): array {
+				return [
+					'message' => 'Pad create-from-template failed',
+					'context' => [
+						'file' => $path,
+						'templateFileId' => $templateFileId,
+						'padId' => $padId,
+					],
+				];
+			},
+		);
+	}
+
+	/**
+	 * Shared core of the template materialization pipeline. Validates the
+	 * template, resolves placeholders, provisions a fresh pad, seeds its
+	 * content, writes the target file, and creates the binding. The target
+	 * file must already exist on disk (the callers either create it via
+	 * `PadFileCreator` or receive it pre-populated from NC's native template
+	 * copy flow).
+	 *
+	 * On any failure between provisioning and binding, the freshly created
+	 * Etherpad pad is best-effort deleted before rethrowing.
+	 *
+	 * @return array{file_id:int,pad_id:string,access_mode:string,pad_url:string}
+	 */
+	public function materializeTemplateInto(File $target, File $template, ?IUser $user): array {
+		if (!str_ends_with(strtolower($template->getName()), '.pad')) {
 			throw new NotAPadFileException('Template is not a .pad file.');
 		}
-		$templateContent = (string)$templateNode->getContent();
+		$templateContent = (string)$template->getContent();
 		if (trim($templateContent) === '') {
 			throw new \InvalidArgumentException('Template is empty.');
 		}
@@ -303,75 +366,51 @@ class PadCreationService {
 		$resolvedText = $this->placeholderResolver->apply($snapshot['text'], $user);
 		$resolvedHtml = $this->placeholderResolver->apply($snapshot['html'], $user);
 
-		$padId = '';
-		$fileCreated = false;
+		$fileId = (int)$target->getId();
+		if ($fileId <= 0) {
+			throw new \RuntimeException('Could not resolve target file ID.');
+		}
 
-		return $this->withCreateRollback(
-			function () use ($uid, $path, $accessMode, $resolvedText, $resolvedHtml, &$padId, &$fileCreated): array {
-				$fileNode = $this->padFileCreator->createUserFile($uid, $path);
-				$fileCreated = true;
-				$fileId = (int)$fileNode->getId();
-				if ($fileId <= 0) {
-					throw new \RuntimeException('Could not resolve new file ID.');
-				}
+		$padId = $this->padBootstrapService->provisionPadId($accessMode);
+		try {
+			$this->padBootstrapService->pushInitialSnapshot($padId, $resolvedText, $resolvedHtml);
+			$padUrl = $this->etherpadClient->buildPadUrl($padId);
 
-				$padId = $this->padBootstrapService->provisionPadId($accessMode);
-				$this->padBootstrapService->pushInitialSnapshot($padId, $resolvedText, $resolvedHtml);
-				$padUrl = $this->etherpadClient->buildPadUrl($padId);
+			$content = $this->padFileService->buildInitialDocument(
+				$fileId,
+				$padId,
+				$accessMode,
+				$resolvedText,
+				$padUrl,
+			);
+			$content = $this->padFileService->withExportSnapshot(
+				$content,
+				$resolvedText,
+				$resolvedHtml,
+				0,
+				true,
+			);
+			$target->putContent($content);
+			$this->bindingService->createBinding($fileId, $padId, $accessMode);
+		} catch (\Throwable $e) {
+			try {
+				$this->etherpadClient->deletePad($padId);
+			} catch (\Throwable $cleanupError) {
+				$this->logger->warning('Could not cleanup Etherpad pad after template materialization failure.', [
+					'app' => 'etherpad_nextcloud',
+					'padId' => $padId,
+					'exception' => $cleanupError,
+				]);
+			}
+			throw $e;
+		}
 
-				$content = $this->padFileService->buildInitialDocument(
-					$fileId,
-					$padId,
-					$accessMode,
-					$resolvedText,
-					$padUrl,
-				);
-				$content = $this->padFileService->withExportSnapshot(
-					$content,
-					$resolvedText,
-					$resolvedHtml,
-					0,
-					true,
-				);
-				$fileNode->putContent($content);
-				$this->bindingService->createBinding($fileId, $padId, $accessMode);
-
-				return [
-					'file' => $path,
-					'file_id' => $fileId,
-					'pad_id' => $padId,
-					'access_mode' => $accessMode,
-					'pad_url' => $padUrl,
-				];
-			},
-			function () use ($uid, $path, &$padId, &$fileCreated): void {
-				$this->rollbackService->rollbackFailedCreate($uid, $path, $padId, $fileCreated);
-			},
-			function (\Throwable $e) use ($path, $accessMode, &$padId): ?array {
-				if ($e instanceof BindingException) {
-					return [
-						'message' => 'Pad create-from-template hit existing binding',
-						'context' => [
-							'file' => $path,
-							'accessMode' => $accessMode,
-							'padId' => $padId,
-						],
-					];
-				}
-				return null;
-			},
-			function () use ($path, $accessMode, $templateFileId, &$padId): array {
-				return [
-					'message' => 'Pad create-from-template failed',
-					'context' => [
-						'file' => $path,
-						'templateFileId' => $templateFileId,
-						'accessMode' => $accessMode,
-						'padId' => $padId,
-					],
-				];
-			},
-		);
+		return [
+			'file_id' => $fileId,
+			'pad_id' => $padId,
+			'access_mode' => $accessMode,
+			'pad_url' => $padUrl,
+		];
 	}
 
 	/**

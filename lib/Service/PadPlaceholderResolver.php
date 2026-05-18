@@ -43,15 +43,28 @@ class PadPlaceholderResolver {
 	}
 
 	private function resolveDate(string $arg, string $format, string $original): string {
+		// Pin to UTC so resolver output is deterministic across server timezones —
+		// otherwise `strtotime`/`date` follow `date_default_timezone_get()` and
+		// "today" / "next monday" drift by ±1 day on western-tz hosts.
 		$reference = $this->timeFactory->getTime();
 		$expression = $arg === '' ? 'today' : $arg;
-		$timestamp = strtotime($expression, $reference);
-		if ($timestamp === false) {
+		try {
+			$utc = new \DateTimeZone('UTC');
+			$base = (new \DateTimeImmutable('@' . $reference))->setTimezone($utc);
+			$resolved = $base->modify($expression);
+			if ($resolved === false) {
+				return $original;
+			}
+		} catch (\Throwable) {
 			return $original;
 		}
+
 		$effectiveFormat = $format === '' ? self::DEFAULT_DATE_FORMAT : $format;
-		$rendered = @date($effectiveFormat, $timestamp);
-		return is_string($rendered) ? $rendered : $original;
+		try {
+			return $resolved->format($effectiveFormat);
+		} catch (\Throwable) {
+			return $original;
+		}
 	}
 
 	private function resolveUser(string $arg, ?IUser $user, string $original): string {
@@ -60,11 +73,28 @@ class PadPlaceholderResolver {
 		}
 		switch (strtolower($arg)) {
 			case '':
-				return $user->getDisplayName();
+				return $this->sanitizePathLikeValue($user->getDisplayName());
 			case 'uid':
-				return $user->getUID();
+				return $this->sanitizePathLikeValue($user->getUID());
 			default:
 				return $original;
 		}
+	}
+
+	/**
+	 * Strip characters that could break out of a filename segment when the
+	 * resolved value is interpolated into a user-supplied path (e.g. a target
+	 * file name in `createFromTemplate`). Display names are free-form and may
+	 * contain `/`, `\`, NUL or `..` — none of which belong inside a single
+	 * filename segment. We collapse runs of separators to a single space so
+	 * the result remains human-readable.
+	 */
+	private function sanitizePathLikeValue(string $value): string {
+		$cleaned = str_replace(["\0", "\r", "\n", "\t"], '', $value);
+		$cleaned = preg_replace('#[/\\\\]+#', ' ', $cleaned) ?? $cleaned;
+		// Disallow leading dots so a display name "..foo" can't become "../foo"
+		// after concatenation with separators.
+		$cleaned = preg_replace('/^\.+/', '', $cleaned) ?? $cleaned;
+		return trim($cleaned);
 	}
 }

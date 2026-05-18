@@ -15,7 +15,5 @@ if (!interface_exists(Folder::class)) {
 		public function isCreatable(): bool;
 
 		public function getPath(): string;
-
-		public function getNonExistingName(string $name): string;
 	}
 }

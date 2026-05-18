@@ -5,262 +5,112 @@ declare(strict_types=1);
 namespace OCA\EtherpadNextcloud\Tests\Unit;
 
 use OCA\EtherpadNextcloud\Listeners\FileCreatedFromTemplateListener;
-use OCA\EtherpadNextcloud\Service\BindingService;
-use OCA\EtherpadNextcloud\Service\EtherpadClient;
-use OCA\EtherpadNextcloud\Service\PadBootstrapService;
-use OCA\EtherpadNextcloud\Service\PadFileService;
-use OCA\EtherpadNextcloud\Service\PadPlaceholderResolver;
-use OCP\AppFramework\Utility\ITimeFactory;
+use OCA\EtherpadNextcloud\Service\PadCreationService;
 use OCP\EventDispatcher\Event;
 use OCP\Files\File;
-use OCP\Files\Folder;
 use OCP\Files\Template\FileCreatedFromTemplateEvent;
 use OCP\IUser;
 use OCP\IUserSession;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
+/**
+ * The listener is now a thin wrapper that delegates the template
+ * materialization pipeline to `PadCreationService::materializeTemplateInto`.
+ * Detailed behavior of that pipeline (external template handling, binding
+ * cleanup, etc.) is exercised in `PadCreationServiceTest`. The cases here
+ * focus on the listener-specific responsibilities: filtering irrelevant
+ * events and resetting the NC byte-copy to empty when materialization fails.
+ */
 class FileCreatedFromTemplateListenerTest extends TestCase {
-	private const FIXED_NOW = 1778976000; // 2026-05-17 (Sunday)
-
 	public function testIgnoresUnrelatedEvent(): void {
-		$bindingService = $this->createMock(BindingService::class);
-		$bindingService->expects($this->never())->method('createBinding');
+		$service = $this->createMock(PadCreationService::class);
+		$service->expects($this->never())->method('materializeTemplateInto');
 
-		$this->buildListener($bindingService)->handle(new class extends Event {});
+		$this->buildListener($service)->handle(new class extends Event {});
 	}
 
 	public function testIgnoresNonPadTarget(): void {
-		$target = $this->file(101, 'Notes.txt', '');
-		$bindingService = $this->createMock(BindingService::class);
-		$bindingService->expects($this->never())->method('createBinding');
+		$service = $this->createMock(PadCreationService::class);
+		$service->expects($this->never())->method('materializeTemplateInto');
 
-		$this->buildListener($bindingService)->handle(new FileCreatedFromTemplateEvent(
-			$this->file(7, 'Template.pad', ''),
-			$target,
+		$this->buildListener($service)->handle(new FileCreatedFromTemplateEvent(
+			$this->file('Template.pad'),
+			$this->file('Notes.txt'),
 		));
 	}
 
-	public function testIgnoresBlankTemplate(): void {
-		$bindingService = $this->createMock(BindingService::class);
-		$bindingService->expects($this->never())->method('createBinding');
+	public function testIgnoresMissingTemplate(): void {
+		$service = $this->createMock(PadCreationService::class);
+		$service->expects($this->never())->method('materializeTemplateInto');
 
-		$this->buildListener($bindingService)->handle(new FileCreatedFromTemplateEvent(
+		$this->buildListener($service)->handle(new FileCreatedFromTemplateEvent(
 			null,
-			$this->file(102, 'New.pad', ''),
+			$this->file('New.pad'),
 		));
 	}
 
-	public function testMaterializesFromTemplate(): void {
-		$template = $this->file(7, 'Protokoll-Template.pad', 'tpl-content');
-		$targetParent = $this->createMock(Folder::class);
-		$targetParent->method('getPath')->willReturn('/alice/files/Meetings');
-		$target = $this->file(99, 'Protokoll.pad', '', $targetParent);
-		$target->expects($this->once())
-			->method('putContent')
-			->with($this->stringContains('snapshot+placeholders'));
+	public function testDelegatesToService(): void {
+		$template = $this->file('Tpl.pad');
+		$target = $this->file('New.pad');
+		$target->expects($this->never())->method('putContent');
 
-		$padFileService = $this->createMock(PadFileService::class);
-		$padFileService->method('parsePadFile')->with('tpl-content')->willReturn([
-			'frontmatter' => ['pad_id' => 'g.tpl$pad', 'access_mode' => 'protected'],
-			'body' => 'body',
-		]);
-		$padFileService->method('extractPadMetadata')->willReturn([
-			'pad_id' => 'g.tpl$pad',
-			'access_mode' => 'protected',
-			'pad_url' => '',
-		]);
-		$padFileService->method('isExternalFrontmatter')->willReturn(false);
-		$padFileService->method('getSnapshotPartsFromBody')->willReturn([
-			'text' => 'Sitzung am {{date:next monday|d.m.Y}}',
-			'html' => '<p>{{date:next monday|d.m.Y}}</p>',
-		]);
-		$padFileService->method('buildInitialDocument')->willReturn('initial-doc');
-		$padFileService->method('withExportSnapshot')->willReturn('snapshot+placeholders-applied');
+		$service = $this->createMock(PadCreationService::class);
+		$service->expects($this->once())
+			->method('materializeTemplateInto')
+			->with($target, $template, $this->isInstanceOf(IUser::class));
 
-		$bootstrap = $this->createMock(PadBootstrapService::class);
-		$bootstrap->expects($this->once())
-			->method('provisionPadId')
-			->with('protected')
-			->willReturn('p-newpad123');
-		$bootstrap->expects($this->once())
-			->method('pushInitialSnapshot')
-			->with(
-				'p-newpad123',
-				'Sitzung am 18.05.2026',
-				'<p>18.05.2026</p>',
-			);
-
-		$bindingService = $this->createMock(BindingService::class);
-		$bindingService->expects($this->once())
-			->method('createBinding')
-			->with(99, 'p-newpad123', 'protected');
-
-		$etherpadClient = $this->createMock(EtherpadClient::class);
-		$etherpadClient->method('buildPadUrl')->willReturn('https://pad.example.test/p/p-newpad123');
-
-		$this->buildListener($bindingService, $padFileService, $bootstrap, $etherpadClient)
-			->handle(new FileCreatedFromTemplateEvent($template, $target));
+		$this->buildListener($service)->handle(new FileCreatedFromTemplateEvent($template, $target));
 	}
 
-	public function testNeverRenamesTargetEvenWhenTemplateNameHasPlaceholder(): void {
-		// NC's TemplateManager re-fetches the new file by its original path
-		// *after* this event fires (TemplateManager.php:171). A rename here
-		// would break that lookup with NotFoundException → 403 to the
-		// client. Filename templating must come from elsewhere; this
-		// listener stays read-only on the file path.
-		$template = $this->file(7, 'Protokoll {{date:next monday|d.m.Y}}.pad', 'tpl');
-		$target = $this->file(99, 'Untitled.pad', '');
-		$target->expects($this->never())->method('move');
-
-		$padFileService = $this->minimalPadFileService();
-		$bootstrap = $this->minimalBootstrap();
-		$bindingService = $this->createMock(BindingService::class);
-		$bindingService->method('createBinding');
-
-		$this->buildListener($bindingService, $padFileService, $bootstrap)
-			->handle(new FileCreatedFromTemplateEvent($template, $target));
-	}
-
-	public function testWipesTargetWhenTemplateIsExternal(): void {
-		// NC has already byte-copied the external template's frontmatter
-		// (with ext.* pad_id) into the new file. Leaving it there would
-		// confuse the open flow and leak the source's external pad URL.
-		// Reset the target to empty so the regular missing-frontmatter
-		// init creates a clean managed pad on first open.
-		$template = $this->file(7, 'External.pad', 'tpl');
-		$target = $this->file(99, 'New.pad', '');
+	public function testResetsTargetWhenServiceThrows(): void {
+		$template = $this->file('Tpl.pad');
+		$target = $this->file('New.pad');
 		$target->expects($this->once())->method('putContent')->with('');
 
-		$padFileService = $this->createMock(PadFileService::class);
-		$padFileService->method('parsePadFile')->willReturn([
-			'frontmatter' => ['pad_id' => 'ext.remote', 'access_mode' => 'public'],
-			'body' => '',
-		]);
-		$padFileService->method('extractPadMetadata')->willReturn(['pad_id' => 'ext.remote']);
+		$service = $this->createMock(PadCreationService::class);
+		$service->method('materializeTemplateInto')
+			->willThrowException(new \RuntimeException('boom'));
 
-		$bootstrap = $this->createMock(PadBootstrapService::class);
-		$bootstrap->expects($this->never())->method('provisionPadId');
-
-		$bindingService = $this->createMock(BindingService::class);
-		$bindingService->expects($this->never())->method('createBinding');
-
-		$this->buildListener($bindingService, $padFileService, $bootstrap)
-			->handle(new FileCreatedFromTemplateEvent($template, $target));
+		$this->buildListener($service)->handle(new FileCreatedFromTemplateEvent($template, $target));
 	}
 
-	public function testWipesTargetWhenTemplateFrontmatterIsUnparseable(): void {
-		$template = $this->file(7, 'Broken.pad', 'tpl');
-		$target = $this->file(99, 'New.pad', '');
+	public function testResetsTargetWhenNoUserInSession(): void {
+		$template = $this->file('Tpl.pad');
+		$target = $this->file('New.pad');
 		$target->expects($this->once())->method('putContent')->with('');
 
-		$padFileService = $this->createMock(PadFileService::class);
-		$padFileService->method('parsePadFile')->willThrowException(new \RuntimeException('not yaml'));
+		$service = $this->createMock(PadCreationService::class);
+		$service->expects($this->never())->method('materializeTemplateInto');
 
-		$bootstrap = $this->createMock(PadBootstrapService::class);
-		$bootstrap->expects($this->never())->method('provisionPadId');
-
-		$bindingService = $this->createMock(BindingService::class);
-		$bindingService->expects($this->never())->method('createBinding');
-
-		$this->buildListener($bindingService, $padFileService, $bootstrap)
-			->handle(new FileCreatedFromTemplateEvent($template, $target));
-	}
-
-	public function testWipesTargetAndDeletesPadWhenBindingFails(): void {
-		// createBinding can fail (unique-constraint race, DB error). The
-		// freshly provisioned Etherpad pad must be deleted and the target
-		// file wiped so the user gets a clean state instead of a .pad
-		// pointing at a deleted pad_id.
-		$template = $this->file(7, 'Tpl.pad', 'tpl');
-		$target = $this->file(99, 'New.pad', '');
-		$putCalls = [];
-		$target->method('putContent')->willReturnCallback(
-			static function (string $content) use (&$putCalls): void {
-				$putCalls[] = $content;
-			}
-		);
-
-		$padFileService = $this->minimalPadFileService();
-		$bootstrap = $this->createMock(PadBootstrapService::class);
-		$bootstrap->method('provisionPadId')->willReturn('p-doomed');
-		$bootstrap->method('pushInitialSnapshot');
-
-		$bindingService = $this->createMock(BindingService::class);
-		$bindingService->method('createBinding')->willThrowException(new \RuntimeException('binding race'));
-
-		$etherpadClient = $this->createMock(EtherpadClient::class);
-		$etherpadClient->method('buildPadUrl')->willReturn('https://pad.example.test/p/p-doomed');
-		// Cleanup: the freshly provisioned pad has to be deleted.
-		$etherpadClient->expects($this->once())->method('deletePad')->with('p-doomed');
-
-		$this->buildListener($bindingService, $padFileService, $bootstrap, $etherpadClient)
-			->handle(new FileCreatedFromTemplateEvent($template, $target));
-
-		// First putContent wrote the template payload; second wiped it back
-		// to empty after the binding race surfaced via the handle() catch.
-		$this->assertCount(2, $putCalls);
-		$this->assertSame('', end($putCalls));
+		$listener = $this->buildListener($service, withUser: false);
+		$listener->handle(new FileCreatedFromTemplateEvent($template, $target));
 	}
 
 	private function buildListener(
-		?BindingService $bindingService = null,
-		?PadFileService $padFileService = null,
-		?PadBootstrapService $bootstrap = null,
-		?EtherpadClient $etherpadClient = null,
+		PadCreationService $service,
+		bool $withUser = true,
 	): FileCreatedFromTemplateListener {
-		$user = $this->createMock(IUser::class);
-		$user->method('getDisplayName')->willReturn('Jacob');
-		$user->method('getUID')->willReturn('jaggob');
 		$userSession = $this->createMock(IUserSession::class);
-		$userSession->method('getUser')->willReturn($user);
-
-		$time = $this->createMock(ITimeFactory::class);
-		$time->method('getTime')->willReturn(self::FIXED_NOW);
-
+		if ($withUser) {
+			$user = $this->createMock(IUser::class);
+			$user->method('getUID')->willReturn('alice');
+			$user->method('getDisplayName')->willReturn('Alice');
+			$userSession->method('getUser')->willReturn($user);
+		} else {
+			$userSession->method('getUser')->willReturn(null);
+		}
 		return new FileCreatedFromTemplateListener(
-			$padFileService ?? $this->minimalPadFileService(),
-			new PadPlaceholderResolver($time),
-			$bootstrap ?? $this->minimalBootstrap(),
-			$bindingService ?? $this->createMock(BindingService::class),
-			$etherpadClient ?? $this->createMock(EtherpadClient::class),
+			$service,
 			$userSession,
 			$this->createMock(LoggerInterface::class),
 		);
 	}
 
-	private function minimalPadFileService(): PadFileService {
-		$padFileService = $this->createMock(PadFileService::class);
-		$padFileService->method('parsePadFile')->willReturn([
-			'frontmatter' => ['pad_id' => 'g.tpl$pad', 'access_mode' => 'protected'],
-			'body' => '',
-		]);
-		$padFileService->method('extractPadMetadata')->willReturn([
-			'pad_id' => 'g.tpl$pad',
-			'access_mode' => 'protected',
-			'pad_url' => '',
-		]);
-		$padFileService->method('isExternalFrontmatter')->willReturn(false);
-		$padFileService->method('getSnapshotPartsFromBody')->willReturn(['text' => '', 'html' => '']);
-		$padFileService->method('buildInitialDocument')->willReturn('initial-doc');
-		$padFileService->method('withExportSnapshot')->willReturn('updated-doc');
-		return $padFileService;
-	}
-
-	private function minimalBootstrap(): PadBootstrapService {
-		$bootstrap = $this->createMock(PadBootstrapService::class);
-		$bootstrap->method('provisionPadId')->willReturn('p-new');
-		return $bootstrap;
-	}
-
-	private function file(int $id, string $name, string $content, ?Folder $parent = null): File {
+	private function file(string $name): File {
 		$file = $this->createMock(File::class);
-		$file->method('getId')->willReturn($id);
 		$file->method('getName')->willReturn($name);
-		$file->method('getContent')->willReturn($content);
-		if ($parent !== null) {
-			$file->method('getParent')->willReturn($parent);
-		}
+		$file->method('getId')->willReturn(42);
 		return $file;
 	}
 }

@@ -8,11 +8,7 @@ declare(strict_types=1);
 
 namespace OCA\EtherpadNextcloud\Listeners;
 
-use OCA\EtherpadNextcloud\Service\BindingService;
-use OCA\EtherpadNextcloud\Service\EtherpadClient;
-use OCA\EtherpadNextcloud\Service\PadBootstrapService;
-use OCA\EtherpadNextcloud\Service\PadFileService;
-use OCA\EtherpadNextcloud\Service\PadPlaceholderResolver;
+use OCA\EtherpadNextcloud\Service\PadCreationService;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use OCP\Files\File;
@@ -20,13 +16,21 @@ use OCP\Files\Template\FileCreatedFromTemplateEvent;
 use OCP\IUserSession;
 use Psr\Log\LoggerInterface;
 
+/**
+ * Hooks into Nextcloud's native "+ New pad" template flow. NC has already
+ * byte-copied the template into the target path before this event fires, so
+ * the heavy lifting (parse → resolve placeholders → provision pad → seed
+ * snapshot → rewrite file with fresh frontmatter → create binding) is shared
+ * with `PadCreationService::materializeTemplateInto` to keep both entry
+ * points (NC native picker + custom-frontend API) in lockstep.
+ *
+ * On any skip or failure path the target is reset to empty so NC's normal
+ * missing-frontmatter init handles the file on first open instead of the
+ * user inheriting the template's source frontmatter/pad_id.
+ */
 class FileCreatedFromTemplateListener implements IEventListener {
 	public function __construct(
-		private PadFileService $padFileService,
-		private PadPlaceholderResolver $placeholderResolver,
-		private PadBootstrapService $padBootstrapService,
-		private BindingService $bindingService,
-		private EtherpadClient $etherpadClient,
+		private PadCreationService $padCreationService,
 		private IUserSession $userSession,
 		private LoggerInterface $logger,
 	) {
@@ -48,10 +52,24 @@ class FileCreatedFromTemplateListener implements IEventListener {
 			return;
 		}
 
+		$user = $this->userSession->getUser();
+		if ($user === null) {
+			// Template flow without a session is unexpected (NC always
+			// dispatches inside a logged-in request) but we refuse to render
+			// a half-resolved pad: wipe the byte-copy and let normal init
+			// kick in on first open.
+			$this->logger->warning('Template event fired without an active user — resetting target to empty.', [
+				'app' => 'etherpad_nextcloud',
+				'fileId' => (int)$target->getId(),
+			]);
+			$this->resetTargetToEmpty($target);
+			return;
+		}
+
 		try {
-			$this->materializeFromTemplate($target, $template);
+			$this->padCreationService->materializeTemplateInto($target, $template, $user);
 		} catch (\Throwable $e) {
-			$this->logger->error('Pad template materialization failed.', [
+			$this->logger->error('Pad template materialization failed — resetting target to empty.', [
 				'app' => 'etherpad_nextcloud',
 				'targetFileId' => (int)$target->getId(),
 				'templateFileId' => (int)$template->getId(),
@@ -60,75 +78,6 @@ class FileCreatedFromTemplateListener implements IEventListener {
 			// Wipe whatever NC byte-copied so the new file becomes a regular
 			// empty .pad and the next open initialises frontmatter normally.
 			$this->resetTargetToEmpty($target);
-		}
-	}
-
-	private function materializeFromTemplate(File $target, File $template): void {
-		$user = $this->userSession->getUser();
-		$content = (string)$template->getContent();
-		if (trim($content) === '') {
-			return;
-		}
-
-		try {
-			$parsed = $this->padFileService->parsePadFile($content);
-			$frontmatter = $parsed['frontmatter'];
-			$meta = $this->padFileService->extractPadMetadata($frontmatter);
-		} catch (\Throwable) {
-			$this->resetTargetToEmpty($target);
-			return;
-		}
-
-		$sourcePadId = (string)($meta['pad_id'] ?? '');
-		if ($sourcePadId === '' || str_starts_with($sourcePadId, 'ext.')
-			|| $this->padFileService->isExternalFrontmatter($frontmatter, $sourcePadId)) {
-			$this->resetTargetToEmpty($target);
-			return;
-		}
-
-		$accessMode = (string)($meta['access_mode'] ?? BindingService::ACCESS_PROTECTED);
-		if ($accessMode !== BindingService::ACCESS_PUBLIC && $accessMode !== BindingService::ACCESS_PROTECTED) {
-			$accessMode = BindingService::ACCESS_PROTECTED;
-		}
-
-		$snapshot = $this->padFileService->getSnapshotPartsFromBody((string)$parsed['body']);
-		$resolvedText = $this->placeholderResolver->apply($snapshot['text'], $user);
-		$resolvedHtml = $this->placeholderResolver->apply($snapshot['html'], $user);
-
-		$newPadId = $this->padBootstrapService->provisionPadId($accessMode);
-
-		try {
-			$this->padBootstrapService->pushInitialSnapshot($newPadId, $resolvedText, $resolvedHtml);
-
-			$targetFileId = (int)$target->getId();
-			$padUrl = $this->etherpadClient->buildPadUrl($newPadId);
-			$initialDoc = $this->padFileService->buildInitialDocument(
-				$targetFileId,
-				$newPadId,
-				$accessMode,
-				$resolvedText,
-				$padUrl,
-			);
-			$withSnapshot = $this->padFileService->withExportSnapshot(
-				$initialDoc,
-				$resolvedText,
-				$resolvedHtml,
-				0,
-				true,
-			);
-			$target->putContent($withSnapshot);
-			$this->bindingService->createBinding($targetFileId, $newPadId, $accessMode);
-		} catch (\Throwable $e) {
-			try {
-				$this->etherpadClient->deletePad($newPadId);
-			} catch (\Throwable $cleanupError) {
-				$this->logger->warning('Could not cleanup Etherpad pad after template materialization failed.', [
-					'app' => 'etherpad_nextcloud',
-					'padId' => $newPadId,
-					'exception' => $cleanupError,
-				]);
-			}
-			throw $e;
 		}
 	}
 
