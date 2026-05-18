@@ -60,6 +60,13 @@ class PadPlaceholderResolver {
 		[$head, $property] = array_pad(explode('.', $normalized, 2), 2, '');
 		switch ($head) {
 			case 'date':
+				// `date` directive uses `:` for its argument and `|` for the
+				// format — a dotted property is never meaningful. Leave such
+				// inputs as literal so the user can spot the typo rather than
+				// silently rendering today's date.
+				if ($property !== '') {
+					return $original;
+				}
 				return $this->resolveDate($arg, $format, $original);
 			case 'user':
 				return $this->resolveUser($property, $user, $original, $sanitizeUserValues);

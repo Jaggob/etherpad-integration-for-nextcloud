@@ -96,6 +96,14 @@ class PadPlaceholderResolverTest extends TestCase {
 		$this->assertSame('etc passwd', $result);
 	}
 
+	public function testLeavesDotedDateDirectiveAsLiteral(): void {
+		// `date.something` is not a real property — the date directive only
+		// supports `:arg` and `|format`. Silently rendering today's date
+		// would mask the typo, so we keep the original literal.
+		$result = $this->resolver()->applyForContent('Stempel: {{date.foo}}', $this->user('x'));
+		$this->assertSame('Stempel: {{date.foo}}', $result);
+	}
+
 	public function testApplyForContentPreservesSlashesInDisplayName(): void {
 		// In body / snapshot context the display name must reach the user
 		// verbatim — stripping `/` from "AC/DC" would silently mangle visible

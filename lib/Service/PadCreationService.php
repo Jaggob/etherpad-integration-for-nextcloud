@@ -337,6 +337,13 @@ class PadCreationService {
 	 * On any failure between provisioning and binding, the freshly created
 	 * Etherpad pad is best-effort deleted before rethrowing.
 	 *
+	 * Pad-lifecycle ownership: this method **owns the Etherpad-side lifecycle**
+	 * of any pad it provisions — callers that wrap the call in an outer
+	 * rollback (e.g. `withCreateRollback`) must NOT also try to delete the
+	 * pad in their rollback path. The outer wrapper's job is limited to the
+	 * Nextcloud file it created; the pad is already cleaned up internally if
+	 * we throw out of here.
+	 *
 	 * @return array{file_id:int,pad_id:string,access_mode:string,pad_url:string}
 	 */
 	public function materializeTemplateInto(File $target, File $template, ?IUser $user): array {
@@ -352,7 +359,10 @@ class PadCreationService {
 		$frontmatter = $parsed['frontmatter'];
 		$meta = $this->padFileService->extractPadMetadata($frontmatter);
 		$sourcePadId = (string)($meta['pad_id'] ?? '');
-		if ($sourcePadId === '' || str_starts_with($sourcePadId, 'ext.')
+		if ($sourcePadId === '') {
+			throw new \InvalidArgumentException('Template has no usable pad_id in its frontmatter.');
+		}
+		if (str_starts_with($sourcePadId, 'ext.')
 			|| $this->padFileService->isExternalFrontmatter($frontmatter, $sourcePadId)) {
 			throw new \InvalidArgumentException('External pads cannot be used as a template.');
 		}
