@@ -34,9 +34,10 @@ class ExternalPadSeeder {
 	 */
 	public function seed(File $file, int $fileId, string $padUrl): array {
 		$external = $this->etherpadClient->normalizeAndFetchExternalPublicPadTextOrEmpty($padUrl);
-		// External pads are no longer DB-bound, so the local marker only needs to
-		// distinguish them from managed internal pad IDs. The canonical remote
-		// identity remains pad_origin + remote_pad_id in the frontmatter.
+		// External pads aren't DB-bound (we don't own their lifecycle), so the
+		// local `ext.*` pad-id is just a marker distinguishing them from
+		// managed internal IDs. Canonical remote identity lives in the
+		// pad_origin + remote_pad_id frontmatter extras.
 		$externalPadId = 'ext.' . $external['pad_id'];
 		$content = $this->padFileService->buildInitialDocument(
 			$fileId,
