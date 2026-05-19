@@ -133,13 +133,34 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 					requesttoken: ocRequestToken(),
 				}
 
+				const buildInitError = (data, fallbackMessage) => {
+					const err = new Error((data && data.message) || fallbackMessage)
+					// Forward a structured code so callers can branch on
+					// `legacy_collision_no_access` without parsing the message.
+					if (data && typeof data.code === 'string' && data.code !== '') {
+						err.code = data.code
+					}
+					return err
+				}
+
+				const announceMigratedStatus = (data) => {
+					if (data && data.status === 'migrated_from_legacy') {
+						// Audit-visible on the backend; mirror it in the
+						// browser console so dev tools makes the conversion
+						// visible without surfacing a UI toast (the codebase
+						// has no toast infra wired yet).
+						console.info('Legacy Ownpad .pad migrated to managed format on first open.')
+					}
+				}
+
 				if (this.resolvedFileId !== null) {
 					const url = ocGenerateUrl('/apps/' + APP_ID + '/api/v1/pads/initialize-by-id/' + encodeURIComponent(String(this.resolvedFileId)))
 					const response = await fetch(url, { method: 'POST', credentials: 'same-origin', headers })
 					const data = await response.json().catch(() => ({}))
 					if (!response.ok) {
-						throw new Error((data && data.message) || 'Pad initialization failed.')
+						throw buildInitError(data, 'Pad initialization failed.')
 					}
+					announceMigratedStatus(data)
 					return data
 				}
 
@@ -160,8 +181,9 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 				})
 				const data = await response.json().catch(() => ({}))
 				if (!response.ok) {
-					throw new Error((data && data.message) || 'Pad initialization failed.')
+					throw buildInitError(data, 'Pad initialization failed.')
 				}
+				announceMigratedStatus(data)
 				return data
 			},
 			markLoaded() {
