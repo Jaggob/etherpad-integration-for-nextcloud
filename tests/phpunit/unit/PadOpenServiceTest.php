@@ -6,6 +6,7 @@ namespace OCA\EtherpadNextcloud\Tests\Unit;
 
 use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
+use OCA\EtherpadNextcloud\Service\ExternalPadExportFetcher;
 use OCA\EtherpadNextcloud\Service\PadFileLockRetryService;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadOpenService;
@@ -43,6 +44,7 @@ class PadOpenServiceTest extends TestCase {
 			$this->createMock(PadFileLockRetryService::class),
 			$this->createMock(BindingService::class),
 			$this->createMock(EtherpadClient::class),
+			$this->createMock(ExternalPadExportFetcher::class),
 			$this->createMock(PadSessionService::class),
 			new SnapshotExtractor($padFileService, new SnapshotHtmlSanitizer()),
 			$this->createMock(LoggerInterface::class),

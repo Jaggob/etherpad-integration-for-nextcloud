@@ -23,6 +23,7 @@ class PublicPadOpenService {
 
 	public function __construct(
 		private EtherpadClient $etherpadClient,
+		private ExternalPadExportFetcher $externalPadExportFetcher,
 		private PadSessionService $padSessionService,
 		private SnapshotExtractor $snapshotExtractor,
 	) {
@@ -75,7 +76,7 @@ class PublicPadOpenService {
 			if ($padUrl === '') {
 				throw new EtherpadClientException('External pad URL metadata is missing or invalid.');
 			}
-			$normalized = $this->etherpadClient->normalizeAndValidateExternalPublicPadUrl($padUrl);
+			$normalized = $this->externalPadExportFetcher->normalizeAndValidateExternalPublicPadUrl($padUrl);
 			$snapshot = $this->snapshotExtractor->extract($padFileContent);
 			return new PublicPadOpenTarget(
 				$normalized['pad_url'],

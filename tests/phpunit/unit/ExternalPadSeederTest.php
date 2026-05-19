@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace OCA\EtherpadNextcloud\Tests\Unit;
 
 use OCA\EtherpadNextcloud\Service\BindingService;
-use OCA\EtherpadNextcloud\Service\EtherpadClient;
+use OCA\EtherpadNextcloud\Service\ExternalPadExportFetcher;
 use OCA\EtherpadNextcloud\Service\ExternalPadSeeder;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCP\Files\File;
@@ -18,8 +18,8 @@ class ExternalPadSeederTest extends TestCase {
 			->method('putContent')
 			->with('seeded-frontmatter');
 
-		$etherpadClient = $this->createMock(EtherpadClient::class);
-		$etherpadClient->expects($this->once())
+		$fetcher = $this->createMock(ExternalPadExportFetcher::class);
+		$fetcher->expects($this->once())
 			->method('normalizeAndFetchExternalPublicPadTextOrEmpty')
 			->with('https://pad.remote.test/p/RemotePad')
 			->willReturn([
@@ -49,7 +49,7 @@ class ExternalPadSeederTest extends TestCase {
 			->with('initial-doc', 'snapshot-body', '', 0, false)
 			->willReturn('seeded-frontmatter');
 
-		$result = (new ExternalPadSeeder($padFileService, $etherpadClient))
+		$result = (new ExternalPadSeeder($padFileService, $fetcher))
 			->seed($fileNode, 999, 'https://pad.remote.test/p/RemotePad');
 
 		$this->assertSame([
@@ -61,8 +61,8 @@ class ExternalPadSeederTest extends TestCase {
 	}
 
 	public function testSeedSurfacesSnapshotUnavailableWarningCode(): void {
-		$etherpadClient = $this->createMock(EtherpadClient::class);
-		$etherpadClient->method('normalizeAndFetchExternalPublicPadTextOrEmpty')
+		$fetcher = $this->createMock(ExternalPadExportFetcher::class);
+		$fetcher->method('normalizeAndFetchExternalPublicPadTextOrEmpty')
 			->willReturn([
 				'pad_url' => 'https://pad.remote.test/p/RemotePad',
 				'origin' => 'https://pad.remote.test',
@@ -75,7 +75,7 @@ class ExternalPadSeederTest extends TestCase {
 		$padFileService->method('buildInitialDocument')->willReturn('doc');
 		$padFileService->method('withExportSnapshot')->willReturn('doc');
 
-		$result = (new ExternalPadSeeder($padFileService, $etherpadClient))
+		$result = (new ExternalPadSeeder($padFileService, $fetcher))
 			->seed($this->createMock(File::class), 1, 'https://pad.remote.test/p/RemotePad');
 
 		$this->assertSame('remote_export_unavailable', $result['snapshot_warning_code']);

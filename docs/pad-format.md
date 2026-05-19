@@ -122,9 +122,9 @@ Snapshot write flow:
 - `PadFileService::withExportSnapshot(...)` builds the new `.pad` content after an Etherpad export.
 - `PadFileLockRetryService::putContentWithSyncLockRetry(...)` writes that content back to the Nextcloud file with bounded lock retry.
 - `SnapshotExtractor` is read-only: it extracts text + sanitized HTML for viewer responses and does not mutate `.pad` files.
-- External public pad create/sync paths both use the validated, host-pinned `/export/txt` fetch internally and store no HTML snapshot:
-  - create uses `EtherpadClient::normalizeAndFetchExternalPublicPadTextOrEmpty(...)`, allowing the `.pad` file to be created with an empty initial snapshot if the export is not available yet.
-  - sync uses `EtherpadClient::normalizeAndFetchExternalPublicPadText(...)`, keeping later export failures visible.
+- External public pad create/sync paths both use the validated, host-pinned `/export/txt` fetch internally (via `ExternalPadExportFetcher`) and store no HTML snapshot:
+  - create uses `ExternalPadExportFetcher::normalizeAndFetchExternalPublicPadTextOrEmpty(...)`, allowing the `.pad` file to be created with an empty initial snapshot if the export is not available yet.
+  - sync uses `ExternalPadExportFetcher::normalizeAndFetchExternalPublicPadText(...)`, keeping later export failures visible.
 
 ## Sync Semantics
 

@@ -6,6 +6,7 @@ namespace OCA\EtherpadNextcloud\Tests\Unit;
 
 use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
+use OCA\EtherpadNextcloud\Service\ExternalPadExportFetcher;
 use OCA\EtherpadNextcloud\Service\PadFileLockRetryService;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadSyncService;
@@ -126,7 +127,8 @@ class PadSyncServiceTest extends TestCase {
 		$bindingService->expects($this->never())->method('assertConsistentMapping');
 
 		$etherpadClient = $this->createMock(EtherpadClient::class);
-		$etherpadClient->expects($this->once())
+		$externalPadExportFetcher = $this->createMock(ExternalPadExportFetcher::class);
+		$externalPadExportFetcher->expects($this->once())
 			->method('normalizeAndFetchExternalPublicPadText')
 			->with('https://pad.example.test/p/remote')
 			->willReturn([
@@ -142,7 +144,7 @@ class PadSyncServiceTest extends TestCase {
 			->with($file, 'updated-frontmatter')
 			->willReturn(1);
 
-		$result = $this->buildService($padFileService, $userNodeResolver, $bindingService, $etherpadClient, $lockRetryService)
+		$result = $this->buildService($padFileService, $userNodeResolver, $bindingService, $etherpadClient, $lockRetryService, $externalPadExportFetcher)
 			->syncById('alice', 138, true);
 
 		$this->assertSame(PadSyncService::STATUS_UPDATED, $result->status);
@@ -160,6 +162,7 @@ class PadSyncServiceTest extends TestCase {
 		?BindingService $bindingService = null,
 		?EtherpadClient $etherpadClient = null,
 		?PadFileLockRetryService $lockRetryService = null,
+		?ExternalPadExportFetcher $externalPadExportFetcher = null,
 	): PadSyncService {
 		return new PadSyncService(
 			$padFileService ?? $this->createMock(PadFileService::class),
@@ -167,6 +170,7 @@ class PadSyncServiceTest extends TestCase {
 			$lockRetryService ?? $this->createMock(PadFileLockRetryService::class),
 			$bindingService ?? $this->createMock(BindingService::class),
 			$etherpadClient ?? $this->createMock(EtherpadClient::class),
+			$externalPadExportFetcher ?? $this->createMock(ExternalPadExportFetcher::class),
 			$this->createMock(LoggerInterface::class),
 		);
 	}

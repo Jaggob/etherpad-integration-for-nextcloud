@@ -6,6 +6,7 @@ namespace OCA\EtherpadNextcloud\Tests\Unit;
 
 use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
+use OCA\EtherpadNextcloud\Service\ExternalPadExportFetcher;
 use OCA\EtherpadNextcloud\Service\PadFileLockRetryService;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadMetadataService;
@@ -44,12 +45,12 @@ class PadMetadataServiceTest extends TestCase {
 			isExternal: true,
 		));
 
-		$etherpadClient = $this->createMock(EtherpadClient::class);
-		$etherpadClient->method('normalizeAndValidateExternalPublicPadUrl')
+		$fetcher = $this->createMock(ExternalPadExportFetcher::class);
+		$fetcher->method('normalizeAndValidateExternalPublicPadUrl')
 			->with('https://pad.example.test/p/External')
 			->willReturn(['pad_url' => 'https://pad.example.test/p/External']);
 
-		$result = $this->buildService($padFileService, userNodeResolver: $userNodeResolver, lockRetryService: $lockRetryService, etherpadClient: $etherpadClient)
+		$result = $this->buildService($padFileService, userNodeResolver: $userNodeResolver, lockRetryService: $lockRetryService, externalPadExportFetcher: $fetcher)
 			->metaById('alice', 138);
 
 		$this->assertTrue($result->isPad);
@@ -329,6 +330,7 @@ class PadMetadataServiceTest extends TestCase {
 		?UserNodeResolver $userNodeResolver = null,
 		?PadFileLockRetryService $lockRetryService = null,
 		?EtherpadClient $etherpadClient = null,
+		?ExternalPadExportFetcher $externalPadExportFetcher = null,
 		?BindingService $bindingService = null,
 	): PadMetadataService {
 		return new PadMetadataService(
@@ -337,6 +339,7 @@ class PadMetadataServiceTest extends TestCase {
 			$userNodeResolver ?? $this->createMock(UserNodeResolver::class),
 			$lockRetryService ?? $this->createMock(PadFileLockRetryService::class),
 			$etherpadClient ?? $this->createMock(EtherpadClient::class),
+			$externalPadExportFetcher ?? $this->createMock(ExternalPadExportFetcher::class),
 			$bindingService ?? $this->createMock(BindingService::class),
 			$this->createMock(LoggerInterface::class),
 		);

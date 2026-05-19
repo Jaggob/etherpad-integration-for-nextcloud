@@ -9,6 +9,7 @@ use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
 use OCA\EtherpadNextcloud\Exception\PadParentFolderNotWritableException;
 use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
+use OCA\EtherpadNextcloud\Service\ExternalPadExportFetcher;
 use OCA\EtherpadNextcloud\Service\PadBootstrapService;
 use OCA\EtherpadNextcloud\Service\PadCreateRollbackService;
 use OCA\EtherpadNextcloud\Service\PadCreationService;
@@ -119,8 +120,8 @@ class PadCreationServiceTest extends TestCase {
 		$fileCreator->method('createUserFile')->with('alice', '/External.pad')->willReturn($fileNode);
 		$rollbackService = $this->createMock(PadCreateRollbackService::class);
 
-		$etherpadClient = $this->createMock(EtherpadClient::class);
-		$etherpadClient->method('normalizeAndFetchExternalPublicPadTextOrEmpty')
+		$fetcher = $this->createMock(ExternalPadExportFetcher::class);
+		$fetcher->method('normalizeAndFetchExternalPublicPadTextOrEmpty')
 			->with('https://pad.remote.test/p/RemotePad')
 			->willReturn([
 				'pad_url' => 'https://pad.remote.test/p/RemotePad',
@@ -152,7 +153,7 @@ class PadCreationServiceTest extends TestCase {
 		$bindingService = $this->createMock(BindingService::class);
 		$bindingService->expects($this->never())->method('createBinding');
 
-		$result = $this->buildService($padFileService, $padPaths, $fileCreator, null, $rollbackService, $bindingService, $etherpadClient)
+		$result = $this->buildService($padFileService, $padPaths, $fileCreator, null, $rollbackService, $bindingService, externalPadExportFetcher: $fetcher)
 			->createFromUrl('alice', '/External', 'https://pad.remote.test/p/RemotePad');
 
 		$this->assertSame([
@@ -175,8 +176,8 @@ class PadCreationServiceTest extends TestCase {
 		$fileCreator->method('createUserFile')->with('alice', '/External.pad')->willReturn($fileNode);
 		$rollbackService = $this->createMock(PadCreateRollbackService::class);
 
-		$etherpadClient = $this->createMock(EtherpadClient::class);
-		$etherpadClient->method('normalizeAndFetchExternalPublicPadTextOrEmpty')
+		$fetcher = $this->createMock(ExternalPadExportFetcher::class);
+		$fetcher->method('normalizeAndFetchExternalPublicPadTextOrEmpty')
 			->with('https://pad.remote.test/p/RemotePad')
 			->willReturn([
 				'pad_url' => 'https://pad.remote.test/p/RemotePad',
@@ -195,7 +196,7 @@ class PadCreationServiceTest extends TestCase {
 		$bindingService = $this->createMock(BindingService::class);
 		$bindingService->expects($this->never())->method('createBinding');
 
-		$result = $this->buildService($padFileService, $padPaths, $fileCreator, null, $rollbackService, $bindingService, $etherpadClient)
+		$result = $this->buildService($padFileService, $padPaths, $fileCreator, null, $rollbackService, $bindingService, externalPadExportFetcher: $fetcher)
 			->createFromUrl('alice', '/External', 'https://pad.remote.test/p/RemotePad');
 
 		$this->assertSame([
@@ -220,8 +221,8 @@ class PadCreationServiceTest extends TestCase {
 		$fileCreator = $this->createMock(PadFileCreator::class);
 		$fileCreator->method('createUserFile')->willReturn($fileNode);
 
-		$etherpadClient = $this->createMock(EtherpadClient::class);
-		$etherpadClient->method('normalizeAndFetchExternalPublicPadTextOrEmpty')
+		$fetcher = $this->createMock(ExternalPadExportFetcher::class);
+		$fetcher->method('normalizeAndFetchExternalPublicPadTextOrEmpty')
 			->willReturn([
 				'pad_url' => 'https://pad.remote.test/p/RemotePad',
 				'origin' => 'https://pad.remote.test',
@@ -241,7 +242,7 @@ class PadCreationServiceTest extends TestCase {
 			null,
 			$this->createMock(PadCreateRollbackService::class),
 			$this->createMock(BindingService::class),
-			$etherpadClient,
+			externalPadExportFetcher: $fetcher,
 		)->createFromUrl('alice', '/External', 'https://pad.remote.test/p/RemotePad');
 
 		$this->assertSame('remote_export_unavailable', $result['snapshot_warning_code']);
@@ -261,8 +262,8 @@ class PadCreationServiceTest extends TestCase {
 			->method('rollbackExternalCreate')
 			->with('alice', '/External.pad', true);
 
-		$etherpadClient = $this->createMock(EtherpadClient::class);
-		$etherpadClient->method('normalizeAndFetchExternalPublicPadTextOrEmpty')
+		$fetcher = $this->createMock(ExternalPadExportFetcher::class);
+		$fetcher->method('normalizeAndFetchExternalPublicPadTextOrEmpty')
 			->with('https://pad.remote.test/p/RemotePad')
 			->willThrowException(new EtherpadClientException('Remote pad unavailable.'));
 
@@ -271,7 +272,7 @@ class PadCreationServiceTest extends TestCase {
 
 		$this->expectException(EtherpadClientException::class);
 
-		$this->buildService($padFileService, $padPaths, $fileCreator, null, $rollbackService, etherpadClient: $etherpadClient)
+		$this->buildService($padFileService, $padPaths, $fileCreator, null, $rollbackService, externalPadExportFetcher: $fetcher)
 			->createFromUrl('alice', '/External', 'https://pad.remote.test/p/RemotePad');
 	}
 
@@ -427,6 +428,7 @@ class PadCreationServiceTest extends TestCase {
 		?PadBootstrapService $bootstrap = null,
 		?\OCA\EtherpadNextcloud\Service\PadPlaceholderResolver $placeholderResolver = null,
 		?\OCA\EtherpadNextcloud\Service\ExternalPadSeeder $externalPadSeeder = null,
+		?ExternalPadExportFetcher $externalPadExportFetcher = null,
 	): PadCreationService {
 		if ($placeholderResolver === null) {
 			$timeFactory = $this->createMock(\OCP\AppFramework\Utility\ITimeFactory::class);
@@ -435,12 +437,13 @@ class PadCreationServiceTest extends TestCase {
 		}
 		$padFileService = $padFileService ?? $this->createMock(PadFileService::class);
 		$etherpadClient = $etherpadClient ?? $this->createMock(EtherpadClient::class);
+		$externalPadExportFetcher = $externalPadExportFetcher ?? $this->createMock(ExternalPadExportFetcher::class);
 		// Build a real seeder from the test's mocked deps by default so the
 		// createFromUrl tests can keep stubbing
-		// EtherpadClient::normalizeAndFetchExternalPublicPadTextOrEmpty
+		// ExternalPadExportFetcher::normalizeAndFetchExternalPublicPadTextOrEmpty
 		// directly without having to mock the seeder separately.
 		$externalPadSeeder = $externalPadSeeder
-			?? new \OCA\EtherpadNextcloud\Service\ExternalPadSeeder($padFileService, $etherpadClient);
+			?? new \OCA\EtherpadNextcloud\Service\ExternalPadSeeder($padFileService, $externalPadExportFetcher);
 		return new PadCreationService(
 			$padFileService,
 			$padPaths ?? $this->createMock(PathNormalizer::class),

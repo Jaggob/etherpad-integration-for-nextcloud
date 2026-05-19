@@ -26,6 +26,7 @@ class PadOpenService {
 		private PadFileLockRetryService $lockRetryService,
 		private BindingService $bindingService,
 		private EtherpadClient $etherpadClient,
+		private ExternalPadExportFetcher $externalPadExportFetcher,
 		private PadSessionService $padSessionService,
 		private SnapshotExtractor $snapshotExtractor,
 		private LoggerInterface $logger,
@@ -126,7 +127,7 @@ class PadOpenService {
 			if ($padUrl === '') {
 				throw new EtherpadClientException('External pad URL metadata is missing or invalid.');
 			}
-			$normalized = $this->etherpadClient->normalizeAndValidateExternalPublicPadUrl($padUrl);
+			$normalized = $this->externalPadExportFetcher->normalizeAndValidateExternalPublicPadUrl($padUrl);
 			$effectivePadUrl = $normalized['pad_url'];
 			$originalPadUrl = $normalized['pad_url'];
 		} else {

@@ -7,6 +7,7 @@ namespace OCA\EtherpadNextcloud\Tests\Unit;
 use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
 use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
+use OCA\EtherpadNextcloud\Service\ExternalPadExportFetcher;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadSessionService;
 use OCA\EtherpadNextcloud\Service\PublicPadOpenService;
@@ -66,13 +67,13 @@ class PublicPadOpenServiceTest extends TestCase {
 		$padFiles->expects($this->once())->method('getTextSnapshotForRestore')->with('content')->willReturn('External snapshot');
 		$padFiles->expects($this->once())->method('getHtmlSnapshotForRestore')->with('content')->willReturn('<h1>External</h1><iframe></iframe>');
 
-		$etherpad = $this->createMock(EtherpadClient::class);
-		$etherpad->expects($this->once())
+		$fetcher = $this->createMock(ExternalPadExportFetcher::class);
+		$fetcher->expects($this->once())
 			->method('normalizeAndValidateExternalPublicPadUrl')
 			->with('https://remote.example/p/Test')
 			->willReturn(['pad_url' => 'https://remote.example/p/Test']);
 
-		$result = $this->buildService($padFiles, $etherpad)->open(
+		$result = $this->buildService($padFiles, externalPadExportFetcher: $fetcher)->open(
 			'ext.abc',
 			BindingService::ACCESS_PUBLIC,
 			true,
@@ -165,10 +166,12 @@ class PublicPadOpenServiceTest extends TestCase {
 		?PadFileService $padFileService = null,
 		?EtherpadClient $etherpadClient = null,
 		?PadSessionService $padSessionService = null,
+		?ExternalPadExportFetcher $externalPadExportFetcher = null,
 	): PublicPadOpenService {
 		$padFileService ??= $this->createMock(PadFileService::class);
 		return new PublicPadOpenService(
 			$etherpadClient ?? $this->createMock(EtherpadClient::class),
+			$externalPadExportFetcher ?? $this->createMock(ExternalPadExportFetcher::class),
 			$padSessionService ?? $this->createMock(PadSessionService::class),
 			new SnapshotExtractor($padFileService, new SnapshotHtmlSanitizer()),
 		);
