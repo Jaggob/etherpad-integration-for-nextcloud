@@ -28,6 +28,50 @@ class EtherpadClientTest extends TestCase {
 		);
 	}
 
+	public function testGetConfiguredOriginNormalizesScheme(): void {
+		$client = new EtherpadClient($this->configWithHost('HTTPS://Pad.Example.Test/'));
+		$this->assertSame('https://pad.example.test', $client->getConfiguredOrigin());
+	}
+
+	public function testGetConfiguredOriginOmitsDefaultPorts(): void {
+		$client = new EtherpadClient($this->configWithHost('https://pad.example.test:443'));
+		$this->assertSame('https://pad.example.test', $client->getConfiguredOrigin());
+
+		$client = new EtherpadClient($this->configWithHost('http://pad.example.test:80'));
+		$this->assertSame('http://pad.example.test', $client->getConfiguredOrigin());
+	}
+
+	public function testGetConfiguredOriginKeepsNonDefaultPort(): void {
+		$client = new EtherpadClient($this->configWithHost('https://pad.example.test:9001'));
+		$this->assertSame('https://pad.example.test:9001', $client->getConfiguredOrigin());
+	}
+
+	public function testGetConfiguredOriginAllowsHttp(): void {
+		// Unlike `parsePublicPadUrl`, the configured-origin accessor must not
+		// enforce https — admins may legitimately run Etherpad on http behind
+		// a private network.
+		$client = new EtherpadClient($this->configWithHost('http://pad.internal.lan'));
+		$this->assertSame('http://pad.internal.lan', $client->getConfiguredOrigin());
+	}
+
+	public function testGetConfiguredOriginReturnsEmptyWhenUnconfigured(): void {
+		$client = new EtherpadClient($this->configWithHost(''));
+		$this->assertSame('', $client->getConfiguredOrigin());
+	}
+
+	private function configWithHost(string $host): IConfig {
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(
+			static function (string $appName, string $key, string $default = '') use ($host): string {
+				if ($appName === 'etherpad_nextcloud' && $key === 'etherpad_host') {
+					return $host;
+				}
+				return $default;
+			}
+		);
+		return $config;
+	}
+
 	public function testNormalizeAndValidateExternalPublicPadUrlCanonicalizesHttpsUrl(): void {
 		$client = new EtherpadClient($this->buildExternalEnabledConfig());
 
@@ -36,6 +80,22 @@ class EtherpadClientTest extends TestCase {
 		$this->assertSame('https://1.1.1.1', $result['origin']);
 		$this->assertSame('My Pad', $result['pad_id']);
 		$this->assertSame('https://1.1.1.1/p/My%20Pad', $result['pad_url']);
+	}
+
+	public function testNormalizeAndValidateExternalPublicPadUrlKeepsLiteralPlusInPadId(): void {
+		// `+` is literal in URL path segments. Using urldecode() previously
+		// turned `team+pad` into pad-id `team pad`, then re-emitted
+		// `/p/team%20pad` which hits a different / non-existent pad.
+		$client = new EtherpadClient($this->buildExternalEnabledConfig());
+		$result = $client->normalizeAndValidateExternalPublicPadUrl('https://1.1.1.1/p/team+meeting');
+		$this->assertSame('team+meeting', $result['pad_id']);
+		$this->assertSame('https://1.1.1.1/p/team%2Bmeeting', $result['pad_url']);
+	}
+
+	public function testNormalizeAndValidateExternalPublicPadUrlDecodesPercentEncodedPlus(): void {
+		$client = new EtherpadClient($this->buildExternalEnabledConfig());
+		$result = $client->normalizeAndValidateExternalPublicPadUrl('https://1.1.1.1/p/team%2Bmeeting');
+		$this->assertSame('team+meeting', $result['pad_id']);
 	}
 
 	public function testNormalizeAndValidateExternalPublicPadUrlAcceptsMatchingAllowlistedOriginWithPort(): void {

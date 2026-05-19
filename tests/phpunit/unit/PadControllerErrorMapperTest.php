@@ -6,6 +6,7 @@ namespace OCA\EtherpadNextcloud\Tests\Unit;
 
 use OCA\EtherpadNextcloud\Controller\PadControllerErrorMapper;
 use OCA\EtherpadNextcloud\Exception\BindingException;
+use OCA\EtherpadNextcloud\Exception\LegacyPadCollisionException;
 use OCA\EtherpadNextcloud\Exception\MissingBindingException;
 use OCA\EtherpadNextcloud\Exception\ControllerBadRequestException;
 use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
@@ -122,6 +123,17 @@ class PadControllerErrorMapperTest extends TestCase {
 
 		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
 		$this->assertSame('missing_binding', $response->getData()['code']);
+	}
+
+	public function testRunMapsLegacyPadCollision(): void {
+		$response = $this->buildMapper()->run(
+			static fn(): array => throw new LegacyPadCollisionException('not your pad'),
+			static fn(array $result): DataResponse => new DataResponse($result),
+		);
+
+		$this->assertSame(Http::STATUS_CONFLICT, $response->getStatus());
+		$this->assertSame('legacy_collision_no_access', $response->getData()['code']);
+		$this->assertSame('not your pad', $response->getData()['message']);
 	}
 
 	public function testRunMapsPadAlreadyHasBinding(): void {

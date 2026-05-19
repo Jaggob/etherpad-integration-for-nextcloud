@@ -32,9 +32,11 @@ This plugin lets you surface pads from an Etherpad instance inside Nextcloud and
 
 - Running this app and Ownpad at the same time is not supported.
   - Both apps hook into `.pad` MIME/viewer handling, which leads to ambiguous file-type resolution and open-action conflicts.
-- This app does currently not automatically import Ownpad legacy `.pad` files.
-- Ownpad `.pad` files (`[InternetShortcut]` + `URL=...`) are currently rejected by default because of a different binding/lifecycle model than Ownpad (including database state handling), so a safe migration is non-trivial.
-- A dedicated, explicit migration/import flow for legacy Ownpad `.pad` files is planned for the future. Feel free to commit your solutions for that!
+- Legacy Ownpad `.pad` files (`[InternetShortcut]` + `URL=...`) are automatically migrated to this app's binding-and-`.pad` model the first time a user opens them. The migration branches on the source URL's origin and the embedded pad-id:
+  - Same Etherpad server, free-form pad-id → re-bound as a managed public pad.
+  - Same Etherpad server, group pad-id (`g.<group>$<name>`) → re-bound as a managed protected pad.
+  - Different Etherpad server → converted to an external (`ext.*`) public pad pointing at the original URL.
+- If two Ownpad `.pad` files point at the same pad, only the first one to be opened gets the binding; the second is treated like a copied pad (no second binding row, the existing copy-of-a-pad flow handles open from there). See [`docs/legacy-ownpad-migration.md`](docs/legacy-ownpad-migration.md) for the full state table, audit-log shape, and the security rationale.
 
 ## Install
 

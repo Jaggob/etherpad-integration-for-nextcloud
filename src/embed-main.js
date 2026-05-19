@@ -360,12 +360,17 @@ import { fetchJsonWithTimeout as fetchJson } from './lib/fetch-helpers.js'
 
 	const initializePad = async () => {
 		const url = initializeByIdUrlTemplate.replace('__FILE_ID__', encodeURIComponent(String(fileId)))
-		await fetchJson(url, {
+		const data = await fetchJson(url, {
 			method: 'POST',
 			headers: {
 				requesttoken: requestToken(),
 			},
 		})
+		if (data && data.status === 'migrated_from_legacy') {
+			// Mirror the backend audit-log entry to the browser console; no
+			// toast surface is wired up in this app yet.
+			console.info('Legacy Ownpad .pad migrated to managed format on first open.')
+		}
 	}
 
 	const hideAllPanels = () => {

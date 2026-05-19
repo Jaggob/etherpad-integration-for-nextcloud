@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Legacy Ownpad `.pad` files (those holding only an `[InternetShortcut]` block) are automatically migrated to the current binding-and-`.pad` model on first open. The conversion branches on the source URL's origin and the pad-id format (`g.X$Y` → protected, anything else → public), preserves the existing remote pad on the same-origin path, and routes cross-origin shortcuts through the external-pad flow. A claim-collision rule prevents legacy files from being used to "claim" pads already bound to another user's file. See `docs/legacy-ownpad-migration.md`.
 - Trusted embed integration for same-site / trusted-origin hosts:
   - minimal authenticated embed page via `/embed/by-id/{fileId}`
   - trusted `frame-ancestors` / embed-origin allowlist

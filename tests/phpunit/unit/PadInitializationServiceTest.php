@@ -166,7 +166,8 @@ class PadInitializationServiceTest extends TestCase {
 		$bootstrap = $this->createMock(PadBootstrapService::class);
 		$bootstrap->expects($this->once())
 			->method('initializeMissingFrontmatter')
-			->with($file, 'legacy-content');
+			->with('alice', $file, 'legacy-content')
+			->willReturn(false);
 
 		$result = (new PadInitializationService($padFileService, $this->createMock(PadPathService::class), $userNodeResolver, $bootstrap))
 			->initialize('alice', $file, 'legacy-content');
@@ -176,5 +177,40 @@ class PadInitializationServiceTest extends TestCase {
 		$this->assertSame(42, $result->fileId);
 		$this->assertSame('g.XYZ$pad', $result->padId);
 		$this->assertSame(BindingService::ACCESS_PROTECTED, $result->accessMode);
+	}
+
+	public function testInitializeReportsMigratedStatusForLegacyOwnpadShortcut(): void {
+		$file = $this->createMock(File::class);
+		$file->method('getId')->willReturn(43);
+		$file->method('getContent')->willReturn('updated-content');
+
+		$userNodeResolver = $this->createMock(UserNodeResolver::class);
+		$userNodeResolver->method('toUserAbsolutePath')->willReturn('/LegacyShortcut.pad');
+
+		$padFileService = $this->createMock(PadFileService::class);
+		$parseCalls = 0;
+		$padFileService->expects($this->exactly(2))
+			->method('parsePadFile')
+			->willReturnCallback(static function (string $content) use (&$parseCalls): array {
+				$parseCalls++;
+				if ($parseCalls === 1) {
+					throw new MissingFrontmatterException('Missing frontmatter.');
+				}
+				return [
+					'frontmatter' => [
+						'pad_id' => 're-bound-pad',
+						'access_mode' => BindingService::ACCESS_PUBLIC,
+					],
+				];
+			});
+
+		$bootstrap = $this->createMock(PadBootstrapService::class);
+		$bootstrap->method('initializeMissingFrontmatter')->willReturn(true);
+
+		$result = (new PadInitializationService($padFileService, $this->createMock(PadPathService::class), $userNodeResolver, $bootstrap))
+			->initialize('alice', $file, "[InternetShortcut]\nURL=https://pad.example.test/p/re-bound-pad\n");
+
+		$this->assertSame(PadInitializationService::STATUS_MIGRATED_FROM_LEGACY, $result->status);
+		$this->assertSame('re-bound-pad', $result->padId);
 	}
 }

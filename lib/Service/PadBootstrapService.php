@@ -20,6 +20,7 @@ class PadBootstrapService {
 		private EtherpadClient $etherpadClient,
 		private ISecureRandom $secureRandom,
 		private LoggerInterface $logger,
+		private PadLegacyMigrationService $legacyMigrationService,
 	) {
 	}
 
@@ -68,7 +69,13 @@ class PadBootstrapService {
 		return $this->etherpadClient->createGroupPad($groupId, $padName);
 	}
 
-	public function initializeMissingFrontmatter(File $file, string $existingContent): void {
+	/**
+	 * Bootstrap the YAML frontmatter for a `.pad` file that doesn't have it
+	 * yet. Returns true if the file was a legacy Ownpad shortcut and we ran
+	 * the migration path (callers may want to surface that as a distinct
+	 * status to the frontend); false for the regular empty-file init.
+	 */
+	public function initializeMissingFrontmatter(string $uid, File $file, string $existingContent): bool {
 		$fileId = (int)$file->getId();
 		$existingContentTrimmed = trim($existingContent);
 		$isEmptyFile = $existingContentTrimmed === '';
@@ -77,7 +84,8 @@ class PadBootstrapService {
 			throw new PadFileFormatException('Missing YAML frontmatter in .pad file.');
 		}
 		if ($legacyShortcut !== null) {
-			throw new PadFileFormatException('Legacy Ownpad .pad files cannot be auto-imported.');
+			$this->legacyMigrationService->migrate($uid, $file, $legacyShortcut);
+			return true;
 		}
 
 		$binding = $this->bindingService->findByFileId($fileId);
@@ -85,14 +93,10 @@ class PadBootstrapService {
 		$createdNewPad = false;
 		$padId = '';
 		$accessMode = BindingService::ACCESS_PROTECTED;
-		$padUrl = null;
 
 		if ($binding !== null) {
 			$padId = (string)$binding['pad_id'];
 			$accessMode = (string)$binding['access_mode'];
-			if ($legacyShortcut !== null) {
-				$padUrl = (string)$legacyShortcut['url'];
-			}
 		} else {
 			$padId = $this->provisionPadId(BindingService::ACCESS_PROTECTED);
 			$accessMode = BindingService::ACCESS_PROTECTED;
@@ -102,10 +106,8 @@ class PadBootstrapService {
 		}
 
 		try {
-			$effectivePadUrl = ($padUrl !== null && $padUrl !== '')
-				? $padUrl
-				: $this->etherpadClient->buildPadUrl($padId);
-			$doc = $this->padFileService->buildInitialDocument($fileId, $padId, $accessMode, '', $effectivePadUrl);
+			$padUrl = $this->etherpadClient->buildPadUrl($padId);
+			$doc = $this->padFileService->buildInitialDocument($fileId, $padId, $accessMode, '', $padUrl);
 			$file->putContent($doc);
 		} catch (\Throwable $e) {
 			if ($createdNewBinding) {
@@ -134,6 +136,7 @@ class PadBootstrapService {
 			}
 			throw $e;
 		}
+		return false;
 	}
 
 	private function buildProtectedPadName(): string {

@@ -11,6 +11,7 @@ namespace OCA\EtherpadNextcloud\Controller;
 
 use OCA\EtherpadNextcloud\Exception\BindingException;
 use OCA\EtherpadNextcloud\Exception\ControllerBadRequestException;
+use OCA\EtherpadNextcloud\Exception\LegacyPadCollisionException;
 use OCA\EtherpadNextcloud\Exception\MissingBindingException;
 use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
 use OCA\EtherpadNextcloud\Exception\PadAlreadyHasBindingException;
@@ -108,6 +109,15 @@ class PadControllerErrorMapper {
 				$payload,
 				(int)($options['binding_status'] ?? Http::STATUS_BAD_REQUEST),
 			);
+		} catch (LegacyPadCollisionException $e) {
+			// The legacy Ownpad shortcut points at a pad-id that is already
+			// bound to another file the requesting user has no access to.
+			// 409 (not 403): the conflict is with the *other* file's
+			// binding, not access-denied to the file we're opening.
+			return new DataResponse([
+				'message' => $e->getMessage(),
+				'code' => 'legacy_collision_no_access',
+			], Http::STATUS_CONFLICT);
 		} catch (PadFileFormatException|EtherpadClientException $e) {
 			return new DataResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
 		} catch (\RuntimeException $e) {

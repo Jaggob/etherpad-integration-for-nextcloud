@@ -421,22 +421,32 @@ class PadCreationServiceTest extends TestCase {
 		?EtherpadClient $etherpadClient = null,
 		?PadBootstrapService $bootstrap = null,
 		?\OCA\EtherpadNextcloud\Service\PadPlaceholderResolver $placeholderResolver = null,
+		?\OCA\EtherpadNextcloud\Service\ExternalPadSeeder $externalPadSeeder = null,
 	): PadCreationService {
 		if ($placeholderResolver === null) {
 			$timeFactory = $this->createMock(\OCP\AppFramework\Utility\ITimeFactory::class);
 			$timeFactory->method('getTime')->willReturn(1778976000);
 			$placeholderResolver = new \OCA\EtherpadNextcloud\Service\PadPlaceholderResolver($timeFactory);
 		}
+		$padFileService = $padFileService ?? $this->createMock(PadFileService::class);
+		$etherpadClient = $etherpadClient ?? $this->createMock(EtherpadClient::class);
+		// Build a real seeder from the test's mocked deps by default so the
+		// createFromUrl tests can keep stubbing
+		// EtherpadClient::normalizeAndFetchExternalPublicPadTextOrEmpty
+		// directly without having to mock the seeder separately.
+		$externalPadSeeder = $externalPadSeeder
+			?? new \OCA\EtherpadNextcloud\Service\ExternalPadSeeder($padFileService, $etherpadClient);
 		return new PadCreationService(
-			$padFileService ?? $this->createMock(PadFileService::class),
+			$padFileService,
 			$padPaths ?? $this->createMock(PadPathService::class),
 			$fileCreator ?? $this->createMock(PadFileCreator::class),
 			$userNodeResolver ?? $this->createMock(UserNodeResolver::class),
 			$rollbackService ?? $this->createMock(PadCreateRollbackService::class),
 			$bindingService ?? $this->createMock(BindingService::class),
-			$etherpadClient ?? $this->createMock(EtherpadClient::class),
+			$etherpadClient,
 			$bootstrap ?? $this->createMock(PadBootstrapService::class),
 			$placeholderResolver,
+			$externalPadSeeder,
 			$this->createMock(LoggerInterface::class),
 		);
 	}
