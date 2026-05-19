@@ -65,12 +65,12 @@ class PadBootstrapServiceTest extends TestCase {
 		$file->expects($this->once())->method('getId')->willReturn($fileId);
 		$file->expects($this->once())->method('putContent')->with('doc-content');
 
-		$service = new PadBootstrapService($bindingService, $padFileService, $etherpadClient, $secureRandom, $logger);
-		$service->initializeMissingFrontmatter($file, '');
+		$migration = $this->createMock(\OCA\EtherpadNextcloud\Service\PadLegacyMigrationService::class);
+		$service = new PadBootstrapService($bindingService, $padFileService, $etherpadClient, $secureRandom, $logger, $migration);
+		$service->initializeMissingFrontmatter('alice', $file, '');
 	}
 
-	public function testInitializeMissingFrontmatterRejectsLegacyShortcut(): void {
-		$fileId = 7;
+	public function testInitializeMissingFrontmatterDelegatesLegacyShortcutToMigrationService(): void {
 		$legacy = [
 			'url' => 'https://pad.example.test/p/public-pad',
 			'pad_id' => 'public-pad',
@@ -84,20 +84,23 @@ class PadBootstrapServiceTest extends TestCase {
 		$padFileService->expects($this->once())
 			->method('parseLegacyOwnpadShortcut')
 			->willReturn($legacy);
-		$padFileService->expects($this->never())->method('inferAccessModeFromPadId');
 
 		$etherpadClient = $this->createMock(EtherpadClient::class);
 		$secureRandom = $this->createMock(ISecureRandom::class);
 		$logger = $this->createMock(LoggerInterface::class);
 
 		$file = $this->createMock(File::class);
-		$file->expects($this->once())->method('getId')->willReturn($fileId);
 
-		$service = new PadBootstrapService($bindingService, $padFileService, $etherpadClient, $secureRandom, $logger);
+		$migration = $this->createMock(\OCA\EtherpadNextcloud\Service\PadLegacyMigrationService::class);
+		$migration->expects($this->once())
+			->method('migrate')
+			->with('alice', $file, $legacy);
 
-		$this->expectException(PadFileFormatException::class);
-		$this->expectExceptionMessage('Legacy Ownpad .pad files cannot be auto-imported.');
-		$service->initializeMissingFrontmatter($file, "[InternetShortcut]\nURL=https://pad.example.test/p/public-pad\n");
+		$service = new PadBootstrapService($bindingService, $padFileService, $etherpadClient, $secureRandom, $logger, $migration);
+
+		$this->assertTrue(
+			$service->initializeMissingFrontmatter('alice', $file, "[InternetShortcut]\nURL=https://pad.example.test/p/public-pad\n")
+		);
 	}
 
 	public function testInitializeMissingFrontmatterCleansUpWhenWriteFails(): void {
@@ -146,10 +149,11 @@ class PadBootstrapServiceTest extends TestCase {
 			->with('doc-that-fails-to-write')
 			->willThrowException(new \RuntimeException('write failed'));
 
-		$service = new PadBootstrapService($bindingService, $padFileService, $etherpadClient, $secureRandom, $logger);
+		$migration = $this->createMock(\OCA\EtherpadNextcloud\Service\PadLegacyMigrationService::class);
+		$service = new PadBootstrapService($bindingService, $padFileService, $etherpadClient, $secureRandom, $logger, $migration);
 
 		$this->expectException(\RuntimeException::class);
 		$this->expectExceptionMessage('write failed');
-		$service->initializeMissingFrontmatter($file, '');
+		$service->initializeMissingFrontmatter('alice', $file, '');
 	}
 }

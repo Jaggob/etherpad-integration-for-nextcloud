@@ -17,6 +17,7 @@ use OCP\Files\NotFoundException;
 class PadInitializationService {
 	public const STATUS_ALREADY_INITIALIZED = 'already_initialized';
 	public const STATUS_INITIALIZED = 'initialized';
+	public const STATUS_MIGRATED_FROM_LEGACY = 'migrated_from_legacy';
 
 	public function __construct(
 		private PadFileService $padFileService,
@@ -75,13 +76,13 @@ class PadInitializationService {
 			throw $e;
 		}
 
-		$this->padBootstrapService->initializeMissingFrontmatter($file, $content);
+		$wasLegacyMigration = $this->padBootstrapService->initializeMissingFrontmatter($uid, $file, $content);
 		$updatedContent = (string)$file->getContent();
 		$parsed = $this->padFileService->parsePadFile((string)$updatedContent);
 		$meta = $parsed['frontmatter'];
 
 		return new PadInitializationResult(
-			status: self::STATUS_INITIALIZED,
+			status: $wasLegacyMigration ? self::STATUS_MIGRATED_FROM_LEGACY : self::STATUS_INITIALIZED,
 			file: $path,
 			fileId: $fileId,
 			padId: (string)$meta['pad_id'],
