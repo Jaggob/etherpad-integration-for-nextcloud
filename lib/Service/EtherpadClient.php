@@ -304,6 +304,44 @@ class EtherpadClient {
 		return $host;
 	}
 
+	/**
+	 * Returns the configured Etherpad origin (scheme + host + port,
+	 * normalized) so callers can compare a foreign pad URL against "is this
+	 * the server we manage?". Default ports (80/443) are omitted. Empty
+	 * string when no host is configured — callers should treat that as
+	 * "always cross-origin".
+	 *
+	 * Tolerant of http (unlike `parsePublicPadUrl` which enforces https)
+	 * because admins may legitimately run Etherpad behind a plain-http
+	 * internal endpoint while still wanting same-origin re-bind to work.
+	 */
+	public function getConfiguredOrigin(): string {
+		$host = rtrim((string)$this->config->getAppValue('etherpad_nextcloud', 'etherpad_host', ''), '/');
+		if ($host === '') {
+			return '';
+		}
+		return $this->normalizeOrigin($host);
+	}
+
+	/**
+	 * Normalize an absolute URL to a comparable origin string
+	 * (scheme://host[:port]). Returns '' on unparseable input.
+	 */
+	public function normalizeOrigin(string $url): string {
+		$parts = parse_url($url);
+		if ($parts === false || empty($parts['scheme']) || empty($parts['host'])) {
+			return '';
+		}
+		$scheme = strtolower((string)$parts['scheme']);
+		$host = strtolower((string)$parts['host']);
+		$port = isset($parts['port']) ? (int)$parts['port'] : null;
+		$isDefaultPort = ($scheme === 'https' && $port === 443) || ($scheme === 'http' && $port === 80);
+		if ($port === null || $isDefaultPort) {
+			return $scheme . '://' . $host;
+		}
+		return $scheme . '://' . $host . ':' . $port;
+	}
+
 	private function getApiHost(): string {
 		$apiHost = rtrim((string)$this->config->getAppValue('etherpad_nextcloud', 'etherpad_api_host', ''), '/');
 		if ($apiHost !== '') {
