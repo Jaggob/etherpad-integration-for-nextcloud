@@ -42,8 +42,8 @@ class PadResponseServiceTest extends TestCase {
 		$urlGenerator = $this->createMock(IURLGenerator::class);
 		$urlGenerator->method('linkToRoute')
 			->willReturnMap([
-				['etherpad_nextcloud.pad.syncById', ['fileId' => 42], '/sync/42'],
-				['etherpad_nextcloud.pad.syncStatusById', ['fileId' => 42], '/sync-status/42'],
+				['etherpad_nextcloud.padLifecycle.syncById', ['fileId' => 42], '/sync/42'],
+				['etherpad_nextcloud.padLifecycle.syncStatusById', ['fileId' => 42], '/sync-status/42'],
 			]);
 
 		$appConfigService = $this->createMock(AppConfigService::class);

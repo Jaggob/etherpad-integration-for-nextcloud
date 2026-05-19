@@ -51,17 +51,17 @@ class EmbedController extends Controller {
 			},
 			fn(array $resolved): TemplateResponse => $this->responseBuilder->build('embed', [
 				'file_id' => $resolved['file_id'],
-				'open_by_id_url' => $this->urlGenerator->linkToRoute($this->appName . '.pad.openById'),
+				'open_by_id_url' => $this->urlGenerator->linkToRoute($this->appName . '.padSession.openById'),
 				'initialize_by_id_url_template' => $this->urlGenerator->linkToRoute(
-					$this->appName . '.pad.initializeById',
+					$this->appName . '.padSession.initializeById',
 					['fileId' => '__FILE_ID__']
 				),
 				'recover_url_template' => $this->urlGenerator->linkToRoute(
-					$this->appName . '.pad.recoverByFileId',
+					$this->appName . '.padLifecycle.recoverByFileId',
 					['fileId' => '__FILE_ID__']
 				),
 				'find_original_url_template' => $this->urlGenerator->linkToRoute(
-					$this->appName . '.pad.findOriginalByFileId',
+					$this->appName . '.padLifecycle.findOriginalByFileId',
 					['fileId' => '__FILE_ID__']
 				),
 				'l10n' => [
@@ -98,7 +98,7 @@ class EmbedController extends Controller {
 			},
 			fn(array $resolved): TemplateResponse => $this->responseBuilder->build('embed-create', [
 				'parent_folder_id' => $resolved['parent_folder_id'],
-				'create_by_parent_url' => $this->urlGenerator->linkToRoute($this->appName . '.pad.createByParent'),
+				'create_by_parent_url' => $this->urlGenerator->linkToRoute($this->appName . '.padCreate.createByParent'),
 				'l10n' => [
 					'loading' => $this->l10n->t('Creating pad...'),
 					'error_title' => $this->l10n->t('Unable to create pad'),
