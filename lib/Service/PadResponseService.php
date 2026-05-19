@@ -178,8 +178,8 @@ class PadResponseService {
 			'snapshot_text' => $target->snapshotText,
 			'snapshot_html' => $target->snapshotHtml,
 			'url' => $target->url,
-			'sync_url' => $this->urlGenerator->linkToRoute('etherpad_nextcloud.pad.syncById', ['fileId' => $target->fileId]),
-			'sync_status_url' => $this->urlGenerator->linkToRoute('etherpad_nextcloud.pad.syncStatusById', ['fileId' => $target->fileId]),
+			'sync_url' => $this->urlGenerator->linkToRoute('etherpad_nextcloud.padLifecycle.syncById', ['fileId' => $target->fileId]),
+			'sync_status_url' => $this->urlGenerator->linkToRoute('etherpad_nextcloud.padLifecycle.syncStatusById', ['fileId' => $target->fileId]),
 			'sync_interval_seconds' => $this->appConfigService->getSyncIntervalSeconds(),
 		];
 

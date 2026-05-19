@@ -102,8 +102,8 @@ class PadSessionControllerTest extends TestCase {
 		$urlGenerator = $this->createMock(IURLGenerator::class);
 		$urlGenerator->method('linkToRoute')
 			->willReturnMap([
-				['etherpad_nextcloud.pad.syncById', ['fileId' => 138], '/sync/138'],
-				['etherpad_nextcloud.pad.syncStatusById', ['fileId' => 138], '/sync-status/138'],
+				['etherpad_nextcloud.padLifecycle.syncById', ['fileId' => 138], '/sync/138'],
+				['etherpad_nextcloud.padLifecycle.syncStatusById', ['fileId' => 138], '/sync-status/138'],
 		]);
 		$logger = $this->createMock(LoggerInterface::class);
 		$padPaths = new PathNormalizer();
@@ -229,8 +229,8 @@ class PadSessionControllerTest extends TestCase {
 		$urlGenerator = $this->createMock(IURLGenerator::class);
 		$urlGenerator->method('linkToRoute')
 			->willReturnMap([
-				['etherpad_nextcloud.pad.syncById', ['fileId' => 138], '/sync/138'],
-				['etherpad_nextcloud.pad.syncStatusById', ['fileId' => 138], '/sync-status/138'],
+				['etherpad_nextcloud.padLifecycle.syncById', ['fileId' => 138], '/sync/138'],
+				['etherpad_nextcloud.padLifecycle.syncStatusById', ['fileId' => 138], '/sync-status/138'],
 		]);
 		$logger = $this->createMock(LoggerInterface::class);
 		$padPaths = new PathNormalizer();
