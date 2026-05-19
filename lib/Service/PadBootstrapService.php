@@ -93,7 +93,6 @@ class PadBootstrapService {
 		$createdNewPad = false;
 		$padId = '';
 		$accessMode = BindingService::ACCESS_PROTECTED;
-		$padUrl = null;
 
 		if ($binding !== null) {
 			$padId = (string)$binding['pad_id'];
@@ -107,10 +106,8 @@ class PadBootstrapService {
 		}
 
 		try {
-			$effectivePadUrl = ($padUrl !== null && $padUrl !== '')
-				? $padUrl
-				: $this->etherpadClient->buildPadUrl($padId);
-			$doc = $this->padFileService->buildInitialDocument($fileId, $padId, $accessMode, '', $effectivePadUrl);
+			$padUrl = $this->etherpadClient->buildPadUrl($padId);
+			$doc = $this->padFileService->buildInitialDocument($fileId, $padId, $accessMode, '', $padUrl);
 			$file->putContent($doc);
 		} catch (\Throwable $e) {
 			if ($createdNewBinding) {

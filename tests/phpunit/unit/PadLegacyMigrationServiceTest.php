@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace OCA\EtherpadNextcloud\Tests\Unit;
 
+use OCA\EtherpadNextcloud\Exception\BindingException;
 use OCA\EtherpadNextcloud\Exception\LegacyPadCollisionException;
 use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
-use OCA\EtherpadNextcloud\Service\PadCreationService;
+use OCA\EtherpadNextcloud\Service\ExternalPadSeeder;
 use OCA\EtherpadNextcloud\Service\PadFileService;
 use OCA\EtherpadNextcloud\Service\PadLegacyMigrationService;
 use OCA\EtherpadNextcloud\Service\UserNodeResolver;
@@ -21,9 +22,9 @@ class PadLegacyMigrationServiceTest extends TestCase {
 		$file = $this->createMock(File::class);
 		$file->method('getId')->willReturn(101);
 
-		$padCreation = $this->createMock(PadCreationService::class);
-		$padCreation->expects($this->once())
-			->method('seedExternalIntoFile')
+		$externalPadSeeder = $this->createMock(ExternalPadSeeder::class);
+		$externalPadSeeder->expects($this->once())
+			->method('seed')
 			->with($file, 101, 'https://legacy.example.test/p/team-meeting')
 			->willReturn([
 				'file_id' => 101,
@@ -45,7 +46,7 @@ class PadLegacyMigrationServiceTest extends TestCase {
 		$this->buildService(
 			binding: $binding,
 			etherpadClient: $etherpadClient,
-			padCreation: $padCreation,
+			externalPadSeeder: $externalPadSeeder,
 		)->migrate('alice', $file, [
 			'url' => 'https://legacy.example.test/p/team-meeting',
 			'pad_id' => 'team-meeting',
@@ -164,6 +165,98 @@ class PadLegacyMigrationServiceTest extends TestCase {
 		]);
 	}
 
+	public function testSameOriginNoCollisionCreatesBindingBeforeFile(): void {
+		// The reviewer's concern: if a partial failure leaves the .pad with
+		// managed frontmatter but no binding row, the copy-recovery flow
+		// can't help (it needs *some* binding for the pad-id to exist).
+		// So binding goes first; the file write goes second.
+		$callOrder = [];
+
+		$file = $this->createMock(File::class);
+		$file->method('getId')->willReturn(606);
+		$file->method('putContent')->willReturnCallback(static function () use (&$callOrder): void {
+			$callOrder[] = 'putContent';
+		});
+
+		$padFileService = $this->createMock(PadFileService::class);
+		$padFileService->method('inferAccessModeFromPadId')->willReturn(BindingService::ACCESS_PROTECTED);
+		$padFileService->method('buildInitialDocument')->willReturn('frontmatter');
+
+		$etherpadClient = $this->createMock(EtherpadClient::class);
+		$etherpadClient->method('getConfiguredOrigin')->willReturn('https://pad.our-server.test');
+		$etherpadClient->method('normalizeOrigin')->willReturn('https://pad.our-server.test');
+		$etherpadClient->method('buildPadUrl')->willReturn('https://pad.our-server.test/p/g.x$y');
+
+		$binding = $this->createMock(BindingService::class);
+		$binding->method('findByPadId')->willReturn(null);
+		$binding->expects($this->once())
+			->method('createBinding')
+			->willReturnCallback(static function () use (&$callOrder): void {
+				$callOrder[] = 'createBinding';
+			});
+
+		$this->buildService(
+			binding: $binding,
+			padFileService: $padFileService,
+			etherpadClient: $etherpadClient,
+		)->migrate('alice', $file, [
+			'url' => 'https://pad.our-server.test/p/g.x$y',
+			'pad_id' => 'g.x$y',
+		]);
+
+		$this->assertSame(['createBinding', 'putContent'], $callOrder);
+	}
+
+	public function testSameOriginBindingRaceReclassifiesAsCollisionWithAccess(): void {
+		// A concurrent migration / open created the binding between our
+		// findByPadId and our createBinding. The second findByPadId now
+		// finds the winning binding; if we can read that file we recover
+		// as a copy-of-a-pad without writing a second binding row.
+		$file = $this->createMock(File::class);
+		$file->method('getId')->willReturn(707);
+		$file->expects($this->once())->method('putContent');
+
+		$padFileService = $this->createMock(PadFileService::class);
+		$padFileService->method('inferAccessModeFromPadId')->willReturn(BindingService::ACCESS_PUBLIC);
+		$padFileService->method('buildInitialDocument')->willReturn('frontmatter');
+
+		$etherpadClient = $this->createMock(EtherpadClient::class);
+		$etherpadClient->method('getConfiguredOrigin')->willReturn('https://pad.our-server.test');
+		$etherpadClient->method('normalizeOrigin')->willReturn('https://pad.our-server.test');
+		$etherpadClient->method('buildPadUrl')->willReturn('https://pad.our-server.test/p/race-pad');
+
+		$binding = $this->createMock(BindingService::class);
+		$findCalls = 0;
+		$binding->method('findByPadId')->willReturnCallback(
+			static function () use (&$findCalls): ?array {
+				$findCalls++;
+				if ($findCalls === 1) {
+					return null; // initial check: no binding
+				}
+				return ['file_id' => 808, 'pad_id' => 'race-pad', 'access_mode' => 'public'];
+			}
+		);
+		$binding->expects($this->once())
+			->method('createBinding')
+			->willThrowException(new BindingException('unique constraint hit'));
+
+		$resolver = $this->createMock(UserNodeResolver::class);
+		$resolver->expects($this->once())
+			->method('resolveUserFileNodeById')
+			->with('alice', 808)
+			->willReturn($this->createMock(File::class));
+
+		$this->buildService(
+			binding: $binding,
+			padFileService: $padFileService,
+			etherpadClient: $etherpadClient,
+			resolver: $resolver,
+		)->migrate('alice', $file, [
+			'url' => 'https://pad.our-server.test/p/race-pad',
+			'pad_id' => 'race-pad',
+		]);
+	}
+
 	public function testSameOriginCollisionWithoutAccessRefuses(): void {
 		// The pad is bound to someone else's file alice cannot read.
 		// Migration is refused, the .pad file stays untouched, an exception
@@ -209,14 +302,14 @@ class PadLegacyMigrationServiceTest extends TestCase {
 		?BindingService $binding = null,
 		?PadFileService $padFileService = null,
 		?EtherpadClient $etherpadClient = null,
-		?PadCreationService $padCreation = null,
+		?ExternalPadSeeder $externalPadSeeder = null,
 		?UserNodeResolver $resolver = null,
 	): PadLegacyMigrationService {
 		return new PadLegacyMigrationService(
 			$binding ?? $this->createMock(BindingService::class),
 			$padFileService ?? $this->createMock(PadFileService::class),
 			$etherpadClient ?? $this->createMock(EtherpadClient::class),
-			$padCreation ?? $this->createMock(PadCreationService::class),
+			$externalPadSeeder ?? $this->createMock(ExternalPadSeeder::class),
 			$resolver ?? $this->createMock(UserNodeResolver::class),
 			$this->createMock(LoggerInterface::class),
 		);

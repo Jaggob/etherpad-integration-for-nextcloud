@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace OCA\EtherpadNextcloud\Service;
 
+use OCA\EtherpadNextcloud\Exception\BindingException;
 use OCA\EtherpadNextcloud\Exception\LegacyPadCollisionException;
 use OCP\Files\File;
 use OCP\Files\NotFoundException;
@@ -44,7 +45,7 @@ class PadLegacyMigrationService {
 		private BindingService $bindingService,
 		private PadFileService $padFileService,
 		private EtherpadClient $etherpadClient,
-		private PadCreationService $padCreationService,
+		private ExternalPadSeeder $externalPadSeeder,
 		private UserNodeResolver $userNodeResolver,
 		private LoggerInterface $logger,
 	) {
@@ -69,7 +70,7 @@ class PadLegacyMigrationService {
 		$isSameOrigin = $configuredOrigin !== '' && $configuredOrigin === $sourceOrigin;
 
 		if (!$isSameOrigin) {
-			$this->padCreationService->seedExternalIntoFile($file, $fileId, $sourceUrl);
+			$this->externalPadSeeder->seed($file, $fileId, $sourceUrl);
 			$this->logger->info('Migrated legacy Ownpad .pad as external public pad.', [
 				'app' => 'etherpad_nextcloud',
 				'fileId' => $fileId,
@@ -84,29 +85,57 @@ class PadLegacyMigrationService {
 		$existingBinding = $this->bindingService->findByPadId($sourcePadId, BindingService::STATE_ACTIVE);
 
 		if ($existingBinding === null) {
-			$this->writeManagedFrontmatter($file, $fileId, $sourcePadId, $accessMode);
-			$this->bindingService->createBinding($fileId, $sourcePadId, $accessMode);
-			$this->logger->info('Migrated legacy Ownpad .pad as managed pad (re-bind).', [
-				'app' => 'etherpad_nextcloud',
-				'fileId' => $fileId,
-				'sourceUrl' => $sourceUrl,
-				'originBranch' => 'same',
-				'accessMode' => $accessMode,
-				'padId' => $sourcePadId,
-				'collision' => 'none',
-				'uid' => $uid,
-			]);
-			return;
+			// Create the binding first, then write the file. If the binding
+			// fails (e.g. a concurrent migration claimed the same pad-id
+			// between findByPadId and createBinding), we re-classify as a
+			// collision and fall through to the access check — the .pad
+			// file is left untouched so the next open retries cleanly.
+			//
+			// Doing it in the other order would leave a half-migrated state:
+			// the file would have managed frontmatter pointing at a pad-id
+			// with no binding row, and the existing copy-recovery flow can't
+			// help (it needs *some* binding for that pad-id to exist).
+			try {
+				$this->bindingService->createBinding($fileId, $sourcePadId, $accessMode);
+			} catch (BindingException $e) {
+				$existingBinding = $this->bindingService->findByPadId($sourcePadId, BindingService::STATE_ACTIVE);
+				if ($existingBinding === null) {
+					// Race lost AND no winner — surface the original failure
+					// so the open retry sees a clear "could not initialize".
+					throw $e;
+				}
+				$this->logger->info('Legacy Ownpad migration lost a race for the pad-id; reclassifying as collision.', [
+					'app' => 'etherpad_nextcloud',
+					'fileId' => $fileId,
+					'padId' => $sourcePadId,
+					'uid' => $uid,
+				]);
+				// Fall through to the collision-with-access handling below.
+			}
+			if ($existingBinding === null) {
+				$this->writeManagedFrontmatter($file, $fileId, $sourcePadId, $accessMode);
+				$this->logger->info('Migrated legacy Ownpad .pad as managed pad (re-bind).', [
+					'app' => 'etherpad_nextcloud',
+					'fileId' => $fileId,
+					'sourceUrl' => $sourceUrl,
+					'originBranch' => 'same',
+					'accessMode' => $accessMode,
+					'padId' => $sourcePadId,
+					'collision' => 'none',
+					'uid' => $uid,
+				]);
+				return;
+			}
 		}
 
 		$boundFileId = (int)$existingBinding['file_id'];
 		if ($boundFileId === $fileId) {
-			// Defensive: this branch is unreachable today because we only get
-			// here when the file has no YAML frontmatter, which implies no
-			// binding tied to it either. If it happens anyway, just write the
-			// frontmatter — the existing binding already covers us.
+			// Self-collision: an earlier migration attempt for this file
+			// succeeded in creating the binding but failed before the file
+			// write. Just finish the file-side work; the binding already
+			// covers us.
 			$this->writeManagedFrontmatter($file, $fileId, $sourcePadId, $accessMode);
-			$this->logger->info('Migrated legacy Ownpad .pad — binding already exists for this file.', [
+			$this->logger->info('Migrated legacy Ownpad .pad — finishing partially-completed prior migration.', [
 				'app' => 'etherpad_nextcloud',
 				'fileId' => $fileId,
 				'sourceUrl' => $sourceUrl,
