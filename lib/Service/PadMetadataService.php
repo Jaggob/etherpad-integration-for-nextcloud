@@ -22,6 +22,7 @@ class PadMetadataService {
 		private UserNodeResolver $userNodeResolver,
 		private PadFileLockRetryService $lockRetryService,
 		private EtherpadClient $etherpadClient,
+		private ExternalPadExportFetcher $externalPadExportFetcher,
 		private BindingService $bindingService,
 		private LoggerInterface $logger,
 	) {
@@ -220,7 +221,7 @@ class PadMetadataService {
 
 	private function resolvePublicOpenUrl(string $padId, string $padUrl, bool $isExternal): string {
 		if ($isExternal && $padUrl !== '') {
-			$normalized = $this->etherpadClient->normalizeAndValidateExternalPublicPadUrl($padUrl);
+			$normalized = $this->externalPadExportFetcher->normalizeAndValidateExternalPublicPadUrl($padUrl);
 			return (string)$normalized['pad_url'];
 		}
 		if ($padId !== '') {

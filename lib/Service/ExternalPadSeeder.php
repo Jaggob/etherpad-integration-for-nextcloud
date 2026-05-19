@@ -19,13 +19,13 @@ use OCP\Files\File;
  *
  * Lives in its own service to keep `PadCreationService` and
  * `PadLegacyMigrationService` from forming a constructor cycle with
- * `PadBootstrapService` — the seeding logic only needs `EtherpadClient`
- * and `PadFileService`, never the bootstrap path.
+ * `PadBootstrapService` — the seeding logic only needs
+ * `ExternalPadExportFetcher` and `PadFileService`, never the bootstrap path.
  */
 class ExternalPadSeeder {
 	public function __construct(
 		private PadFileService $padFileService,
-		private EtherpadClient $etherpadClient,
+		private ExternalPadExportFetcher $externalPadExportFetcher,
 	) {
 	}
 
@@ -33,7 +33,7 @@ class ExternalPadSeeder {
 	 * @return array{file_id:int,pad_id:string,access_mode:string,pad_url:string,snapshot_warning_code?:string}
 	 */
 	public function seed(File $file, int $fileId, string $padUrl): array {
-		$external = $this->etherpadClient->normalizeAndFetchExternalPublicPadTextOrEmpty($padUrl);
+		$external = $this->externalPadExportFetcher->normalizeAndFetchExternalPublicPadTextOrEmpty($padUrl);
 		// External pads aren't DB-bound (we don't own their lifecycle), so the
 		// local `ext.*` pad-id is just a marker distinguishing them from
 		// managed internal IDs. Canonical remote identity lives in the

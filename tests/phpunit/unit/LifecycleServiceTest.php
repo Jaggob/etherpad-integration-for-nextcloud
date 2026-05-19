@@ -364,7 +364,6 @@ class LifecycleServiceTest extends TestCase {
 		$etherpadClient->expects($this->never())->method('setText');
 		$etherpadClient->expects($this->never())->method('setHTML');
 		$etherpadClient->expects($this->never())->method('deletePad');
-		$etherpadClient->expects($this->never())->method('normalizeAndValidateExternalPublicPadUrl');
 
 		$file = $this->createMock(File::class);
 		$file->method('getId')->willReturn($fileId);
@@ -423,7 +422,6 @@ class LifecycleServiceTest extends TestCase {
 		$etherpadClient->expects($this->never())->method('setText');
 		$etherpadClient->expects($this->never())->method('setHTML');
 		$etherpadClient->expects($this->never())->method('deletePad');
-		$etherpadClient->expects($this->never())->method('normalizeAndValidateExternalPublicPadUrl');
 
 		$file = $this->createMock(File::class);
 		$file->method('getId')->willReturn($fileId);
@@ -487,7 +485,6 @@ class LifecycleServiceTest extends TestCase {
 		$etherpadClient->expects($this->never())->method('setText');
 		$etherpadClient->expects($this->never())->method('setHTML');
 		$etherpadClient->expects($this->never())->method('deletePad');
-		$etherpadClient->expects($this->never())->method('normalizeAndValidateExternalPublicPadUrl');
 
 		$file = $this->createMock(File::class);
 		$file->method('getId')->willReturn($fileId);

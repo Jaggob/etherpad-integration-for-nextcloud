@@ -32,6 +32,7 @@ class PadSyncService {
 		private PadFileLockRetryService $lockRetryService,
 		private BindingService $bindingService,
 		private EtherpadClient $etherpadClient,
+		private ExternalPadExportFetcher $externalPadExportFetcher,
 		private LoggerInterface $logger,
 	) {
 	}
@@ -144,7 +145,7 @@ class PadSyncService {
 		}
 		// External sync already performs a live upstream text fetch on every call.
 		// force=1 therefore only marks caller intent while preserving the no-blind-rewrite invariant.
-		$external = $this->etherpadClient->normalizeAndFetchExternalPublicPadText($padUrl);
+		$external = $this->externalPadExportFetcher->normalizeAndFetchExternalPublicPadText($padUrl);
 		$text = $external['text'];
 
 		$existingText = $this->padFileService->getTextSnapshotForRestore($currentContent);

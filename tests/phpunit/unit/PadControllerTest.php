@@ -10,6 +10,7 @@ use OCA\EtherpadNextcloud\Exception\PadAlreadyHasBindingException;
 use OCA\EtherpadNextcloud\Service\AppConfigService;
 use OCA\EtherpadNextcloud\Service\BindingService;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
+use OCA\EtherpadNextcloud\Service\ExternalPadExportFetcher;
 use OCA\EtherpadNextcloud\Service\LifecycleService;
 use OCA\EtherpadNextcloud\Service\PadCreationService;
 use OCA\EtherpadNextcloud\Service\PadFileLockRetryService;
@@ -165,6 +166,7 @@ class PadControllerTest extends TestCase {
 			$lockRetryService,
 			$bindingService,
 			$etherpadClient,
+			$this->createMock(ExternalPadExportFetcher::class),
 			$this->createMock(PadSessionService::class),
 			new SnapshotExtractor($padFileService, new SnapshotHtmlSanitizer()),
 			$logger,
@@ -265,11 +267,12 @@ class PadControllerTest extends TestCase {
 		$bindingService->expects($this->never())->method('assertConsistentMapping');
 
 		$etherpadClient = $this->createMock(EtherpadClient::class);
-		$etherpadClient->expects($this->once())
+		$etherpadClient->expects($this->never())->method('buildPadUrl');
+		$externalPadExportFetcher = $this->createMock(ExternalPadExportFetcher::class);
+		$externalPadExportFetcher->expects($this->once())
 			->method('normalizeAndValidateExternalPublicPadUrl')
 			->with('https://pad.portal.fzs.de/p/Test')
 			->willReturn(['pad_url' => 'https://pad.portal.fzs.de/p/Test']);
-		$etherpadClient->expects($this->never())->method('buildPadUrl');
 
 		$appConfigService = $this->createMock(AppConfigService::class);
 		$appConfigService->expects($this->once())
@@ -293,6 +296,7 @@ class PadControllerTest extends TestCase {
 			$lockRetryService,
 			$bindingService,
 			$etherpadClient,
+			$externalPadExportFetcher,
 			$this->createMock(PadSessionService::class),
 			new SnapshotExtractor($padFileService, new SnapshotHtmlSanitizer()),
 			$logger,
@@ -587,8 +591,8 @@ class PadControllerTest extends TestCase {
 		$bindingService = $this->createMock(BindingService::class);
 		$bindingService->method('assertConsistentMapping');
 
-		$etherpadClient = $this->createMock(EtherpadClient::class);
-		$etherpadClient->expects($this->once())
+		$externalPadExportFetcher = $this->createMock(ExternalPadExportFetcher::class);
+		$externalPadExportFetcher->expects($this->once())
 			->method('normalizeAndFetchExternalPublicPadText')
 			->with('https://pad.example.test/p/public-pad')
 			->willReturn([
@@ -604,7 +608,7 @@ class PadControllerTest extends TestCase {
 			rootFolder: $rootFolder,
 			padFileService: $padFileService,
 			bindingService: $bindingService,
-			etherpadClient: $etherpadClient,
+			externalPadExportFetcher: $externalPadExportFetcher,
 		);
 		$response = $controller->syncById(138);
 
@@ -810,16 +814,18 @@ class PadControllerTest extends TestCase {
 		?BindingService $bindingService = null,
 		?EtherpadClient $etherpadClient = null,
 		?LifecycleService $padLifecycleOperations = null,
+		?ExternalPadExportFetcher $externalPadExportFetcher = null,
 	): PadController {
 		$resolvedRootFolder = $rootFolder ?? $this->createMock(IRootFolder::class);
 		$resolvedEtherpadClient = $etherpadClient ?? $this->createMock(EtherpadClient::class);
+		$resolvedExternalPadExportFetcher = $externalPadExportFetcher ?? $this->createMock(ExternalPadExportFetcher::class);
 		$resolvedPadFileService = $padFileService ?? $this->createMock(PadFileService::class);
 		$resolvedBindingService = $bindingService ?? $this->createMock(BindingService::class);
 		$logger = $this->createMock(LoggerInterface::class);
 		$padPaths = new PathNormalizer();
 		$userNodeResolver = new UserNodeResolver($resolvedRootFolder);
 		$lockRetryService = $this->buildNoSleepLockRetryService();
-		$padMetadataService = new PadMetadataService($resolvedPadFileService, $padPaths, $userNodeResolver, $lockRetryService, $resolvedEtherpadClient, $resolvedBindingService, $logger);
+		$padMetadataService = new PadMetadataService($resolvedPadFileService, $padPaths, $userNodeResolver, $lockRetryService, $resolvedEtherpadClient, $resolvedExternalPadExportFetcher, $resolvedBindingService, $logger);
 		$padOpenService = new PadOpenService(
 			$resolvedPadFileService,
 			$padPaths,
@@ -827,11 +833,12 @@ class PadControllerTest extends TestCase {
 			$lockRetryService,
 			$resolvedBindingService,
 			$resolvedEtherpadClient,
+			$resolvedExternalPadExportFetcher,
 			$this->createMock(PadSessionService::class),
 			new SnapshotExtractor($resolvedPadFileService, new SnapshotHtmlSanitizer()),
 			$logger,
 		);
-		$padSyncService = new PadSyncService($resolvedPadFileService, $userNodeResolver, $lockRetryService, $resolvedBindingService, $resolvedEtherpadClient, $logger);
+		$padSyncService = new PadSyncService($resolvedPadFileService, $userNodeResolver, $lockRetryService, $resolvedBindingService, $resolvedEtherpadClient, $resolvedExternalPadExportFetcher, $logger);
 		$padLifecycleOperations = $padLifecycleOperations
 			?? $this->createMock(LifecycleService::class);
 		$urlGenerator = $this->createMock(IURLGenerator::class);
