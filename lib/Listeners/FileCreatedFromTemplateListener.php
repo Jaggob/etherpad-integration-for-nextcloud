@@ -61,7 +61,7 @@ class FileCreatedFromTemplateListener implements IEventListener {
 
 		$user = $this->userSession->getUser();
 		if ($user === null) {
-			$this->logger->warning('Template event fired without an active user — leaving target empty.', [
+			$this->logger->warning('Template event fired without an active user — resetting target to empty.', [
 				'app' => 'etherpad_nextcloud',
 				'fileId' => (int)$target->getId(),
 			]);
