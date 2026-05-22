@@ -23,6 +23,31 @@ import { fetchJsonWithTimeout as fetchJson } from './lib/fetch-helpers.js'
 
 	const requestToken = () => ocRequestToken(templateRequestToken)
 
+	/**
+	 * Post an `epnc:*` event to the host page that's embedding this iframe.
+	 *
+	 * Target-origin is `*` rather than a specific origin because the create
+	 * page doesn't know the host's origin up-front (the host hasn't talked to
+	 * us yet). The actual access control happens at iframe-load time via the
+	 * route's CSP `frame-ancestors` header, which only lists the admin-
+	 * configured `trusted_embed_origins`. Anyone receiving these messages is
+	 * by construction already in that allowlist.
+	 *
+	 * No-ops if we're not actually embedded (window.parent === window).
+	 */
+	const postHostMessage = (type, payload) => {
+		if (window.parent === window) {
+			return
+		}
+		try {
+			window.parent.postMessage(Object.assign({ type }, payload || {}), '*')
+		} catch (e) {
+			// Posting can throw on certain cross-origin / cross-process boundaries;
+			// inline error rendering is the user-visible fallback, so the message
+			// is purely advisory for the host.
+		}
+	}
+
 	const showError = (message) => {
 		if (loadingNode instanceof HTMLElement) {
 			loadingNode.hidden = true
@@ -33,6 +58,24 @@ import { fetchJsonWithTimeout as fetchJson } from './lib/fetch-helpers.js'
 		if (errorNode instanceof HTMLElement) {
 			errorNode.hidden = false
 		}
+	}
+
+	/**
+	 * Emit a structured `epnc:create-failed` event AND render the inline error.
+	 * `reason` is a coarse bucket so hosts can branch without parsing the
+	 * HTTP status:
+	 *   - 'invalid' — client-side validation failed (missing name, etc.)
+	 *   - 'conflict' — backend returned 409 (e.g. duplicate filename)
+	 *   - 'server'  — any other 4xx / 5xx
+	 *   - 'network' — fetch itself failed (offline, CORS, timeout)
+	 */
+	const failCreate = (reason, message, status) => {
+		showError(message)
+		postHostMessage('epnc:create-failed', {
+			reason,
+			status: typeof status === 'number' ? status : null,
+			message: String(message || ''),
+		})
 	}
 
 	const readLauncherParams = () => {
@@ -51,23 +94,30 @@ import { fetchJsonWithTimeout as fetchJson } from './lib/fetch-helpers.js'
 		return url.pathname + url.search + url.hash
 	}
 
+	const classifyHttpStatus = (status) => {
+		if (status === 409) {
+			return 'conflict'
+		}
+		return 'server'
+	}
+
 	const run = async () => {
 		if (!Number.isFinite(parentFolderId) || parentFolderId <= 0 || createByParentUrl === '') {
-			showError(incompleteConfigMessage)
+			failCreate('invalid', incompleteConfigMessage)
 			return
 		}
 		if (requestToken() === '') {
-			showError('CSRF request token is missing.')
+			failCreate('invalid', 'CSRF request token is missing.')
 			return
 		}
 
 		const { name, accessMode } = readLauncherParams()
 		if (name === '') {
-			showError(missingNameMessage)
+			failCreate('invalid', missingNameMessage)
 			return
 		}
 		if (accessMode !== 'protected' && accessMode !== 'public') {
-			showError(invalidAccessModeMessage)
+			failCreate('invalid', invalidAccessModeMessage)
 			return
 		}
 
@@ -86,11 +136,25 @@ import { fetchJsonWithTimeout as fetchJson } from './lib/fetch-helpers.js'
 				body: body.toString(),
 			})
 			if (!data || typeof data.embed_url !== 'string' || data.embed_url.trim() === '') {
-				throw new Error('Pad creation API did not return a valid embed URL.')
+				failCreate('server', 'Pad creation API did not return a valid embed URL.')
+				return
 			}
+			// Notify host BEFORE the redirect: once we navigate the iframe away
+			// the host loses its handle on this script and any postMessage from
+			// the new page would carry the open-flow's `epnc:host-*` schema
+			// instead.
+			postHostMessage('epnc:create-succeeded', {
+				embed_url: data.embed_url,
+				file_id: typeof data.file_id === 'number' ? data.file_id : null,
+				pad_id: typeof data.pad_id === 'string' ? data.pad_id : '',
+				access_mode: typeof data.access_mode === 'string' ? data.access_mode : '',
+			})
 			window.location.replace(normalizeEmbedRedirectUrl(data.embed_url))
 		} catch (error) {
-			showError(error instanceof Error ? error.message : 'Pad creation failed.')
+			const status = (error && typeof error.status === 'number') ? error.status : null
+			const message = error instanceof Error ? error.message : 'Pad creation failed.'
+			const reason = status === null ? 'network' : classifyHttpStatus(status)
+			failCreate(reason, message, status)
 		}
 	}
 

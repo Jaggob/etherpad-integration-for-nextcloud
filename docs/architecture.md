@@ -156,7 +156,11 @@ Primary flow (minimal blank create launcher page):
 4. `src/embed-create-main.js` reads `name` and `accessMode` from the launcher URL, validates them client-side, and calls `POST /api/v1/pads/create-by-parent` same-origin with CSRF token from the template.
    - the token is injected manually for the same reason as embed-open: blank layout has no automatic `OC.requestToken` bootstrap
 5. `PadCreateController::createByParent` performs server-side validation of `name`, `accessMode`, and the writable target folder before creating the `.pad` file and binding.
-6. On success the launcher redirects itself to the returned `embed_url`, after which the normal embed-open flow takes over.
+6. Before redirecting, `src/embed-create-main.js` posts the host page one of two structured events so the surrounding UI can react without scraping the iframe DOM:
+   - `epnc:create-succeeded` — payload `{embed_url, file_id, pad_id, access_mode}`. Fires once on the success path, immediately before the iframe self-redirects to the embed-open URL.
+   - `epnc:create-failed` — payload `{reason, status, message}`. Fires on any error. `reason` is one of `'invalid'` (client-side validation), `'conflict'` (HTTP 409 — e.g. duplicate filename), `'server'` (any other 4xx/5xx), or `'network'` (fetch itself failed).
+   The inline error rendering inside the iframe is unchanged — `postMessage` is purely additive for hosts that want to act on the outcome. Target-origin is `*` because the page doesn't know the host's origin up-front; the `frame-ancestors` allowlist already constrains who can be the parent.
+7. On success the launcher redirects itself to the returned `embed_url`, after which the normal embed-open flow takes over.
 
 ### 3) Open (public share)
 
