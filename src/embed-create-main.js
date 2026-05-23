@@ -62,6 +62,11 @@ import { fetchJsonWithTimeout as fetchJson } from './lib/fetch-helpers.js'
 
 	/**
 	 * Emit a structured `epnc:create-failed` event AND render the inline error.
+	 * The message is normalised once so the host's payload and the user-facing
+	 * inline message never drift (an empty/undefined `message` would otherwise
+	 * land in the iframe as "Unknown error." but in the postMessage payload as
+	 * the empty string).
+	 *
 	 * `reason` is a coarse bucket so hosts can branch without parsing the
 	 * HTTP status:
 	 *   - 'invalid' — client-side validation failed (missing name, etc.)
@@ -70,11 +75,12 @@ import { fetchJsonWithTimeout as fetchJson } from './lib/fetch-helpers.js'
 	 *   - 'network' — fetch itself failed (offline, CORS, timeout)
 	 */
 	const failCreate = (reason, message, status) => {
-		showError(message)
+		const normalizedMessage = String(message || 'Unknown error.')
+		showError(normalizedMessage)
 		postHostMessage('epnc:create-failed', {
 			reason,
 			status: typeof status === 'number' ? status : null,
-			message: String(message || ''),
+			message: normalizedMessage,
 		})
 	}
 

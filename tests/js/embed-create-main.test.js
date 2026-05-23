@@ -186,6 +186,71 @@ describe('embed-create-main', () => {
 		expect(payload.message).toBe('Pad name is required.')
 	})
 
+	it('emits epnc:create-failed with reason=invalid when embed config is incomplete', async () => {
+		// Simulates the host page mounting the iframe without the
+		// data-create-by-parent-url attribute (or with a non-numeric
+		// parent-folder-id). The flow should bail before doing any fetch
+		// AND still send the host a structured signal.
+		document.body.innerHTML = `
+			<div id="etherpad-nextcloud-embed-create"
+				class="epnc-embed"
+				data-parent-folder-id=""
+				data-create-by-parent-url=""
+				data-request-token="csrf"
+				data-l10n-missing-name="Pad name is required."
+				data-l10n-invalid-access-mode="Invalid access mode."
+				data-l10n-incomplete-config="Embed configuration is incomplete.">
+				<div data-epnc-embed-create-loading>loading</div>
+				<div data-epnc-embed-create-error hidden>
+					<p data-epnc-embed-create-error-message></p>
+				</div>
+			</div>
+		`
+		await importEmbedCreate()
+		await flushMicrotasks()
+
+		expect(fetch).not.toHaveBeenCalled()
+		expect(locationReplaceSpy).not.toHaveBeenCalled()
+
+		const payload = parentPostSpy.mock.calls[0][0]
+		expect(payload.type).toBe('epnc:create-failed')
+		expect(payload.reason).toBe('invalid')
+		expect(payload.status).toBe(null)
+		expect(payload.message).toBe('Embed configuration is incomplete.')
+	})
+
+	it('emits epnc:create-failed with reason=invalid when the CSRF token is missing', async () => {
+		// data-request-token empty AND no window.OC fallback. The script
+		// should refuse to call fetch and surface a structured invalid
+		// signal to the host.
+		document.body.innerHTML = `
+			<div id="etherpad-nextcloud-embed-create"
+				class="epnc-embed"
+				data-parent-folder-id="42"
+				data-create-by-parent-url="/api/create-by-parent"
+				data-request-token=""
+				data-l10n-missing-name="Pad name is required."
+				data-l10n-invalid-access-mode="Invalid access mode."
+				data-l10n-incomplete-config="Embed configuration is incomplete.">
+				<div data-epnc-embed-create-loading>loading</div>
+				<div data-epnc-embed-create-error hidden>
+					<p data-epnc-embed-create-error-message></p>
+				</div>
+			</div>
+		`
+		delete window.OC
+		await importEmbedCreate()
+		await flushMicrotasks()
+
+		expect(fetch).not.toHaveBeenCalled()
+		expect(locationReplaceSpy).not.toHaveBeenCalled()
+
+		const payload = parentPostSpy.mock.calls[0][0]
+		expect(payload.type).toBe('epnc:create-failed')
+		expect(payload.reason).toBe('invalid')
+		expect(payload.message).toBe('CSRF request token is missing.')
+	})
+
 	it('does not emit succeeded then failed when the server returns a cross-origin embed_url', async () => {
 		// Regression: an earlier version emitted `epnc:create-succeeded`
 		// before validating the redirect target. A bad embed_url would then
