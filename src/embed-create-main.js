@@ -126,8 +126,12 @@ import { fetchJsonWithTimeout as fetchJson } from './lib/fetch-helpers.js'
 		body.set('name', name)
 		body.set('accessMode', accessMode)
 
+		// Step 1: server-side create. Failures here are either network
+		// (fetch threw — no HTTP status reached us) or server (we got a
+		// status code back, including the 409 on duplicate filename).
+		let data
 		try {
-			const data = await fetchJson(createByParentUrl, {
+			data = await fetchJson(createByParentUrl, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
@@ -135,27 +139,43 @@ import { fetchJsonWithTimeout as fetchJson } from './lib/fetch-helpers.js'
 				},
 				body: body.toString(),
 			})
-			if (!data || typeof data.embed_url !== 'string' || data.embed_url.trim() === '') {
-				failCreate('server', 'Pad creation API did not return a valid embed URL.')
-				return
-			}
-			// Notify host BEFORE the redirect: once we navigate the iframe away
-			// the host loses its handle on this script and any postMessage from
-			// the new page would carry the open-flow's `epnc:host-*` schema
-			// instead.
-			postHostMessage('epnc:create-succeeded', {
-				embed_url: data.embed_url,
-				file_id: typeof data.file_id === 'number' ? data.file_id : null,
-				pad_id: typeof data.pad_id === 'string' ? data.pad_id : '',
-				access_mode: typeof data.access_mode === 'string' ? data.access_mode : '',
-			})
-			window.location.replace(normalizeEmbedRedirectUrl(data.embed_url))
 		} catch (error) {
 			const status = (error && typeof error.status === 'number') ? error.status : null
 			const message = error instanceof Error ? error.message : 'Pad creation failed.'
 			const reason = status === null ? 'network' : classifyHttpStatus(status)
 			failCreate(reason, message, status)
+			return
 		}
+
+		// Step 2: validate the server's response shape *and* the redirect
+		// target before emitting success. A malformed or cross-origin
+		// embed_url is a server-side bug, not a network failure — and we
+		// must not announce success only to then announce failure to the
+		// same host listener, which would leave them with contradictory
+		// signals.
+		if (!data || typeof data.embed_url !== 'string' || data.embed_url.trim() === '') {
+			failCreate('server', 'Pad creation API did not return a valid embed URL.')
+			return
+		}
+		let redirectTarget
+		try {
+			redirectTarget = normalizeEmbedRedirectUrl(data.embed_url)
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Invalid embed URL.'
+			failCreate('server', message)
+			return
+		}
+
+		// Step 3: announce success once everything is definitively OK, then
+		// navigate. Notify *before* the redirect: once we replace the iframe
+		// location the host loses its handle on this script.
+		postHostMessage('epnc:create-succeeded', {
+			embed_url: data.embed_url,
+			file_id: typeof data.file_id === 'number' ? data.file_id : null,
+			pad_id: typeof data.pad_id === 'string' ? data.pad_id : '',
+			access_mode: typeof data.access_mode === 'string' ? data.access_mode : '',
+		})
+		window.location.replace(redirectTarget)
 	}
 
 	void run()

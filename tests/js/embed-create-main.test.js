@@ -41,12 +41,15 @@ const errorPanelHidden = () => document.querySelector('[data-epnc-embed-create-e
 
 let parentPostSpy
 let locationReplaceSpy
+let originalLocationDescriptor
 
 const importEmbedCreate = async (search) => {
 	const url = `http://localhost/embed/create-by-parent/42${search ?? '?name=My%20Pad&accessMode=protected'}`
 	// happy-dom doesn't let us simply reassign window.location; redefine just
-	// the bits we touch.
+	// the bits we touch. `configurable: true` is required so afterEach can
+	// restore the original descriptor and the next test can redefine again.
 	Object.defineProperty(window, 'location', {
+		configurable: true,
 		writable: true,
 		value: {
 			href: url,
@@ -71,6 +74,9 @@ beforeEach(() => {
 		value: { postMessage: parentPostSpy },
 	})
 	locationReplaceSpy = vi.fn()
+	// Cache the original `location` descriptor so afterEach can restore it
+	// instead of leaving the test's mock around for the next file.
+	originalLocationDescriptor = Object.getOwnPropertyDescriptor(window, 'location')
 })
 
 afterEach(() => {
@@ -79,6 +85,10 @@ afterEach(() => {
 	delete globalThis.fetch
 	// Restore parent (point back at window so happy-dom's defaults hold).
 	Object.defineProperty(window, 'parent', { configurable: true, value: window })
+	// Restore the location descriptor we cached in beforeEach (if any).
+	if (originalLocationDescriptor) {
+		Object.defineProperty(window, 'location', originalLocationDescriptor)
+	}
 })
 
 describe('embed-create-main', () => {
@@ -174,6 +184,32 @@ describe('embed-create-main', () => {
 		expect(payload.type).toBe('epnc:create-failed')
 		expect(payload.reason).toBe('invalid')
 		expect(payload.message).toBe('Pad name is required.')
+	})
+
+	it('does not emit succeeded then failed when the server returns a cross-origin embed_url', async () => {
+		// Regression: an earlier version emitted `epnc:create-succeeded`
+		// before validating the redirect target. A bad embed_url would then
+		// throw on `normalizeEmbedRedirectUrl()`, fall into the catch, and
+		// emit a contradictory `epnc:create-failed` — leaving the host with
+		// both signals for the same operation. We now validate first.
+		fetch.mockResolvedValueOnce(jsonResponse({
+			embed_url: 'https://evil.example/whatever',
+			file_id: 777,
+			pad_id: 'p',
+			access_mode: 'protected',
+		}))
+
+		await importEmbedCreate()
+		await flushMicrotasks()
+
+		// Exactly one event, classified as a server-side response problem
+		// (not a network error — fetch itself succeeded).
+		expect(parentPostSpy).toHaveBeenCalledOnce()
+		const payload = parentPostSpy.mock.calls[0][0]
+		expect(payload.type).toBe('epnc:create-failed')
+		expect(payload.reason).toBe('server')
+		// And no redirect happened.
+		expect(locationReplaceSpy).not.toHaveBeenCalled()
 	})
 
 	it('does not postMessage when not embedded (window.parent === window)', async () => {
