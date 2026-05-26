@@ -120,6 +120,19 @@ $TRANSLATIONS = [
 	"Etherpad connection test successful." => "Conexión con Etherpad comprobada correctamente.",
 	"Etherpad connection test failed." => "No se pudo comprobar la conexión con Etherpad.",
 	"Etherpad connection test failed: {detail}" => "No se pudo comprobar la conexión con Etherpad: {detail}",
+	"Close" => "Cerrar",
+	"Create" => "Crear",
+	"Creating..." => "Creando...",
+	"File name" => "Nombre de archivo",
+	"File name is required." => "El nombre de archivo es obligatorio.",
+	"Open in Etherpad" => "Abrir en Etherpad",
+	"Public pad" => "Pad público",
+	"Public pad from URL" => "Pad público desde URL",
+	"External pad URL" => "URL de pad externo",
+	"External pad URL is required." => "La URL de pad externo es obligatoria.",
+	"Could not create public pad." => "No se pudo crear el pad público.",
+	"Could not import public pad URL." => "No se pudo importar la URL del pad público.",
+	"Could not fetch the pad content from the remote server. The new file is empty for now — open the pad in the viewer to populate it." => "No se pudo obtener el contenido del pad desde el servidor remoto. El nuevo archivo está vacío por ahora — abre el pad en el visor para rellenarlo.",
 ];
 
 $PLURAL_FORMS = "nplurals=2; plural=(n != 1);";
