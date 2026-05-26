@@ -51,7 +51,7 @@ class PadLifecycleController extends AbstractPadController {
 			fn(array $result): DataResponse => $this->padResponses->lifecycleResponse($result),
 			[
 				'invalid_argument' => $this->l10n->t('Invalid file path.'),
-				'not_found' => $this->l10n->t('Pad file not found.'),
+				'not_found' => $this->l10n->t('.pad file not found.'),
 				'generic' => $this->l10n->t('Could not move pad to trash.'),
 				'on_throwable' => fn(\Throwable $e) => $this->logError('Pad trash API failed', [
 					'file' => $file,
@@ -68,7 +68,7 @@ class PadLifecycleController extends AbstractPadController {
 			fn(array $result): DataResponse => $this->padResponses->lifecycleResponse($result),
 			[
 				'invalid_argument' => $this->l10n->t('Invalid file path.'),
-				'not_found' => $this->l10n->t('Pad file not found.'),
+				'not_found' => $this->l10n->t('.pad file not found.'),
 				'generic' => $this->l10n->t('Could not restore pad from trash.'),
 				'on_throwable' => fn(\Throwable $e) => $this->logError('Pad restore API failed', [
 					'file' => $file,
@@ -84,7 +84,7 @@ class PadLifecycleController extends AbstractPadController {
 			fn(IUser $user): array => $this->lifecycleService->recoverByFileId($user->getUID(), $this->requireFileId($fileId)),
 			fn(array $result): DataResponse => $this->padResponses->lifecycleResponse($result),
 			[
-				'not_found' => $this->l10n->t('Pad file not found.'),
+				'not_found' => $this->l10n->t('.pad file not found.'),
 				'generic' => $this->l10n->t('Could not recover pad from this file.'),
 				'on_throwable' => fn(\Throwable $e) => $this->logError('Pad recovery API failed', [
 					'fileId' => $fileId,

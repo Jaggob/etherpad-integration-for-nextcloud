@@ -64,13 +64,11 @@ $TRANSLATIONS = [
 	"Could not create pad from template." => "Impossible de créer le pad à partir du modèle.",
 	"Could not create pad." => "Impossible de créer le pad.",
 	"Could not import external pad." => "Impossible d'importer le pad externe.",
-	"Could not initialize pad file." => "Impossible d'initialiser le fichier pad.",
 	"Could not look up the original pad." => "Impossible de retrouver le pad original.",
 	"Could not move pad to trash." => "Impossible de déplacer le pad vers la corbeille.",
 	"Could not open pad." => "Impossible d'ouvrir le pad.",
 	"Could not read pad metadata." => "Impossible de lire les métadonnées du pad.",
 	"Could not recover pad from this file." => "Impossible de récupérer le pad depuis ce fichier.",
-	"Could not resolve pad file." => "Impossible de résoudre le fichier pad.",
 	"Could not restore pad from trash." => "Impossible de restaurer le pad depuis la corbeille.",
 	"Could not sync pad content." => "Impossible de synchroniser le contenu du pad.",
 	"Create new pad from this file" => "Créer un nouveau pad à partir de ce fichier",
@@ -96,7 +94,6 @@ $TRANSLATIONS = [
 	"Loading pad..." => "Chargement du pad...",
 	"No synced snapshot is stored in this .pad file yet." => "Aucun instantané synchronisé n'est encore stocké dans ce fichier .pad.",
 	"Open the original .pad file" => "Ouvrir le fichier .pad original",
-	"Pad file not found." => "Fichier pad introuvable.",
 	"Pad from another server" => "Pad d'un autre serveur",
 	"Pad name is required." => "Le nom du pad est obligatoire.",
 	"Read-only snapshot" => "Instantané en lecture seule",
@@ -120,6 +117,9 @@ $TRANSLATIONS = [
 	"Hint: Set \"authenticationMethod\": \"apikey\" in Etherpad's settings.json." => "Indice : définissez \"authenticationMethod\": \"apikey\" dans le fichier settings.json d'Etherpad.",
 	"Could not create pad" => "Impossible de créer le pad",
 	"Could not open pad" => "Impossible d'ouvrir le pad",
+	"Could not initialize .pad file." => "Impossible d'initialiser le fichier .pad.",
+	"Could not resolve .pad file." => "Impossible de résoudre le fichier .pad.",
+	".pad file not found." => "Fichier .pad introuvable.",
 ];
 
 $PLURAL_FORMS = "nplurals=2; plural=(n > 1);";

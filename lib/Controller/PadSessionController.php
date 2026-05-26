@@ -79,7 +79,7 @@ class PadSessionController extends AbstractPadController {
 			[
 				'invalid_argument' => $this->l10n->t('Invalid file path.'),
 				'not_found' => $this->l10n->t('Cannot open selected .pad file.'),
-				'generic' => $this->l10n->t('Could not initialize pad file.'),
+				'generic' => $this->l10n->t('Could not initialize .pad file.'),
 				'on_throwable' => fn(\Throwable $e) => $this->logError('Pad frontmatter initialization failed in API initialize', [
 					'file' => $file,
 					'exception' => $e,
@@ -95,7 +95,7 @@ class PadSessionController extends AbstractPadController {
 			fn(PadInitializationResult $result): DataResponse => new DataResponse($this->padResponses->initializationResponse($result)),
 			[
 				'not_found' => $this->l10n->t('Cannot open selected .pad file.'),
-				'generic' => $this->l10n->t('Could not initialize pad file.'),
+				'generic' => $this->l10n->t('Could not initialize .pad file.'),
 				'on_throwable' => fn(\Throwable $e) => $this->logError('Pad frontmatter initialization failed in API initialize-by-id', [
 					'fileId' => $fileId,
 					'exception' => $e,
@@ -125,7 +125,7 @@ class PadSessionController extends AbstractPadController {
 			fn(PadResolution $resolution): DataResponse => new DataResponse($this->padResponses->resolveResponse($resolution)),
 			[
 				'invalid_argument' => $this->l10n->t('Invalid file path.'),
-				'generic' => $this->l10n->t('Could not resolve pad file.'),
+				'generic' => $this->l10n->t('Could not resolve .pad file.'),
 			],
 		);
 	}
