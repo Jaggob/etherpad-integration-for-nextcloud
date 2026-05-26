@@ -84,7 +84,7 @@ class AdminController extends Controller {
 			},
 			fn(HealthCheckResult $result): DataResponse => new DataResponse([
 				'ok' => true,
-				'message' => $this->l10n->t('Health check successful.'),
+				'message' => $this->l10n->t('Etherpad connection test successful.'),
 				'host' => $result->host,
 				'api_host' => $result->apiHost,
 				'api_version' => $result->apiVersion,
@@ -94,7 +94,7 @@ class AdminController extends Controller {
 				'pending_delete_count' => $result->pendingDeleteCount,
 			]),
 			[
-				'generic' => $this->l10n->t('Health check failed.'),
+				'generic' => $this->l10n->t('Etherpad connection test failed.'),
 				'log_message' => 'Etherpad health check failed',
 			],
 		);

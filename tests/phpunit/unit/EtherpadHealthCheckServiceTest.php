@@ -181,7 +181,7 @@ class EtherpadHealthCheckServiceTest extends TestCase {
 				->check($this->settings());
 			$this->fail('Expected health check exception.');
 		} catch (AdminHealthCheckException $e) {
-			$this->assertSame('Health check failed: something completely unexpected happened', $e->getMessage());
+			$this->assertSame('Etherpad connection test failed: something completely unexpected happened', $e->getMessage());
 		}
 	}
 

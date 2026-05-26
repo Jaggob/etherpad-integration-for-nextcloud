@@ -71,12 +71,12 @@ class AdminControllerErrorMapperTest extends TestCase {
 
 	public function testMapsHealthCheckExceptionToBadGateway(): void {
 		$response = $this->buildMapper()->run(
-			static fn(): array => throw new AdminHealthCheckException('Health check failed: bad key'),
+			static fn(): array => throw new AdminHealthCheckException('Etherpad connection test failed: bad key'),
 			static fn(array $data): DataResponse => new DataResponse($data),
 		);
 
 		$this->assertSame(Http::STATUS_BAD_GATEWAY, $response->getStatus());
-		$this->assertSame('Health check failed: bad key', $response->getData()['message']);
+		$this->assertSame('Etherpad connection test failed: bad key', $response->getData()['message']);
 	}
 
 	public function testLogsGenericFailures(): void {
