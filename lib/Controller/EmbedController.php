@@ -66,7 +66,7 @@ class EmbedController extends Controller {
 				),
 				'l10n' => [
 					'loading' => $this->l10n->t('Loading pad...'),
-					'error_title' => $this->l10n->t('Unable to open pad'),
+					'error_title' => $this->l10n->t('Could not open pad'),
 					'external_title' => $this->l10n->t('Pad from another server'),
 					'external_message' => $this->l10n->t('Read-only snapshot from the .pad file.'),
 					'external_empty' => $this->l10n->t('No synced snapshot is stored in this .pad file yet.'),
@@ -79,7 +79,7 @@ class EmbedController extends Controller {
 					'recovery_creating' => $this->l10n->t('Creating new pad...'),
 				],
 			]),
-			errorTitle: $this->l10n->t('Unable to open pad'),
+			errorTitle: $this->l10n->t('Could not open pad'),
 		);
 	}
 
@@ -101,13 +101,13 @@ class EmbedController extends Controller {
 				'create_by_parent_url' => $this->urlGenerator->linkToRoute($this->appName . '.padCreate.createByParent'),
 				'l10n' => [
 					'loading' => $this->l10n->t('Creating pad...'),
-					'error_title' => $this->l10n->t('Unable to create pad'),
+					'error_title' => $this->l10n->t('Could not create pad'),
 					'missing_name' => $this->l10n->t('Pad name is required.'),
 					'invalid_access_mode' => $this->l10n->t('Invalid access mode.'),
 					'incomplete_config' => $this->l10n->t('Embed configuration is incomplete.'),
 				],
 			]),
-			errorTitle: $this->l10n->t('Unable to create pad'),
+			errorTitle: $this->l10n->t('Could not create pad'),
 			notFoundMessage: $this->l10n->t('Cannot resolve selected parent folder.'),
 		);
 	}

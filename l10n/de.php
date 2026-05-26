@@ -49,7 +49,6 @@ $TRANSLATIONS = [
 	"Admin permissions required." => "Administratorrechte erforderlich.",
 	"New pad" => "Neues Pad",
 	"Open original pad" => "Original-Pad öffnen",
-	"Unable to open pad" => "Pad konnte nicht geöffnet werden",
 	"This .pad file has no matching pad in this Nextcloud." => "Für diese .pad-Datei existiert in dieser Nextcloud kein passendes Pad.",
 	"Checking for the original pad..." => "Suche nach dem Original-Pad ...",
 	"This file looks like a copy of an existing .pad file in your account. Open the original to keep editing the linked pad, or create a new pad to fork the content stored in this file." => "Diese Datei sieht aus wie eine Kopie einer bereits vorhandenen .pad-Datei in deinem Konto. Öffne das Original, um am verknüpften Pad weiterzuarbeiten, oder erstelle aus dem in dieser Datei gespeicherten Inhalt ein neues Pad als eigene Kopie.",
@@ -109,7 +108,6 @@ $TRANSLATIONS = [
 	"Selected parent folder is not writable." => "Ausgewählter Zielordner ist nicht beschreibbar.",
 	"Template file not found." => "Vorlagendatei nicht gefunden.",
 	"Trusted embed origins (optional)" => "Vertrauenswürdige Embed-Origins (optional)",
-	"Unable to create pad" => "Pad kann nicht erstellt werden",
 	"Unknown error." => "Unbekannter Fehler.",
 	"Retry pending deletes now" => "Ausstehende Löschungen jetzt wiederholen",
 	"Failed to save settings." => "Einstellungen konnten nicht gespeichert werden.",
@@ -120,6 +118,8 @@ $TRANSLATIONS = [
 	"If enabled, moving a .pad file to the trash also deletes the linked Etherpad pad." => "Wenn aktiviert, wird beim Verschieben einer .pad-Datei in den Papierkorb auch das verknüpfte Etherpad-Pad gelöscht.",
 	"Add trusted Etherpad hostnames or HTTPS origins. Leave empty only if all public HTTPS hosts should be trusted." => "Vertrauenswürdige Etherpad-Hostnamen oder HTTPS-Ursprünge eintragen. Nur leer lassen, wenn alle öffentlichen HTTPS-Hosts vertrauenswürdig sein sollen.",
 	"Hint: Set \"authenticationMethod\": \"apikey\" in Etherpad's settings.json." => "Hinweis: Setze in Etherpads settings.json \"authenticationMethod\": \"apikey\".",
+	"Could not create pad" => "Pad konnte nicht erstellt werden",
+	"Could not open pad" => "Pad konnte nicht geöffnet werden",
 ];
 
 $PLURAL_FORMS = "nplurals=2; plural=(n != 1);";

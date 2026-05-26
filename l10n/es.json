@@ -49,7 +49,7 @@
         "New pad": "Nuevo pad",
         "Open original pad": "Abrir pad original",
         "A file with this name already exists.": "Ya existe un archivo con este nombre.",
-        "Absolute https origins allowed to embed the /embed/by-id and /embed/create-by-parent routes. Leave empty to disable external embedding.": "Orígenes https absolutos permitidos para incrustar las rutas /embed/by-id y /embed/create-by-parent. Déjelo vacío para desactivar la incrustación externa.",
+        "Absolute https origins allowed to embed the /embed/by-id and /embed/create-by-parent routes. Leave empty to disable external embedding.": "Orígenes HTTPS absolutos permitidos para incrustar las rutas /embed/by-id y /embed/create-by-parent. Déjalo vacío para desactivar la incrustación externa.",
         "Back": "Atrás",
         "Cannot open selected .pad file.": "No se puede abrir el archivo .pad seleccionado.",
         "Cannot read selected .pad file.": "No se puede leer el archivo .pad seleccionado.",
@@ -106,8 +106,6 @@
         "This .pad file has no matching pad in this Nextcloud.": "Este archivo .pad no tiene un pad asociado en este Nextcloud.",
         "This file looks like a copy of an existing .pad file in your account. Open the original to keep editing the linked pad, or create a new pad to fork the content stored in this file.": "Este archivo parece ser una copia de un archivo .pad existente en tu cuenta. Abre el original para seguir editando el pad enlazado, o crea un nuevo pad para bifurcar el contenido almacenado en este archivo.",
         "Trusted embed origins (optional)": "Orígenes de incrustación de confianza (opcional)",
-        "Unable to create pad": "No se puede crear el pad",
-        "Unable to open pad": "No se puede abrir el pad",
         "Unknown error.": "Error desconocido.",
         "We couldn't find a matching pad in this Nextcloud. You can create a new pad from the text stored in this file; from then on, opening this file will load the new pad.": "No pudimos encontrar un pad asociado en este Nextcloud. Puedes crear un nuevo pad a partir del texto almacenado en este archivo; a partir de ese momento, abrir este archivo cargará el nuevo pad.",
         "Retry pending deletes now": "Reintentar las eliminaciones pendientes ahora",
@@ -118,7 +116,9 @@
         "Delete linked Etherpad pad when .pad file is moved to trash": "Eliminar el pad de Etherpad enlazado cuando el archivo .pad se mueve a la papelera",
         "If enabled, moving a .pad file to the trash also deletes the linked Etherpad pad.": "Si está activado, al mover un archivo .pad a la papelera también se elimina el pad de Etherpad enlazado.",
         "Add trusted Etherpad hostnames or HTTPS origins. Leave empty only if all public HTTPS hosts should be trusted.": "Agrega nombres de host de Etherpad u orígenes HTTPS de confianza. Déjalo vacío solo si se debe confiar en todos los hosts HTTPS públicos.",
-        "Hint: Set \"authenticationMethod\": \"apikey\" in Etherpad's settings.json.": "Sugerencia: establece \"authenticationMethod\": \"apikey\" en settings.json de Etherpad."
+        "Hint: Set \"authenticationMethod\": \"apikey\" in Etherpad's settings.json.": "Sugerencia: establece \"authenticationMethod\": \"apikey\" en settings.json de Etherpad.",
+        "Could not create pad": "No se pudo crear el pad",
+        "Could not open pad": "No se pudo abrir el pad"
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

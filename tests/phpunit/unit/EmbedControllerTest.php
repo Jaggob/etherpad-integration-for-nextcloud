@@ -56,7 +56,7 @@ class EmbedControllerTest extends TestCase {
 
 		$this->assertSame('noviewer', $response->getTemplateName());
 		$this->assertSame('Invalid file ID.', $params['error']);
-		$this->assertSame('Unable to open pad', $params['title']);
+		$this->assertSame('Could not open pad', $params['title']);
 	}
 
 	public function testShowByIdReturnsNoviewerWhenFileIsNotPad(): void {
@@ -72,7 +72,7 @@ class EmbedControllerTest extends TestCase {
 
 		$this->assertSame('noviewer', $response->getTemplateName());
 		$this->assertSame('Selected file is not a .pad file.', $params['error']);
-		$this->assertSame('Unable to open pad', $params['title']);
+		$this->assertSame('Could not open pad', $params['title']);
 	}
 
 	public function testShowByIdReturnsNoviewerWhenFileCannotBeResolved(): void {
@@ -87,7 +87,7 @@ class EmbedControllerTest extends TestCase {
 
 		$this->assertSame('noviewer', $response->getTemplateName());
 		$this->assertSame('Cannot open selected .pad file.', $params['error']);
-		$this->assertSame('Unable to open pad', $params['title']);
+		$this->assertSame('Could not open pad', $params['title']);
 	}
 
 	public function testShowByIdReturnsNoviewerWhenNotLoggedIn(): void {
@@ -109,7 +109,7 @@ class EmbedControllerTest extends TestCase {
 
 		$this->assertSame('noviewer', $response->getTemplateName());
 		$this->assertSame('Invalid parent folder ID.', $params['error']);
-		$this->assertSame('Unable to create pad', $params['title']);
+		$this->assertSame('Could not create pad', $params['title']);
 	}
 
 	public function testCreateByParentReturnsNoviewerForNonWritableParent(): void {
@@ -126,7 +126,7 @@ class EmbedControllerTest extends TestCase {
 
 		$this->assertSame('noviewer', $response->getTemplateName());
 		$this->assertSame('Selected parent folder is not writable.', $params['error']);
-		$this->assertSame('Unable to create pad', $params['title']);
+		$this->assertSame('Could not create pad', $params['title']);
 	}
 
 	public function testCreateByParentReturnsParentFolderErrorWhenResolverThrowsNotFound(): void {
@@ -143,7 +143,7 @@ class EmbedControllerTest extends TestCase {
 
 		$this->assertSame('noviewer', $response->getTemplateName());
 		$this->assertSame('Cannot resolve selected parent folder.', $params['error']);
-		$this->assertSame('Unable to create pad', $params['title']);
+		$this->assertSame('Could not create pad', $params['title']);
 	}
 
 	public function testCreateByParentBuildsEmbedCreateTemplate(): void {
