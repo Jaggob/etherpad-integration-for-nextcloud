@@ -174,7 +174,7 @@ PHP checks and optional E2E checks are described in [docs/release-process.md](do
 ### Protected pad permission errors
 
 - Verify Etherpad API key and Etherpad auth mode
-- Run admin `Health check` in `Settings -> Administration -> Pads`
+- Run admin `Test Etherpad connection` in `Settings -> Administration -> Pads`
 
 ### Protected pads fail because of cookies / iframe auth
 

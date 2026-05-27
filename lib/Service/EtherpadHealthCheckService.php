@@ -51,7 +51,7 @@ class EtherpadHealthCheckService {
 			// path leaks the literal '{detail}' through to consumers in
 			// some catalog setups. Doing the substitution here removes that
 			// surface area.
-			$template = (string)$this->l10n->t('Health check failed: {detail}');
+			$template = (string)$this->l10n->t('Etherpad connection test failed: {detail}');
 			throw new AdminHealthCheckException(
 				str_replace('{detail}', $detail, $template),
 				0,
@@ -86,7 +86,7 @@ class EtherpadHealthCheckService {
 		if (str_contains($message, 'no or wrong api key')
 			|| str_contains($message, 'wrong api key')
 			|| str_contains($message, 'invalid apikey')) {
-			return $this->l10n->t('Hint: In Etherpad settings.json set "authenticationMethod": "apikey".');
+			return $this->l10n->t('Hint: Set "authenticationMethod": "apikey" in Etherpad\'s settings.json.');
 		}
 
 		// HTTP status hints come before transport hints because they

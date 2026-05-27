@@ -26,7 +26,7 @@ class EmbedControllerErrorMapperTest extends TestCase {
 		$response = $mapper->runForTemplate(
 			static fn (): string => 'payload',
 			static fn (string $value): TemplateResponse => new TemplateResponse('etherpad_nextcloud', 'embed', ['value' => $value], 'blank'),
-			errorTitle: 'Unable to open pad',
+			errorTitle: 'Could not open pad',
 		);
 
 		$this->assertSame('embed', $response->getTemplateName());
@@ -37,19 +37,19 @@ class EmbedControllerErrorMapperTest extends TestCase {
 		$response = $this->buildMapper()->runForTemplate(
 			static fn (): never => throw new UnauthorizedRequestException(),
 			static fn ($value) => $this->fail('success handler must not run on error'),
-			errorTitle: 'Unable to open pad',
+			errorTitle: 'Could not open pad',
 		);
 
 		$this->assertSame('noviewer', $response->getTemplateName());
 		$this->assertSame('Authentication required.', $response->getParams()['error']);
-		$this->assertSame('Unable to open pad', $response->getParams()['title']);
+		$this->assertSame('Could not open pad', $response->getParams()['title']);
 	}
 
 	public function testRunMapsControllerBadRequestUsingException(): void {
 		$response = $this->buildMapper()->runForTemplate(
 			static fn (): never => throw new ControllerBadRequestException('Invalid file ID.'),
 			static fn ($value) => $this->fail('unreachable'),
-			errorTitle: 'Unable to open pad',
+			errorTitle: 'Could not open pad',
 		);
 
 		$this->assertSame('Invalid file ID.', $response->getParams()['error']);
@@ -59,7 +59,7 @@ class EmbedControllerErrorMapperTest extends TestCase {
 		$response = $this->buildMapper()->runForTemplate(
 			static fn (): never => throw new NotFoundException(),
 			static fn ($value) => $this->fail('unreachable'),
-			errorTitle: 'Unable to open pad',
+			errorTitle: 'Could not open pad',
 		);
 
 		$this->assertSame('Cannot open selected .pad file.', $response->getParams()['error']);
@@ -69,19 +69,19 @@ class EmbedControllerErrorMapperTest extends TestCase {
 		$response = $this->buildMapper()->runForTemplate(
 			static fn (): never => throw new NotFoundException(),
 			static fn ($value) => $this->fail('unreachable'),
-			errorTitle: 'Unable to create pad',
+			errorTitle: 'Could not create pad',
 			notFoundMessage: 'Cannot resolve selected parent folder.',
 		);
 
 		$this->assertSame('Cannot resolve selected parent folder.', $response->getParams()['error']);
-		$this->assertSame('Unable to create pad', $response->getParams()['title']);
+		$this->assertSame('Could not create pad', $response->getParams()['title']);
 	}
 
 	public function testRunMapsNotAPadFile(): void {
 		$response = $this->buildMapper()->runForTemplate(
 			static fn (): never => throw new NotAPadFileException('Selected file is not a .pad file.'),
 			static fn ($value) => $this->fail('unreachable'),
-			errorTitle: 'Unable to open pad',
+			errorTitle: 'Could not open pad',
 		);
 
 		$this->assertSame('Selected file is not a .pad file.', $response->getParams()['error']);
@@ -91,11 +91,11 @@ class EmbedControllerErrorMapperTest extends TestCase {
 		$response = $this->buildMapper()->runForTemplate(
 			static fn (): never => throw new PadParentFolderNotWritableException(),
 			static fn ($value) => $this->fail('unreachable'),
-			errorTitle: 'Unable to create pad',
+			errorTitle: 'Could not create pad',
 		);
 
 		$this->assertSame('Selected parent folder is not writable.', $response->getParams()['error']);
-		$this->assertSame('Unable to create pad', $response->getParams()['title']);
+		$this->assertSame('Could not create pad', $response->getParams()['title']);
 	}
 
 	public function testRunLogsUnhandledExceptionAndReturnsGenericMessage(): void {
@@ -107,10 +107,10 @@ class EmbedControllerErrorMapperTest extends TestCase {
 		$response = $this->buildMapper($logger)->runForTemplate(
 			static fn (): never => throw new \RuntimeException('Internal pipe burst'),
 			static fn ($value) => $this->fail('unreachable'),
-			errorTitle: 'Unable to open pad',
+			errorTitle: 'Could not open pad',
 		);
 
-		$this->assertSame('Unable to open pad.', $response->getParams()['error']);
+		$this->assertSame('Could not open pad.', $response->getParams()['error']);
 	}
 
 	private function buildMapper(?LoggerInterface $logger = null): EmbedControllerErrorMapper {

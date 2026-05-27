@@ -23,7 +23,7 @@ use Psr\Log\LoggerInterface;
  * Maps embed-controller exceptions to embed-shaped TemplateResponses.
  *
  * Endpoints provide an `error_title` so the noviewer template can show a
- * context-appropriate heading (e.g. "Unable to open pad" vs. "Unable to create
+ * context-appropriate heading (e.g. "Could not open pad" vs. "Could not create
  * pad"). Unhandled errors are logged and rendered with a generic message.
  */
 class EmbedControllerErrorMapper {
@@ -75,7 +75,7 @@ class EmbedControllerErrorMapper {
 				'app' => Application::APP_ID,
 				'exception' => $e,
 			]);
-			return $this->errorTemplate($this->l10n->t('Unable to open pad.'), $errorTitle);
+			return $this->errorTemplate($this->l10n->t('Could not open pad.'), $errorTitle);
 		}
 	}
 

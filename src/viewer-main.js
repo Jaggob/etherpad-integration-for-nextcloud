@@ -480,7 +480,7 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 		render(createElement) {
 			if (this.loadError) {
 				const cardChildren = [
-					createElement('div', { class: 'epnc-native-error-title' }, translate('Unable to open pad')),
+					createElement('div', { class: 'epnc-native-error-title' }, translate('Could not open pad')),
 					createElement('div', { class: 'epnc-native-error-message' }, this.loadError),
 				]
 				if (this.canRecover) {

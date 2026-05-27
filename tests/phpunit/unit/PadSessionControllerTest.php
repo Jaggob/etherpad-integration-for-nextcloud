@@ -325,7 +325,7 @@ class PadSessionControllerTest extends TestCase {
 		$response = $controller->resolveById(138);
 
 		$this->assertSame(Http::STATUS_INTERNAL_SERVER_ERROR, $response->getStatus());
-		$this->assertSame('Could not resolve pad file.', $response->getData()['message']);
+		$this->assertSame('Could not resolve .pad file.', $response->getData()['message']);
 	}
 
 	private function buildController(
