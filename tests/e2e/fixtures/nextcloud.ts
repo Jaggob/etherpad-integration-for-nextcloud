@@ -45,6 +45,40 @@ export const createPublicPad = async (page: Page, fileName: string): Promise<str
 	return fileName
 }
 
+export const createBlankPadFromTemplatePicker = async (page: Page, fileName: string): Promise<string> => {
+	await openNewMenu(page)
+	await page.getByRole('menuitem', { name: /new pad|neues pad/i }).first().click()
+
+	const fileNameInput = page.locator('input[type="text"]:visible').last()
+	await fileNameInput.fill(fileName.replace(/\.pad$/i, ''))
+
+	await page.getByRole('button', { name: /create|erstellen/i }).last().click()
+	await expectFileInList(page, fileName)
+	return fileName
+}
+
+export const expectFileInList = async (page: Page, fileName: string): Promise<void> => {
+	await expect(
+		page.locator(`[data-cy-files-list-row-name="${fileName}"], [title="${fileName}"]`).first(),
+	).toBeVisible({ timeout: 30_000 })
+}
+
+export const closeViewer = async (page: Page): Promise<void> => {
+	const viewer = page.locator('.viewer__content, .viewer, [data-cy-viewer]').first()
+	const closeButton = page.getByRole('button', { name: /close|schließen/i }).last()
+	if (await closeButton.isVisible({ timeout: 5_000 }).catch(() => false)) {
+		await closeButton.click()
+	} else {
+		await page.keyboard.press('Escape')
+	}
+	await expect(viewer).toBeHidden({ timeout: 30_000 })
+}
+
+export const openPadFromFileList = async (page: Page, fileName: string): Promise<void> => {
+	await expectFileInList(page, fileName)
+	await page.locator(`[data-cy-files-list-row-name="${fileName}"], [title="${fileName}"]`).first().click()
+}
+
 /**
  * Assert that the Etherpad viewer mounted: NC's viewer modal is present
  * and our viewer surfaced an Etherpad iframe (not the error/no-viewer

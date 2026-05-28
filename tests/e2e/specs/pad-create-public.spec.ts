@@ -5,8 +5,11 @@
 import { test, expect } from '@playwright/test'
 import {
 	gotoFiles,
+	closeViewer,
 	createPublicPad,
+	expectFileInList,
 	expectEtherpadViewerMounted,
+	openPadFromFileList,
 	uniquePadName,
 } from '../fixtures/nextcloud'
 import { deleteViaDav } from '../fixtures/dav'
@@ -30,11 +33,28 @@ test.describe('public pad create + open', () => {
 		await createPublicPad(page, padName)
 
 		// The file shows up in the listing.
-		await expect(
-			page.locator(`[data-cy-files-list-row-name="${padName}"], [title="${padName}"]`).first(),
-		).toBeVisible({ timeout: 30_000 })
+		await expectFileInList(page, padName)
 
 		// Viewer mounts with an Etherpad iframe (not the no-viewer error template).
+		await expectEtherpadViewerMounted(page)
+	})
+})
+
+test.describe('existing public pad open', () => {
+	const padName = uniquePadName('public-open-existing')
+
+	test.afterAll(async () => {
+		await deleteViaDav(padName)
+	})
+
+	test('opens an existing public pad from the file list', async ({ page }) => {
+		await gotoFiles(page)
+		await createPublicPad(page, padName)
+		await expectEtherpadViewerMounted(page)
+
+		await closeViewer(page)
+		await openPadFromFileList(page, padName)
+
 		await expectEtherpadViewerMounted(page)
 	})
 })
