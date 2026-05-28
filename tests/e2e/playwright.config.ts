@@ -16,7 +16,7 @@ loadEnv({ path: resolve(here, '.env.e2e') })
 const baseURL = process.env.E2E_BASE_URL || 'http://localhost:8080'
 
 export default defineConfig({
-	testDir: resolve(here, 'specs'),
+	testDir: here,
 	// One worker by default: tests run against a shared real instance,
 	// so serial execution avoids create/cleanup races. Bump locally with
 	// --workers if your target can take it.
@@ -46,6 +46,7 @@ export default defineConfig({
 		},
 		{
 			name: 'chromium',
+			testMatch: /specs\/.*\.spec\.ts$/,
 			dependencies: ['setup'],
 			use: {
 				...devices['Desktop Chrome'],

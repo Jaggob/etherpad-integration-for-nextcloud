@@ -34,15 +34,14 @@ export const createPublicPad = async (page: Page, fileName: string): Promise<str
 	// menuitem text fallback. The internal entry is "Public pad".
 	await page.getByRole('menuitem', { name: /public pad(?! from)|öffentliches pad(?! aus)/i }).first().click()
 
-	const modal = page.locator('[data-epnc-modal="internal"]')
-	await expect(modal).toBeVisible()
+	await expect(page.getByText(/public pad|öffentliches pad/i).first()).toBeVisible()
 
-	const input = modal.locator('[data-testid="epnc-filename-input"]')
+	const input = page.locator('[data-testid="epnc-filename-input"], input[type="text"]:visible').last()
 	await input.fill(fileName)
-	await modal.locator('[data-testid="epnc-create-submit"]').click()
+	await page.locator('[data-testid="epnc-create-submit"]').or(page.getByRole('button', { name: /create|erstellen/i })).first().click()
 
 	// On success the dialog closes.
-	await expect(modal).toBeHidden({ timeout: 30_000 })
+	await expect(page.getByText(/public pad|öffentliches pad/i).first()).toBeHidden({ timeout: 30_000 })
 	return fileName
 }
 
@@ -55,28 +54,6 @@ export const expectEtherpadViewerMounted = async (page: Page): Promise<void> => 
 	const modal = page.locator('.viewer__content, .viewer, [data-cy-viewer]')
 	await expect(modal.first()).toBeVisible({ timeout: 30_000 })
 	await expect(page.locator('iframe').first()).toBeVisible({ timeout: 30_000 })
-}
-
-/**
- * Delete a file in the user's root via WebDAV using the app password.
- * Used for teardown so specs don't leave pads behind on a shared
- * instance. No-op (with a warning) when E2E_APP_PASSWORD is unset.
- */
-export const deleteViaDav = async (relativePath: string): Promise<void> => {
-	const appPassword = E2E.appPassword
-	if (!appPassword) {
-		// eslint-disable-next-line no-console
-		console.warn(`[e2e] E2E_APP_PASSWORD not set — leaving ${relativePath} on the server`)
-		return
-	}
-	const path = relativePath.replace(/^\/+/, '')
-	const url = `${E2E.baseURL}/remote.php/dav/files/${encodeURIComponent(E2E.user)}/${path}`
-	const auth = Buffer.from(`${E2E.user}:${appPassword}`).toString('base64')
-	const res = await fetch(url, { method: 'DELETE', headers: { Authorization: `Basic ${auth}` } })
-	if (!res.ok && res.status !== 404) {
-		// eslint-disable-next-line no-console
-		console.warn(`[e2e] cleanup DELETE ${path} returned ${res.status}`)
-	}
 }
 
 /** A unique-ish file name so parallel/repeat runs don't collide. */

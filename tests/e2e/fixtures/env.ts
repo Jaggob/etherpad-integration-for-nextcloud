@@ -23,6 +23,13 @@ export const E2E = {
 	get baseURL(): string {
 		return requireEnv('E2E_BASE_URL').replace(/\/+$/, '')
 	},
+	get loginURL(): string {
+		const value = process.env.E2E_LOGIN_URL?.trim() || '/login'
+		if (/^https?:\/\//i.test(value)) {
+			return value
+		}
+		return `${this.baseURL}/${value.replace(/^\/+/, '')}`
+	},
 	get user(): string {
 		return requireEnv('E2E_USER')
 	},
@@ -30,12 +37,14 @@ export const E2E = {
 		return requireEnv('E2E_PASS')
 	},
 	/**
-	 * App password used for non-browser WebDAV setup/teardown (mirrors the
-	 * NC_APP_PASSWORD pattern in tests/integration/*.sh). Optional: only the
-	 * specs that clean up via WebDAV need it.
+	 * App password used for non-browser WebDAV/API setup and teardown
+	 * (mirrors the NC_APP_PASSWORD pattern in tests/integration/*.sh).
+	 *
+	 * Browser specs still use E2E_PASS for the real login form because
+	 * Nextcloud app passwords are primarily BasicAuth credentials for
+	 * clients, WebDAV and OCS endpoints, not a stable web-login contract.
 	 */
-	get appPassword(): string | null {
-		const value = process.env.E2E_APP_PASSWORD
-		return value && value.trim() !== '' ? value.trim() : null
+	get appPassword(): string {
+		return requireEnv('E2E_APP_PASSWORD')
 	},
 }

@@ -26,7 +26,7 @@ npx playwright install chromium
 
 # 2. configure your target
 cp tests/e2e/.env.e2e.example tests/e2e/.env.e2e
-$EDITOR tests/e2e/.env.e2e      # fill in E2E_BASE_URL / E2E_USER / E2E_PASS (+ optional app password)
+$EDITOR tests/e2e/.env.e2e      # fill in E2E_BASE_URL / E2E_LOGIN_URL / E2E_USER / E2E_PASS / E2E_APP_PASSWORD
 ```
 
 ## Run
@@ -38,6 +38,8 @@ npm run test:e2e:ui     # Playwright UI mode (watch + time-travel)
 
 The `setup` project logs in once and saves the session to
 `tests/e2e/.auth/state.json` (gitignored); every spec reuses it.
+`E2E_LOGIN_URL` defaults to `/login`. Override it for instances with a
+custom login front door, for example `/login?noredir=1#body-login`.
 
 ## Layout
 
@@ -47,7 +49,8 @@ tests/e2e/
   auth.setup.ts            form login -> .auth/state.json
   fixtures/
     env.ts                 required-env reader
-    nextcloud.ts           Files-app helpers + WebDAV teardown
+    dav.ts                 WebDAV setup/teardown via app password
+    nextcloud.ts           Files-app browser helpers
   specs/
     pad-create-public.spec.ts   smoke #1: create public pad + viewer mounts
 ```
@@ -58,5 +61,13 @@ over localized text so specs survive UI-language changes.
 ## Cleanup
 
 Specs name their files `e2e-<label>-<timestamp>.pad` and delete them in
-`afterAll` via WebDAV (needs `E2E_APP_PASSWORD`). Without an app password
-they still pass but leave the files behind.
+`afterAll` via WebDAV. `E2E_APP_PASSWORD` is required for these
+non-browser requests, matching the existing `NC_APP_PASSWORD` pattern in
+`tests/integration/*.sh`.
+
+Keep `E2E_PASS` and `E2E_APP_PASSWORD` separate:
+
+- `E2E_PASS` logs into the interactive Nextcloud web UI once and stores
+  Playwright's browser `storageState`.
+- `E2E_APP_PASSWORD` is used only for BasicAuth requests outside the
+  browser, such as WebDAV cleanup and future OCS/API setup.

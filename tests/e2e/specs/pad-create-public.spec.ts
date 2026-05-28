@@ -7,9 +7,9 @@ import {
 	gotoFiles,
 	createPublicPad,
 	expectEtherpadViewerMounted,
-	deleteViaDav,
 	uniquePadName,
 } from '../fixtures/nextcloud'
+import { deleteViaDav } from '../fixtures/dav'
 
 /**
  * Smoke flow #1 (issue #54): create an internal public pad via our
