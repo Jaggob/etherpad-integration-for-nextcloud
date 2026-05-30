@@ -6,10 +6,14 @@ import { test, expect } from '@playwright/test'
 import {
 	gotoFiles,
 	closeViewer,
+	createExternalPublicPadFromUrl,
 	createPublicPad,
 	expectFileInList,
+	expectExternalSnapshotViewerMounted,
+	expectFilesRouteWithoutOpenFlag,
 	expectEtherpadViewerMounted,
 	openPadFromFileList,
+	readEtherpadUrlFromViewer,
 	uniquePadName,
 } from '../fixtures/nextcloud'
 import { deleteViaDav } from '../fixtures/dav'
@@ -53,8 +57,30 @@ test.describe('existing public pad open', () => {
 		await expectEtherpadViewerMounted(page)
 
 		await closeViewer(page)
+		await expectFilesRouteWithoutOpenFlag(page)
 		await openPadFromFileList(page, padName)
 
 		await expectEtherpadViewerMounted(page)
+	})
+})
+
+test.describe('external public pad create + snapshot viewer', () => {
+	const sourcePadName = uniquePadName('external-source')
+	const externalPadName = uniquePadName('external-import')
+
+	test.afterAll(async () => {
+		await deleteViaDav(externalPadName)
+		await deleteViaDav(sourcePadName)
+	})
+
+	test('imports an Etherpad URL and opens the external snapshot viewer', async ({ page }) => {
+		await gotoFiles(page)
+		await createPublicPad(page, sourcePadName)
+		await expectEtherpadViewerMounted(page)
+		const etherpadUrl = await readEtherpadUrlFromViewer(page)
+		await closeViewer(page)
+
+		await createExternalPublicPadFromUrl(page, etherpadUrl, externalPadName)
+		await expectExternalSnapshotViewerMounted(page)
 	})
 })

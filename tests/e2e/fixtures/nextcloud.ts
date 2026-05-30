@@ -18,6 +18,21 @@ export const gotoFiles = async (page: Page): Promise<void> => {
 	await expect(page.locator('[data-cy-files-list], #app-content-files, .files-list')).toBeVisible({ timeout: 30_000 })
 }
 
+/** Open this app's admin settings section. Requires an admin storage state. */
+export const gotoAdminPadSettings = async (page: Page): Promise<void> => {
+	await page.goto(`${E2E.baseURL}/settings/admin/etherpad_nextcloud_pads`)
+	await expect(page.locator('#etherpad-nextcloud-admin-settings')).toBeVisible({ timeout: 30_000 })
+}
+
+/** Run the admin Etherpad health check and assert the configured pad server responds. */
+export const runAdminEtherpadHealthCheck = async (page: Page): Promise<void> => {
+	const status = page.locator('#etherpad-nextcloud-admin-status')
+	await page.locator('#etherpad-nextcloud-health-check').click()
+
+	await expect(status).toHaveClass(/ep-status-success/, { timeout: 30_000 })
+	await expect(status).toContainText(/pad_count=|api=|latency=/, { timeout: 30_000 })
+}
+
 /** Click the Files "+ New" toolbar button and wait for its menu. */
 const openNewMenu = async (page: Page): Promise<void> => {
 	await page.locator('[data-cy-upload-picker] button, .upload-picker button').first().click()
@@ -42,6 +57,29 @@ export const createPublicPad = async (page: Page, fileName: string): Promise<str
 
 	// On success the dialog closes.
 	await expect(page.getByText(/public pad|öffentliches pad/i).first()).toBeHidden({ timeout: 30_000 })
+	return fileName
+}
+
+/**
+ * Create an external public pad from an existing Etherpad URL. The dialog is
+ * intentionally exercised through the UI because most regressions here happen
+ * in the Files-app menu/dialog glue, not only in the backend API.
+ */
+export const createExternalPublicPadFromUrl = async (page: Page, padUrl: string, fileName: string): Promise<string> => {
+	await openNewMenu(page)
+	await page.getByRole('menuitem', { name: /public pad from url|öffentliches pad aus url/i }).first().click()
+
+	await expect(page.getByText(/public pad from url|öffentliches pad aus url/i).first()).toBeVisible()
+
+	const urlInput = page.locator('input[type="url"]:visible').last()
+	await expect(urlInput).toBeVisible()
+	await urlInput.fill(padUrl)
+	await urlInput.press('Tab')
+	await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A')
+	await page.keyboard.type(fileName)
+	await page.getByRole('button', { name: /create|erstellen/i }).last().click()
+
+	await expect(urlInput).toBeHidden({ timeout: 30_000 })
 	return fileName
 }
 
@@ -74,6 +112,10 @@ export const closeViewer = async (page: Page): Promise<void> => {
 	await expect(viewer).toBeHidden({ timeout: 30_000 })
 }
 
+export const expectFilesRouteWithoutOpenFlag = async (page: Page): Promise<void> => {
+	await expect.poll(() => page.url(), { timeout: 10_000 }).not.toMatch(/[?&]openfile=true\b/)
+}
+
 export const openPadFromFileList = async (page: Page, fileName: string): Promise<void> => {
 	await expectFileInList(page, fileName)
 	await page.locator(`[data-cy-files-list-row-name="${fileName}"], [title="${fileName}"]`).first().click()
@@ -88,6 +130,35 @@ export const expectEtherpadViewerMounted = async (page: Page): Promise<void> => 
 	const modal = page.locator('.viewer__content, .viewer, [data-cy-viewer]')
 	await expect(modal.first()).toBeVisible({ timeout: 30_000 })
 	await expect(page.locator('iframe').first()).toBeVisible({ timeout: 30_000 })
+}
+
+export const expectExternalSnapshotViewerMounted = async (page: Page): Promise<void> => {
+	await expect(page.locator('.epnc-native-snapshot').first()).toBeVisible({ timeout: 30_000 })
+	await expect(page.getByText(/pad from another server|pad von einem anderen server/i).first()).toBeVisible()
+	await expect(page.getByRole('link', { name: /open original pad|original-pad öffnen/i })).toBeVisible()
+}
+
+export const readEtherpadUrlFromViewer = async (page: Page): Promise<string> => {
+	const frame = page.locator('iframe[title="Etherpad"]').first()
+	await expect(frame).toBeVisible({ timeout: 30_000 })
+
+	const src = await frame.getAttribute('src')
+	if (src && /^https?:\/\//i.test(src)) {
+		return src
+	}
+
+	const srcdoc = await frame.getAttribute('srcdoc')
+	const match = srcdoc ? srcdoc.match(/<iframe\s+src="([^"]+)"/i) : null
+	const encoded = match && match[1] ? match[1] : ''
+	const decoded = encoded
+		.replace(/&quot;/g, '"')
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>')
+		.replace(/&amp;/g, '&')
+	if (!/^https?:\/\//i.test(decoded)) {
+		throw new Error('Could not read Etherpad URL from viewer iframe.')
+	}
+	return decoded
 }
 
 /** A unique-ish file name so parallel/repeat runs don't collide. */

@@ -38,6 +38,21 @@ export const deleteViaDav = async (relativePath: string): Promise<void> => {
 	}
 }
 
+export const putFileViaDav = async (relativePath: string, content: string): Promise<void> => {
+	const path = relativePath.replace(/^\/+/, '')
+	const res = await fetch(davUrl(path), {
+		method: 'PUT',
+		headers: {
+			Authorization: basicAuthHeader(),
+			'Content-Type': 'text/plain; charset=UTF-8',
+		},
+		body: content,
+	})
+	if (!res.ok && res.status !== 201 && res.status !== 204) {
+		throw new Error(`WebDAV PUT ${path} failed with HTTP ${res.status}`)
+	}
+}
+
 export const createPublicReadShare = async (relativePath: string): Promise<{ token: string, url: string }> => {
 	const body = new URLSearchParams()
 	body.set('path', '/' + relativePath.replace(/^\/+/, ''))

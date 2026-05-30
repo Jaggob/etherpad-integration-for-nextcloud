@@ -14,16 +14,21 @@ import {
 	createPublicReadShare,
 	deletePublicShare,
 	deleteViaDav,
+	putFileViaDav,
 } from '../fixtures/dav'
 
 test.describe('public share access without login', () => {
 	const padName = uniquePadName('public-share')
+	const textFileName = `e2e-public-share-non-pad-${Date.now()}.txt`
 	let shareToken = ''
+	let nonPadShareToken = ''
 	let shareUrl = ''
 
 	test.afterAll(async () => {
 		await deletePublicShare(shareToken)
+		await deletePublicShare(nonPadShareToken)
 		await deleteViaDav(padName)
+		await deleteViaDav(textFileName)
 	})
 
 	test('opens a shared public pad without authenticated storage state', async ({ page, browser }) => {
@@ -54,6 +59,42 @@ test.describe('public share access without login', () => {
 
 			await expect(publicPage.locator('iframe[title="Etherpad"], .epnc-viewer__iframe')).toHaveCount(0)
 			await expect(publicPage.getByRole('heading', { name: /could not open pad|pad konnte nicht geöffnet werden/i })).toBeVisible()
+		} finally {
+			await publicContext.close()
+		}
+	})
+
+	test('rejects invalid public share tokens without pad data', async ({ browser }) => {
+		const publicContext = await browser.newContext()
+		try {
+			const response = await publicContext.request.get(
+				`${E2E.baseURL}/apps/etherpad_nextcloud/api/v1/public/open/not-a-real-e2e-token?file=/Missing.pad`,
+			)
+			const body = await response.text()
+
+			expect(response.status()).toBeGreaterThanOrEqual(400)
+			expect(body).not.toMatch(/"url"\s*:/)
+			expect(body).not.toMatch(/"pad_url"\s*:/)
+		} finally {
+			await publicContext.close()
+		}
+	})
+
+	test('rejects non-pad public shares without pad data', async ({ browser }) => {
+		await putFileViaDav(textFileName, 'This is not a managed pad.')
+		const share = await createPublicReadShare(textFileName)
+		nonPadShareToken = share.token
+
+		const publicContext = await browser.newContext()
+		try {
+			const response = await publicContext.request.get(
+				`${E2E.baseURL}/apps/etherpad_nextcloud/api/v1/public/open/${encodeURIComponent(nonPadShareToken)}`,
+			)
+			const body = await response.text()
+
+			expect(response.status()).toBeGreaterThanOrEqual(400)
+			expect(body).not.toMatch(/"url"\s*:/)
+			expect(body).not.toMatch(/"pad_url"\s*:/)
 		} finally {
 			await publicContext.close()
 		}
