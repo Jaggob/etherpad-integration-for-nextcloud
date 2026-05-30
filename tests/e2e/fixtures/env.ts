@@ -61,7 +61,19 @@ export const E2E = {
 		const value = process.env.E2E_USER2_APP_PASSWORD?.trim()
 		return value && value !== '' ? value : null
 	},
+	/**
+	 * Web-login password for the secondary account. Only the specs that
+	 * need a browser session as user B require this; the API-only
+	 * ownership-boundary spec is happy with the app password alone.
+	 */
+	get secondaryPassword(): string | null {
+		const value = process.env.E2E_USER2_PASS?.trim()
+		return value && value !== '' ? value : null
+	},
 	hasSecondaryAccount(): boolean {
 		return this.secondaryUser !== null && this.secondaryAppPassword !== null
+	},
+	hasSecondaryBrowserAccount(): boolean {
+		return this.hasSecondaryAccount() && this.secondaryPassword !== null
 	},
 }

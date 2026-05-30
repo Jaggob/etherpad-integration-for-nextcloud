@@ -264,6 +264,63 @@ export const createPublicReadShare = async (relativePath: string): Promise<{ tok
 	return { token, url }
 }
 
+/**
+ * Create a user-to-user share (`shareType=0`) granting `shareWith`
+ * read access to the file at `relativePath`. Returns the OCS share id
+ * so callers can revoke through `deleteShareById`.
+ */
+export const createUserReadShare = async (relativePath: string, shareWith: string): Promise<{ id: string }> => {
+	const body = new URLSearchParams()
+	body.set('path', '/' + relativePath.replace(/^\/+/, ''))
+	body.set('shareType', '0')
+	body.set('shareWith', shareWith)
+	body.set('permissions', '1')
+
+	const res = await fetch(`${E2E.baseURL}/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json`, {
+		method: 'POST',
+		headers: {
+			Authorization: basicAuthHeader(),
+			'OCS-APIRequest': 'true',
+			'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+			Accept: 'application/json',
+		},
+		body,
+	})
+	const payload = await parseJsonResponse(res) as {
+		ocs?: { meta?: { statuscode?: number, message?: string }, data?: { id?: string | number } }
+	}
+	const statusCode = Number(payload?.ocs?.meta?.statuscode ?? 0)
+	if (!res.ok || statusCode < 100 || statusCode >= 300) {
+		throw new Error(`OCS user-share create failed with HTTP ${res.status} / OCS ${statusCode}: ${payload?.ocs?.meta?.message || 'unknown error'}`)
+	}
+	const id = String(payload?.ocs?.data?.id ?? '')
+	if (id === '') {
+		throw new Error('OCS user-share create response did not include an id.')
+	}
+	return { id }
+}
+
+/**
+ * Revoke a share by its OCS id. Used by both link-share and user-share
+ * teardown paths. 404 from a stale id is treated as a successful no-op.
+ */
+export const deleteShareById = async (id: string): Promise<void> => {
+	if (id === '') {
+		return
+	}
+	const res = await fetch(`${E2E.baseURL}/ocs/v2.php/apps/files_sharing/api/v1/shares/${encodeURIComponent(id)}?format=json`, {
+		method: 'DELETE',
+		headers: {
+			Authorization: basicAuthHeader(),
+			'OCS-APIRequest': 'true',
+			Accept: 'application/json',
+		},
+	})
+	if (!res.ok && res.status !== 404) {
+		throw new Error(`OCS share delete failed with HTTP ${res.status}`)
+	}
+}
+
 export const deletePublicShare = async (token: string): Promise<void> => {
 	if (token === '') {
 		return

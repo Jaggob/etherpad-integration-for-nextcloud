@@ -18,6 +18,12 @@ export const gotoFiles = async (page: Page): Promise<void> => {
 	await expect(page.locator('[data-cy-files-list], #app-content-files, .files-list')).toBeVisible({ timeout: 30_000 })
 }
 
+/** Open the "Shared with me" view — used by the user-share spec. */
+export const gotoSharedWithMe = async (page: Page): Promise<void> => {
+	await page.goto(`${E2E.baseURL}/apps/files/sharingin`)
+	await expect(page.locator('[data-cy-files-list], #app-content-files, .files-list')).toBeVisible({ timeout: 30_000 })
+}
+
 /** Open this app's admin settings section. Requires an admin storage state. */
 export const gotoAdminPadSettings = async (page: Page): Promise<void> => {
 	await page.goto(`${E2E.baseURL}/settings/admin/etherpad_nextcloud_pads`)
