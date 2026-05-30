@@ -23,19 +23,54 @@ const davUrl = (relativePath: string): string => {
 	return `${E2E.baseURL}/remote.php/dav/files/${encodeURIComponent(E2E.user)}/${path}`
 }
 
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+
+/**
+ * Run `request()` until it stops returning a transient WebDAV state.
+ * A freshly created/just-closed .pad is briefly held by NC's sync write
+ * while Etherpad mirrors content back, and PROPFIND just after a UI
+ * create can race the filecache; both surfaces as one of the codes in
+ * `retryOn`. Up to `maxAttempts` tries with linear backoff.
+ *
+ * `accept` returns true for terminal success (typically 2xx + 207).
+ */
+const withDavRetry = async (
+	request: () => Promise<Response>,
+	options: { retryOn: number[], accept: (status: number) => boolean, maxAttempts?: number, label: string },
+): Promise<Response> => {
+	const maxAttempts = options.maxAttempts ?? 5
+	let lastStatus = 0
+	for (let attempt = 0; attempt < maxAttempts; attempt++) {
+		const res = await request()
+		if (options.accept(res.status)) {
+			return res
+		}
+		lastStatus = res.status
+		if (!options.retryOn.includes(res.status)) {
+			throw new Error(`WebDAV ${options.label} failed with HTTP ${res.status}`)
+		}
+		await sleep(500 + attempt * 500)
+	}
+	throw new Error(`WebDAV ${options.label} still failing after ${maxAttempts} attempts (last HTTP ${lastStatus})`)
+}
+
 /**
  * Delete a file or folder through WebDAV. Used for teardown so browser
  * specs do not leave pads behind on a shared target instance.
  */
 export const deleteViaDav = async (relativePath: string): Promise<void> => {
 	const path = relativePath.replace(/^\/+/, '')
-	const res = await fetch(davUrl(path), {
-		method: 'DELETE',
-		headers: { Authorization: basicAuthHeader() },
-	})
-	if (!res.ok && res.status !== 404) {
-		throw new Error(`WebDAV cleanup DELETE ${path} failed with HTTP ${res.status}`)
-	}
+	// 404 is a successful no-op for cleanup (file already gone). 423
+	// (Locked) is briefly hit when a pad was just closed and Etherpad's
+	// sync write still holds the file lock — retry until it clears.
+	await withDavRetry(
+		() => fetch(davUrl(path), { method: 'DELETE', headers: { Authorization: basicAuthHeader() } }),
+		{
+			retryOn: [423],
+			accept: (status) => status < 300 || status === 404,
+			label: `DELETE ${path}`,
+		},
+	)
 }
 
 export const putFileViaDav = async (relativePath: string, content: string): Promise<void> => {
@@ -62,17 +97,21 @@ export const putFileViaDav = async (relativePath: string, content: string): Prom
 export const copyViaDav = async (srcRelativePath: string, destRelativePath: string): Promise<void> => {
 	const srcPath = srcRelativePath.replace(/^\/+/, '')
 	const destPath = destRelativePath.replace(/^\/+/, '')
-	const res = await fetch(davUrl(srcPath), {
-		method: 'COPY',
-		headers: {
-			Authorization: basicAuthHeader(),
-			Destination: davUrl(destPath),
-			Overwrite: 'F',
+	await withDavRetry(
+		() => fetch(davUrl(srcPath), {
+			method: 'COPY',
+			headers: {
+				Authorization: basicAuthHeader(),
+				Destination: davUrl(destPath),
+				Overwrite: 'F',
+			},
+		}),
+		{
+			retryOn: [423],
+			accept: (status) => status < 300,
+			label: `COPY ${srcPath} -> ${destPath}`,
 		},
-	})
-	if (!res.ok && res.status !== 201 && res.status !== 204) {
-		throw new Error(`WebDAV COPY ${srcPath} -> ${destPath} failed with HTTP ${res.status}`)
-	}
+	)
 }
 
 const trashbinUrl = (subpath: string = ''): string => {
@@ -165,18 +204,26 @@ export const propfindFileId = async (relativePath: string): Promise<number> => {
 		+ '<d:propfind xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">\n'
 		+ '  <d:prop><oc:fileid/></d:prop>\n'
 		+ '</d:propfind>'
-	const res = await fetch(davUrl(path), {
-		method: 'PROPFIND',
-		headers: {
-			Authorization: basicAuthHeader(),
-			Depth: '0',
-			'Content-Type': 'application/xml; charset=UTF-8',
+
+	// PROPFIND right after a UI-driven create sometimes hits 404 because
+	// NC's filecache propagation lags the create response by a few ms;
+	// retry until the file is visible to DAV.
+	const res = await withDavRetry(
+		() => fetch(davUrl(path), {
+			method: 'PROPFIND',
+			headers: {
+				Authorization: basicAuthHeader(),
+				Depth: '0',
+				'Content-Type': 'application/xml; charset=UTF-8',
+			},
+			body,
+		}),
+		{
+			retryOn: [404],
+			accept: (status) => status === 207 || (status >= 200 && status < 300),
+			label: `PROPFIND ${path}`,
 		},
-		body,
-	})
-	if (!res.ok && res.status !== 207) {
-		throw new Error(`WebDAV PROPFIND ${path} failed with HTTP ${res.status}`)
-	}
+	)
 	const text = await res.text()
 	const match = text.match(/<oc:fileid[^>]*>(\d+)<\/oc:fileid>/i)
 	const parsed = match ? Number(match[1]) : NaN

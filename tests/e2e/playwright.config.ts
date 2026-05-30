@@ -23,7 +23,10 @@ export default defineConfig({
 	workers: 1,
 	fullyParallel: false,
 	forbidOnly: !!process.env.CI,
-	retries: process.env.CI ? 1 : 0,
+	// Single retry locally too — long full-suite runs against a real NC
+	// occasionally hit transient ERR_NETWORK_CHANGED or WebDAV 423 lock
+	// contention; one retry hides those without papering over real bugs.
+	retries: process.env.CI ? 2 : 1,
 	timeout: 60_000,
 	expect: { timeout: 15_000 },
 	reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list'], ['html', { open: 'never' }]],
