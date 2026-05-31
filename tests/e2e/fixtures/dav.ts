@@ -25,6 +25,15 @@ const davUrl = (relativePath: string): string => {
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
+/** Decode the XML entities WebDAV property text can carry (not URL-encoding). */
+const xmlUnescape = (value: string): string => value
+	.replace(/&lt;/g, '<')
+	.replace(/&gt;/g, '>')
+	.replace(/&quot;/g, '"')
+	.replace(/&apos;/g, "'")
+	.replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+	.replace(/&amp;/g, '&')
+
 /**
  * Run `request()` until it stops returning a transient WebDAV state.
  * A freshly created/just-closed .pad is briefly held by NC's sync write
@@ -103,15 +112,31 @@ export const moveViaDav = async (srcRelativePath: string, destRelativePath: stri
 	const destPath = destRelativePath.replace(/^\/+/, '')
 	// A pad that was just created/closed may still be locked by the sync
 	// write. NC surfaces that lock on MOVE inconsistently as either 423
-	// (Locked) or an uncaught-LockedException 500, so retry on both — the
-	// only realistic 500 in this create->move window is the lock clearing.
-	await withDavRetry(
-		() => fetch(davUrl(srcPath), {
+	// (Locked) or an *uncaught* LockedException rendered as a 500. We retry
+	// 423 always, but a 500 only when its body is actually a lock error —
+	// any other 500 (a real regression these move/rename specs exist to
+	// catch) is thrown immediately rather than retried away.
+	const maxAttempts = 5
+	let lastStatus = 0
+	let lastBody = ''
+	for (let attempt = 0; attempt < maxAttempts; attempt++) {
+		const res = await fetch(davUrl(srcPath), {
 			method: 'MOVE',
 			headers: { Authorization: basicAuthHeader(), Destination: davUrl(destPath), Overwrite: 'F' },
-		}),
-		{ retryOn: [423, 500], accept: (status) => status < 300, label: `MOVE ${srcPath} -> ${destPath}` },
-	)
+		})
+		if (res.status < 300) {
+			return
+		}
+		lastStatus = res.status
+		lastBody = await res.text().catch(() => '')
+		const isLock = res.status === 423
+			|| (res.status === 500 && /lock|locked/i.test(lastBody))
+		if (!isLock) {
+			throw new Error(`WebDAV MOVE ${srcPath} -> ${destPath} failed with HTTP ${res.status}: ${lastBody.slice(0, 200)}`)
+		}
+		await new Promise((resolve) => setTimeout(resolve, 500 + attempt * 500))
+	}
+	throw new Error(`WebDAV MOVE ${srcPath} -> ${destPath} still locked after ${maxAttempts} attempts (last HTTP ${lastStatus})`)
 }
 
 /** Read a file's raw bytes via WebDAV GET. Retries on the post-create lock race. */
@@ -217,7 +242,10 @@ export const findTrashbinEntry = async (originalFileName: string): Promise<strin
 		if (!hrefMatch || !originalMatch) {
 			continue
 		}
-		if (decodeURIComponent(originalMatch[1].trim()) !== originalFileName) {
+		// The property value is XML text (XML-escaped), not URL-encoded, so
+		// unescape XML entities — not decodeURIComponent, which would throw
+		// on a literal '%' and leave entities like &amp; intact.
+		if (xmlUnescape(originalMatch[1].trim()) !== originalFileName) {
 			continue
 		}
 		// Strip leading /remote.php/dav/trashbin/<user>/ so the caller can

@@ -13,7 +13,11 @@ const here = dirname(fileURLToPath(import.meta.url))
 // base URL, user, passwords — live there, never in the repo.
 loadEnv({ path: resolve(here, '.env.e2e') })
 
-const baseURL = process.env.E2E_BASE_URL || 'http://localhost:8080'
+// No localhost fallback on purpose: specs use the absolute URLs from
+// env.ts (which throws a clear "Missing env var" if E2E_BASE_URL is
+// unset). Leaving this undefined means any future spec that relied on a
+// relative path would fail fast rather than silently hit localhost.
+const baseURL = process.env.E2E_BASE_URL || undefined
 
 export default defineConfig({
 	testDir: here,

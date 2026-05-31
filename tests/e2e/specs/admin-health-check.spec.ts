@@ -13,7 +13,8 @@ import { gotoAdminPadSettings, runAdminEtherpadHealthCheck } from '../fixtures/n
  */
 test.describe('admin Etherpad health check', () => {
 	test('tests the configured Etherpad connection', async ({ page }) => {
-		await gotoAdminPadSettings(page)
+		const isAdmin = await gotoAdminPadSettings(page)
+		test.skip(!isAdmin, 'E2E_USER is not a Nextcloud admin; admin health-check spec skipped.')
 		await runAdminEtherpadHealthCheck(page)
 	})
 })

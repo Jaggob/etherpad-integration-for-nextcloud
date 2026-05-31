@@ -26,18 +26,11 @@ test.describe('pad ownership boundary (cross-user open-by-id)', () => {
 	const padName = uniquePadName('ownership')
 	let createdFileId: number | null = null
 
-	test.beforeAll(async () => {
-		if (!E2E.hasSecondaryAccount()) {
-			return
-		}
-		// File setup happens here so the spec body stays focused on the
-		// permission assertion.
-	})
-
 	test.afterAll(async () => {
-		if (createdFileId !== null) {
-			await deleteViaDav(padName)
-		}
+		// Always attempt cleanup by name: the file is created before
+		// createdFileId is assigned, so gating on that id could leak the
+		// pad if the test threw in between. deleteViaDav no-ops on 404.
+		await deleteViaDav(padName).catch(() => {})
 	})
 
 	test('user B cannot open user A\'s pad via the open-by-id endpoint', async ({ page }) => {

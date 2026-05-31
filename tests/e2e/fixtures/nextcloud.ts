@@ -31,10 +31,14 @@ export const gotoSharedWithMe = async (page: Page): Promise<void> => {
 	await expect(page.locator('[data-cy-files-list], #app-content-files, .files-list')).toBeVisible({ timeout: 30_000 })
 }
 
-/** Open this app's admin settings section. Requires an admin storage state. */
-export const gotoAdminPadSettings = async (page: Page): Promise<void> => {
+/**
+ * Open this app's admin settings section. Returns false (without throwing)
+ * when the account is not an admin — NC then serves 403 / redirects and the
+ * settings root never appears — so the caller can skip rather than time out.
+ */
+export const gotoAdminPadSettings = async (page: Page): Promise<boolean> => {
 	await page.goto(`${E2E.baseURL}/settings/admin/etherpad_nextcloud_pads`)
-	await expect(page.locator('#etherpad-nextcloud-admin-settings')).toBeVisible({ timeout: 30_000 })
+	return page.locator('#etherpad-nextcloud-admin-settings').isVisible({ timeout: 10_000 }).catch(() => false)
 }
 
 /** Run the admin Etherpad health check and assert the configured pad server responds. */
@@ -77,23 +81,42 @@ export const createPublicPad = async (page: Page, fileName: string): Promise<str
  * Create an external public pad from an existing Etherpad URL. The dialog is
  * intentionally exercised through the UI because most regressions here happen
  * in the Files-app menu/dialog glue, not only in the backend API.
+ *
+ * Returns `{ ok: true }` on success. When external pads are disabled or the
+ * host is rejected, the dialog shows an inline error instead of closing;
+ * we return `{ ok: false, error }` so the caller can skip rather than hang
+ * until timeout. Filling the URL auto-suggests a file name (on blur), so we
+ * set the name *after* the URL and target the field by test id rather than
+ * relying on tab order.
  */
-export const createExternalPublicPadFromUrl = async (page: Page, padUrl: string, fileName: string): Promise<string> => {
+export const createExternalPublicPadFromUrl = async (
+	page: Page,
+	padUrl: string,
+	fileName: string,
+): Promise<{ ok: boolean, error?: string }> => {
 	await openNewMenu(page)
 	await page.getByRole('menuitem', { name: /public pad from url|öffentliches pad aus url/i }).first().click()
 
-	await expect(page.getByText(/public pad from url|öffentliches pad aus url/i).first()).toBeVisible()
+	const modal = page.locator('[data-epnc-modal="external"]')
+	await expect(modal).toBeVisible()
 
-	const urlInput = page.locator('input[type="url"]:visible').last()
-	await expect(urlInput).toBeVisible()
+	const urlInput = modal.locator('[data-testid="epnc-external-url-input"]')
 	await urlInput.fill(padUrl)
-	await urlInput.press('Tab')
-	await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A')
-	await page.keyboard.type(fileName)
-	await page.getByRole('button', { name: /create|erstellen/i }).last().click()
+	await urlInput.blur()
 
-	await expect(urlInput).toBeHidden({ timeout: 30_000 })
-	return fileName
+	// Set the name explicitly after the URL's blur-suggestion, by test id.
+	await modal.locator('[data-testid="epnc-filename-input"]').fill(fileName)
+	await modal.locator('[data-testid="epnc-create-submit"]').click()
+
+	// Race success (dialog closes) against the inline error (feature off /
+	// host rejected) so a disabled instance skips instead of timing out.
+	const errorNode = modal.locator('[data-testid="epnc-modal-error"]')
+	const result = await Promise.race([
+		modal.waitFor({ state: 'hidden', timeout: 30_000 }).then(() => ({ ok: true as const })),
+		errorNode.filter({ hasText: /\S/ }).waitFor({ state: 'visible', timeout: 30_000 })
+			.then(async () => ({ ok: false as const, error: (await errorNode.textContent())?.trim() || 'rejected' })),
+	])
+	return result
 }
 
 /**

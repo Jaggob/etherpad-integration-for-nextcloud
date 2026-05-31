@@ -9,7 +9,7 @@ import {
 	gotoFiles,
 	uniquePadName,
 } from '../fixtures/nextcloud'
-import { deleteViaDav, getFileViaDav, propfindFileId, putFileViaDav } from '../fixtures/dav'
+import { deleteViaDav, getFileViaDav, mkcolViaDav, propfindFileId, putFileViaDav } from '../fixtures/dav'
 
 /**
  * Template placeholder substitution end-to-end (#26). A `.pad` template in
@@ -59,8 +59,10 @@ test.describe('template placeholder substitution', () => {
 	})
 
 	test('resolves {{date}} and {{user}} when creating from the template', async ({ page }) => {
-		// Place the template (two-step PUT so its frontmatter carries the
-		// real, self-consistent file id).
+		// Ensure the Templates folder exists (a fresh account's skeleton may
+		// not include it), then place the template (two-step PUT so its
+		// frontmatter carries the real, self-consistent file id).
+		await mkcolViaDav('Templates')
 		await putFileViaDav(templatePath, buildTemplate(1))
 		const templateFileId = await propfindFileId(templatePath)
 		await putFileViaDav(templatePath, buildTemplate(templateFileId))
