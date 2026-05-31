@@ -2,16 +2,17 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  * Copyright (c) 2026 Jacob Bühler
  */
-import { test } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import {
 	gotoFiles,
 	createPublicPad,
 	expectEtherpadViewerMounted,
 	expectRecoveryCardForCopy,
+	followOpenTheOriginal,
 	openPadFromFileList,
 	uniquePadName,
 } from '../fixtures/nextcloud'
-import { copyViaDav, deleteViaDav } from '../fixtures/dav'
+import { copyViaDav, deleteViaDav, propfindFileId } from '../fixtures/dav'
 
 /**
  * Recovery flow for a `.pad` file that has no binding row of its own —
@@ -22,7 +23,8 @@ import { copyViaDav, deleteViaDav } from '../fixtures/dav'
  * occ access needed), then verify the viewer mounts the recovery card
  * with the "Open the original" affordance — proving find-original
  * resolves the source and the user is not silently routed into a wrong
- * pad.
+ * pad — and that following that affordance actually navigates to the
+ * original pad.
  */
 test.describe('orphan .pad recovery', () => {
 	const original = uniquePadName('orphan-source')
@@ -33,7 +35,7 @@ test.describe('orphan .pad recovery', () => {
 		await deleteViaDav(original)
 	})
 
-	test('opens the recovery card with an Open-the-original affordance for a WebDAV-copied .pad', async ({ page }) => {
+	test('shows the recovery card and follows "Open the original" to the source pad', async ({ page }) => {
 		await gotoFiles(page)
 
 		// Create the source pad via the regular UI flow; the create path
@@ -42,6 +44,7 @@ test.describe('orphan .pad recovery', () => {
 		await createPublicPad(page, original)
 		await expectEtherpadViewerMounted(page)
 		await page.goto(page.url())
+		const originalFileId = await propfindFileId(original)
 
 		// Server-side COPY — the destination receives a new fileid but
 		// the binding row stays attached to the source. The destination
@@ -52,5 +55,9 @@ test.describe('orphan .pad recovery', () => {
 		await openPadFromFileList(page, copy)
 
 		await expectRecoveryCardForCopy(page, { originalFound: true })
+
+		// Following the affordance navigates to the original pad (mounts
+		// the viewer, URL points at the original file id, not the copy).
+		await followOpenTheOriginal(page, originalFileId)
 	})
 })

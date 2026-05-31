@@ -222,6 +222,23 @@ export const expectRecoveryCardForCopy = async (page: Page, options: { originalF
 	}
 }
 
+/**
+ * Click the recovery card's "Open the original .pad file" affordance and
+ * confirm it actually navigates to the original pad: the Etherpad viewer
+ * mounts and the URL now points at the original file (by its id), not the
+ * copy. `expectedOriginalFileId` is the original's NC file id.
+ */
+export const followOpenTheOriginal = async (page: Page, expectedOriginalFileId: number): Promise<void> => {
+	const link = page.getByRole('link', { name: /open the original \.pad file|urspr.ngliche \.pad-datei öffnen/i }).first()
+	await expect(link).toBeVisible({ timeout: 30_000 })
+	await link.click()
+	await expectEtherpadViewerMounted(page)
+	// NC's viewer route carries the file id in the path (/files/<id>) or,
+	// depending on version, as a fileid= query param — accept either.
+	await expect.poll(() => page.url(), { timeout: 15_000 })
+		.toMatch(new RegExp(`(/files/${expectedOriginalFileId}\\b|fileid=${expectedOriginalFileId}\\b)`))
+}
+
 /** A unique-ish file name so parallel/repeat runs don't collide. */
 export const uniquePadName = (label: string): string =>
 	`e2e-${label}-${Date.now()}.pad`
