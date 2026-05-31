@@ -88,6 +88,32 @@ export const putFileViaDav = async (relativePath: string, content: string): Prom
 	}
 }
 
+/** Create a collection (folder) via WebDAV MKCOL. 405 (already exists) is a no-op. */
+export const mkcolViaDav = async (relativePath: string): Promise<void> => {
+	const path = relativePath.replace(/^\/+/, '')
+	const res = await fetch(davUrl(path), { method: 'MKCOL', headers: { Authorization: basicAuthHeader() } })
+	if (!res.ok && res.status !== 201 && res.status !== 405) {
+		throw new Error(`WebDAV MKCOL ${path} failed with HTTP ${res.status}`)
+	}
+}
+
+/** Move/rename a file via WebDAV MOVE. The file id is preserved across a move. */
+export const moveViaDav = async (srcRelativePath: string, destRelativePath: string): Promise<void> => {
+	const srcPath = srcRelativePath.replace(/^\/+/, '')
+	const destPath = destRelativePath.replace(/^\/+/, '')
+	// A pad that was just created/closed may still be locked by the sync
+	// write. NC surfaces that lock on MOVE inconsistently as either 423
+	// (Locked) or an uncaught-LockedException 500, so retry on both — the
+	// only realistic 500 in this create->move window is the lock clearing.
+	await withDavRetry(
+		() => fetch(davUrl(srcPath), {
+			method: 'MOVE',
+			headers: { Authorization: basicAuthHeader(), Destination: davUrl(destPath), Overwrite: 'F' },
+		}),
+		{ retryOn: [423, 500], accept: (status) => status < 300, label: `MOVE ${srcPath} -> ${destPath}` },
+	)
+}
+
 /** Read a file's raw bytes via WebDAV GET. Retries on the post-create lock race. */
 export const getFileViaDav = async (relativePath: string): Promise<string> => {
 	const path = relativePath.replace(/^\/+/, '')

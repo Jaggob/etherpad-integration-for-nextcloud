@@ -18,6 +18,13 @@ export const gotoFiles = async (page: Page): Promise<void> => {
 	await expect(page.locator('[data-cy-files-list], #app-content-files, .files-list')).toBeVisible({ timeout: 30_000 })
 }
 
+/** Open the Files app at a specific directory (e.g. after moving a file into it). */
+export const gotoFilesDir = async (page: Page, dir: string): Promise<void> => {
+	const normalized = '/' + dir.replace(/^\/+|\/+$/g, '')
+	await page.goto(`${E2E.baseURL}/apps/files/?dir=${encodeURIComponent(normalized)}`)
+	await expect(page.locator('[data-cy-files-list], #app-content-files, .files-list')).toBeVisible({ timeout: 30_000 })
+}
+
 /** Open the "Shared with me" view — used by the user-share spec. */
 export const gotoSharedWithMe = async (page: Page): Promise<void> => {
 	await page.goto(`${E2E.baseURL}/apps/files/sharingin`)
@@ -86,6 +93,34 @@ export const createExternalPublicPadFromUrl = async (page: Page, padUrl: string,
 	await page.getByRole('button', { name: /create|erstellen/i }).last().click()
 
 	await expect(urlInput).toBeHidden({ timeout: 30_000 })
+	return fileName
+}
+
+/**
+ * Create a pad from a SPECIFIC template via NC's template picker (as
+ * opposed to the blank entry). `templateLabel` matches the tile NC
+ * renders for the template file in the user's Templates folder.
+ */
+export const createPadFromTemplate = async (page: Page, templateLabel: string, fileName: string): Promise<string> => {
+	await openNewMenu(page)
+	await page.getByRole('menuitem', { name: /new pad|neues pad/i }).first().click()
+
+	// Step 1 — the "New pad" dialog only asks for the file name.
+	const fileNameInput = page.locator('input[type="text"]:visible').last()
+	await fileNameInput.fill(fileName.replace(/\.pad$/i, ''))
+	await page.getByRole('button', { name: /^(create|erstellen)$/i }).last().click()
+
+	// Step 2 — the template chooser ("Choose a template for …"). Pick the
+	// tile labelled with our template's (extension-stripped) file name,
+	// then confirm. The tile may not be a button, so match by text and
+	// click the enclosing option.
+	const tileLabel = templateLabel.replace(/\.pad$/i, '')
+	const tile = page.getByText(tileLabel, { exact: false }).first()
+	await expect(tile).toBeVisible({ timeout: 15_000 })
+	await tile.click()
+	await page.getByRole('button', { name: /create|erstellen|anhand der ausgewählten vorlage/i }).last().click()
+
+	await expectFileInList(page, fileName)
 	return fileName
 }
 
