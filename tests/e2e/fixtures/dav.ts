@@ -88,6 +88,41 @@ export const putFileViaDav = async (relativePath: string, content: string): Prom
 	}
 }
 
+/** Read a file's raw bytes via WebDAV GET. Retries on the post-create lock race. */
+export const getFileViaDav = async (relativePath: string): Promise<string> => {
+	const path = relativePath.replace(/^\/+/, '')
+	const res = await withDavRetry(
+		() => fetch(davUrl(path), { method: 'GET', headers: { Authorization: basicAuthHeader() } }),
+		{ retryOn: [423, 404], accept: (status) => status >= 200 && status < 300, label: `GET ${path}` },
+	)
+	return res.text()
+}
+
+/**
+ * POST to one of the plugin's authenticated `/api/v1/pads/...` endpoints
+ * using the app password (same BasicAuth surface the integration bash
+ * specs use). Returns the parsed JSON body plus the HTTP status.
+ */
+export const padApiPost = async (endpoint: string): Promise<{ status: number, body: unknown }> => {
+	const url = `${E2E.baseURL}/index.php/apps/etherpad_nextcloud/api/v1/${endpoint.replace(/^\/+/, '')}`
+	const res = await fetch(url, {
+		method: 'POST',
+		headers: {
+			Authorization: basicAuthHeader(),
+			Accept: 'application/json',
+			'OCS-APIRequest': 'true',
+		},
+	})
+	const text = await res.text()
+	let body: unknown = null
+	try {
+		body = text !== '' ? JSON.parse(text) : null
+	} catch {
+		body = text
+	}
+	return { status: res.status, body }
+}
+
 /**
  * Server-side WebDAV COPY. The copy receives a new file id, so any
  * existing binding row stays attached to the source — the destination
