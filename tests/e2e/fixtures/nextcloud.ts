@@ -38,7 +38,13 @@ export const gotoSharedWithMe = async (page: Page): Promise<void> => {
  */
 export const gotoAdminPadSettings = async (page: Page): Promise<boolean> => {
 	await page.goto(`${E2E.baseURL}/settings/admin/etherpad_nextcloud_pads`)
-	return page.locator('#etherpad-nextcloud-admin-settings').isVisible({ timeout: 10_000 }).catch(() => false)
+	// waitFor (not isVisible({timeout}), whose timeout is a no-op) so a slow
+	// or JS-mounted panel still resolves true for an admin; only a genuine
+	// non-admin (403/redirect, panel never appears) returns false.
+	return page.locator('#etherpad-nextcloud-admin-settings')
+		.waitFor({ state: 'visible', timeout: 10_000 })
+		.then(() => true)
+		.catch(() => false)
 }
 
 /** Run the admin Etherpad health check and assert the configured pad server responds. */

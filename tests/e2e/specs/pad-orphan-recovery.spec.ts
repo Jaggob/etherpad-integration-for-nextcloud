@@ -4,6 +4,7 @@
  */
 import { test, expect } from '@playwright/test'
 import {
+	closeViewer,
 	gotoFiles,
 	createPublicPad,
 	expectEtherpadViewerMounted,
@@ -43,7 +44,9 @@ test.describe('orphan .pad recovery', () => {
 		// intentionally lack.
 		await createPublicPad(page, original)
 		await expectEtherpadViewerMounted(page)
-		await page.goto(page.url())
+		// Close the viewer so the source pad isn't held open while we copy
+		// it (the create/sync path can otherwise still hold the lock).
+		await closeViewer(page)
 		const originalFileId = await propfindFileId(original)
 
 		// Server-side COPY — the destination receives a new fileid but

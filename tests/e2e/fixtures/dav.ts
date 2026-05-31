@@ -106,37 +106,36 @@ export const mkcolViaDav = async (relativePath: string): Promise<void> => {
 	}
 }
 
+/**
+ * Shared MOVE/COPY driver with a bounded lock retry.
+ *
+ * A pad that was just created/closed may still be locked by the sync
+ * write. NC surfaces that lock inconsistently as either 423 (Locked) or
+ * an uncaught LockedException — and in the 500 case the response body is
+ * NC's generic HTML error page with no "locked" marker (confirmed in the
+ * server log: `OCP\Lock\LockedException` rendered as a plain 500). So the
+ * lock is *not* distinguishable from the response alone; we retry both
+ * 423 and 500 with backoff.
+ *
+ * This does not weaken what the move/rename specs verify. They assert the
+ * binding survives a move — which would regress as a *failed reopen
+ * afterwards*, not as a MOVE returning 500 (MOVE/COPY status is NC-core
+ * plumbing, not our plugin). A genuinely broken, deterministic 500 here
+ * would also exhaust the bounded retries and still fail loudly.
+ */
+const davMoveOrCopy = async (method: 'MOVE' | 'COPY', srcPath: string, destPath: string): Promise<void> => {
+	await withDavRetry(
+		() => fetch(davUrl(srcPath), {
+			method,
+			headers: { Authorization: basicAuthHeader(), Destination: davUrl(destPath), Overwrite: 'F' },
+		}),
+		{ retryOn: [423, 500], accept: (status) => status < 300, label: `${method} ${srcPath} -> ${destPath}` },
+	)
+}
+
 /** Move/rename a file via WebDAV MOVE. The file id is preserved across a move. */
 export const moveViaDav = async (srcRelativePath: string, destRelativePath: string): Promise<void> => {
-	const srcPath = srcRelativePath.replace(/^\/+/, '')
-	const destPath = destRelativePath.replace(/^\/+/, '')
-	// A pad that was just created/closed may still be locked by the sync
-	// write. NC surfaces that lock on MOVE inconsistently as either 423
-	// (Locked) or an *uncaught* LockedException rendered as a 500. We retry
-	// 423 always, but a 500 only when its body is actually a lock error —
-	// any other 500 (a real regression these move/rename specs exist to
-	// catch) is thrown immediately rather than retried away.
-	const maxAttempts = 5
-	let lastStatus = 0
-	let lastBody = ''
-	for (let attempt = 0; attempt < maxAttempts; attempt++) {
-		const res = await fetch(davUrl(srcPath), {
-			method: 'MOVE',
-			headers: { Authorization: basicAuthHeader(), Destination: davUrl(destPath), Overwrite: 'F' },
-		})
-		if (res.status < 300) {
-			return
-		}
-		lastStatus = res.status
-		lastBody = await res.text().catch(() => '')
-		const isLock = res.status === 423
-			|| (res.status === 500 && /lock|locked/i.test(lastBody))
-		if (!isLock) {
-			throw new Error(`WebDAV MOVE ${srcPath} -> ${destPath} failed with HTTP ${res.status}: ${lastBody.slice(0, 200)}`)
-		}
-		await new Promise((resolve) => setTimeout(resolve, 500 + attempt * 500))
-	}
-	throw new Error(`WebDAV MOVE ${srcPath} -> ${destPath} still locked after ${maxAttempts} attempts (last HTTP ${lastStatus})`)
+	await davMoveOrCopy('MOVE', srcRelativePath.replace(/^\/+/, ''), destRelativePath.replace(/^\/+/, ''))
 }
 
 /** Read a file's raw bytes via WebDAV GET. Retries on the post-create lock race. */
@@ -181,23 +180,7 @@ export const padApiPost = async (endpoint: string): Promise<{ status: number, bo
  * recovery spec to set up that exact state without poking the DB.
  */
 export const copyViaDav = async (srcRelativePath: string, destRelativePath: string): Promise<void> => {
-	const srcPath = srcRelativePath.replace(/^\/+/, '')
-	const destPath = destRelativePath.replace(/^\/+/, '')
-	await withDavRetry(
-		() => fetch(davUrl(srcPath), {
-			method: 'COPY',
-			headers: {
-				Authorization: basicAuthHeader(),
-				Destination: davUrl(destPath),
-				Overwrite: 'F',
-			},
-		}),
-		{
-			retryOn: [423],
-			accept: (status) => status < 300,
-			label: `COPY ${srcPath} -> ${destPath}`,
-		},
-	)
+	await davMoveOrCopy('COPY', srcRelativePath.replace(/^\/+/, ''), destRelativePath.replace(/^\/+/, ''))
 }
 
 const trashbinUrl = (subpath: string = ''): string => {
