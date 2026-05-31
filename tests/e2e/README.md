@@ -64,8 +64,9 @@ tests/e2e/
 
 Selectors prefer stable hooks (NC `data-cy-*`, our own `data-testid`)
 over localized text so specs survive UI-language changes. Content checks
-are credential-free: they go through the plugin's own HTTP endpoints +
-WebDAV rather than the Etherpad API or editor-iframe typing.
+usually go through the plugin's own HTTP endpoints + WebDAV rather than
+the Etherpad API or editor typing; the author-display-name spec is the
+one deliberate exception because it verifies the real Etherpad session UI.
 
 ## Coverage
 
@@ -74,6 +75,8 @@ Each `specs/*.spec.ts` covers one flow:
 - **pad-create-public** — internal public pad create + open, reopening an
   existing pad, and external pad from URL → external-snapshot viewer.
 - **pad-create-template** — create from the blank template-picker entry.
+- **pad-author-display-name** — protected pad opens with the NC account's
+  display name visible in Etherpad's user list.
 - **pad-template-placeholders** — `{{date}}` / `{{user}}` substitution
   when creating from a Templates-folder `.pad` (#26).
 - **pad-move-rename** — the binding (keyed on file id) survives an

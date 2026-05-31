@@ -173,6 +173,27 @@ export const padApiPost = async (endpoint: string): Promise<{ status: number, bo
 	return { status: res.status, body }
 }
 
+/** Return the display name NC exposes for the primary E2E account. */
+export const getCurrentUserDisplayName = async (): Promise<string> => {
+	const res = await fetch(`${E2E.baseURL}/ocs/v2.php/cloud/user?format=json`, {
+		headers: {
+			Authorization: basicAuthHeader(),
+			'OCS-APIRequest': 'true',
+			Accept: 'application/json',
+		},
+	})
+	const payload = await parseJsonResponse(res) as {
+		ocs?: { meta?: { statuscode?: number, message?: string }, data?: Record<string, unknown> }
+	}
+	const statusCode = Number(payload?.ocs?.meta?.statuscode ?? 0)
+	if (!res.ok || statusCode < 100 || statusCode >= 300) {
+		throw new Error(`OCS current-user lookup failed with HTTP ${res.status} / OCS ${statusCode}: ${payload?.ocs?.meta?.message || 'unknown error'}`)
+	}
+	const data = payload?.ocs?.data || {}
+	const displayName = String(data['display-name'] || data.displayname || data.displayName || '').trim()
+	return displayName !== '' ? displayName : E2E.user
+}
+
 /**
  * Server-side WebDAV COPY. The copy receives a new file id, so any
  * existing binding row stays attached to the source — the destination

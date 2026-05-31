@@ -202,6 +202,61 @@ export const expectEtherpadViewerMounted = async (page: Page): Promise<void> => 
 	await expect(page.locator('iframe').first()).toBeVisible({ timeout: 30_000 })
 }
 
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * Open Etherpad's user list and assert the protected-pad session carries
+ * the NC display name. This intentionally targets protected pads only:
+ * public pads open without a personal Etherpad session so they do not
+ * leak the viewer's name to the pad server.
+ */
+export const expectEtherpadCurrentUserName = async (page: Page, expectedName: string): Promise<void> => {
+	const name = expectedName.trim()
+	if (name === '') {
+		throw new Error('Expected Etherpad display name must not be empty.')
+	}
+	const expected = new RegExp(escapeRegExp(name))
+
+	// The NC viewer hosts a same-origin srcdoc wrapper which then embeds the
+	// actual cross-origin Etherpad iframe one level deeper.
+	const etherpad = page
+		.frameLocator('iframe[title="Etherpad"]').first()
+		.frameLocator('iframe[title="Etherpad"]').first()
+	await expect(etherpad.locator('body')).toBeVisible({ timeout: 30_000 })
+
+	const showUsers = etherpad.locator([
+		'#showusers',
+		'button:has(.buttonicon-showusers)',
+		'.buttonicon-showusers',
+		'[data-l10n-id="pad.toolbar.showusers"]',
+		'[aria-label*="user" i]',
+		'[title*="user" i]',
+		'[aria-label*="benutzer" i]',
+		'[title*="benutzer" i]',
+	].join(', ')).first()
+	await expect(showUsers).toBeVisible({ timeout: 30_000 })
+	await showUsers.click()
+
+	const currentUserNameInput = etherpad.locator([
+		'#myusernameedit',
+		'input[name="username"]',
+		'input[id*="username" i]',
+		'input[class*="username" i]',
+	].join(', ')).first()
+	if (await currentUserNameInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
+		await expect(currentUserNameInput).toHaveValue(expected, { timeout: 15_000 })
+		return
+	}
+
+	await expect(etherpad.locator([
+		'#users',
+		'#userlist',
+		'.userlist',
+		'[id*="users" i]',
+		'[class*="userlist" i]',
+	].join(', ')).first()).toContainText(expected, { timeout: 15_000 })
+}
+
 export const expectExternalSnapshotViewerMounted = async (page: Page, expectedOriginalUrl = ''): Promise<void> => {
 	await expect(page.locator('.epnc-native-snapshot').first()).toBeVisible({ timeout: 30_000 })
 	await expect(page.getByText(/pad from another server|pad von einem anderen server/i).first()).toBeVisible()
