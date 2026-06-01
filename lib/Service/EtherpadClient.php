@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace OCA\EtherpadNextcloud\Service;
 
 use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
+use OCP\IAppConfig;
 use OCP\IConfig;
 
 class EtherpadClient {
@@ -18,6 +19,7 @@ class EtherpadClient {
 
 	public function __construct(
 		private IConfig $config,
+		private IAppConfig $appConfig,
 	) {
 	}
 
@@ -297,10 +299,12 @@ class EtherpadClient {
 	}
 
 	private function getApiKey(): string {
-		// Read via IConfig (which transparently decrypts the now-sensitive
-		// value); the key name is owned by AdminSettingsRepository so the
-		// write and read paths can't drift apart.
-		$key = (string)$this->config->getAppValue('etherpad_nextcloud', AdminSettingsRepository::API_KEY, '');
+		// Must read via IAppConfig: the key is stored sensitive (encrypted
+		// at rest) and IConfig::getAppValue does NOT decrypt sensitive
+		// values, so reading it through IConfig yields an unusable key and
+		// every Etherpad call 401s. IAppConfig::getValueString decrypts it.
+		// The key name is owned by AdminSettingsRepository.
+		$key = $this->appConfig->getValueString('etherpad_nextcloud', AdminSettingsRepository::API_KEY, '');
 		if ($key === '') {
 			throw new EtherpadClientException('Etherpad API key is not configured.');
 		}
