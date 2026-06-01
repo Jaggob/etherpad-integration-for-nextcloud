@@ -22,8 +22,12 @@ const suggestFileNameFromPadUrl = (padUrl) => {
 	return 'Imported pad.pad'
 }
 
-const createModalScaffold = (titleText) => {
+const createModalScaffold = (titleText, variant = '') => {
 	const overlay = document.createElement('div')
+	overlay.setAttribute('data-testid', 'epnc-modal')
+	if (variant !== '') {
+		overlay.setAttribute('data-epnc-modal', variant)
+	}
 	overlay.style.position = 'fixed'
 	overlay.style.inset = '0'
 	overlay.style.background = 'rgba(0, 0, 0, 0.45)'
@@ -42,6 +46,7 @@ const createModalScaffold = (titleText) => {
 
 	const closeButton = document.createElement('button')
 	closeButton.type = 'button'
+	closeButton.setAttribute('data-testid', 'epnc-modal-close')
 	closeButton.setAttribute('aria-label', t(APP_ID, 'Close'))
 	closeButton.textContent = '×'
 	closeButton.style.position = 'absolute'
@@ -77,7 +82,7 @@ const createModalScaffold = (titleText) => {
  * @returns {Promise<*|null>}
  */
 export const openInternalPublicPadDialog = ({ onSubmit }) => new Promise((resolve) => {
-	const { overlay, dialog, closeButton } = createModalScaffold(t(APP_ID, 'Public pad'))
+	const { overlay, dialog, closeButton } = createModalScaffold(t(APP_ID, 'Public pad'), 'internal')
 
 	const nameLabel = document.createElement('label')
 	nameLabel.textContent = t(APP_ID, 'File name')
@@ -86,12 +91,14 @@ export const openInternalPublicPadDialog = ({ onSubmit }) => new Promise((resolv
 
 	const nameInput = document.createElement('input')
 	nameInput.type = 'text'
+	nameInput.setAttribute('data-testid', 'epnc-filename-input')
 	nameInput.value = t(APP_ID, 'Public pad') + '.pad'
 	nameInput.style.width = '100%'
 	nameInput.style.boxSizing = 'border-box'
 	nameInput.style.marginBottom = '12px'
 
 	const error = document.createElement('p')
+	error.setAttribute('data-testid', 'epnc-modal-error')
 	error.style.color = 'var(--color-error, #c62828)'
 	error.style.margin = '0 0 12px 0'
 	error.style.minHeight = '20px'
@@ -99,6 +106,7 @@ export const openInternalPublicPadDialog = ({ onSubmit }) => new Promise((resolv
 	const createButton = document.createElement('button')
 	createButton.type = 'button'
 	createButton.className = 'primary'
+	createButton.setAttribute('data-testid', 'epnc-create-submit')
 	createButton.textContent = t(APP_ID, 'Create')
 
 	let isPending = false
@@ -176,7 +184,7 @@ export const openInternalPublicPadDialog = ({ onSubmit }) => new Promise((resolv
  * @returns {Promise<*|null>} the resolved onSubmit value, or null if the user cancelled.
  */
 export const openExternalPublicPadDialog = ({ onSubmit }) => new Promise((resolve) => {
-	const { overlay, dialog, closeButton } = createModalScaffold(t(APP_ID, 'Public pad from URL'))
+	const { overlay, dialog, closeButton } = createModalScaffold(t(APP_ID, 'Public pad from URL'), 'external')
 
 	const urlLabel = document.createElement('label')
 	urlLabel.textContent = t(APP_ID, 'External pad URL')
@@ -185,6 +193,7 @@ export const openExternalPublicPadDialog = ({ onSubmit }) => new Promise((resolv
 
 	const urlInput = document.createElement('input')
 	urlInput.type = 'url'
+	urlInput.setAttribute('data-testid', 'epnc-external-url-input')
 	urlInput.value = 'https://'
 	urlInput.placeholder = 'https://'
 	urlInput.style.width = '100%'
@@ -198,12 +207,14 @@ export const openExternalPublicPadDialog = ({ onSubmit }) => new Promise((resolv
 
 	const nameInput = document.createElement('input')
 	nameInput.type = 'text'
+	nameInput.setAttribute('data-testid', 'epnc-filename-input')
 	nameInput.value = 'Imported pad.pad'
 	nameInput.style.width = '100%'
 	nameInput.style.boxSizing = 'border-box'
 	nameInput.style.marginBottom = '12px'
 
 	const error = document.createElement('p')
+	error.setAttribute('data-testid', 'epnc-modal-error')
 	error.style.color = 'var(--color-error, #c62828)'
 	error.style.margin = '0 0 12px 0'
 	error.style.minHeight = '20px'
@@ -211,6 +222,7 @@ export const openExternalPublicPadDialog = ({ onSubmit }) => new Promise((resolv
 	const createButton = document.createElement('button')
 	createButton.type = 'button'
 	createButton.className = 'primary'
+	createButton.setAttribute('data-testid', 'epnc-create-submit')
 	createButton.textContent = t(APP_ID, 'Create')
 
 	let isPending = false
