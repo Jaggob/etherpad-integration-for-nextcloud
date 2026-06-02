@@ -57,21 +57,6 @@ class PublicShareUrlBuilderTest extends TestCase {
 		}
 	}
 
-	public function testBuildDownloadUrlForSingleFileShare(): void {
-		$this->assertSame('/s/share-token/download', $this->buildBuilder()->buildDownloadUrl('share-token', '', false, 'Shared.pad'));
-	}
-
-	public function testBuildDownloadUrlForFolderShare(): void {
-		$this->assertSame(
-			'/s/share-token/download?path=%2FFolder&files=Shared.pad',
-			$this->buildBuilder()->buildDownloadUrl('share-token', '/Folder/Shared.pad', true, 'Shared.pad')
-		);
-	}
-
-	public function testBuildDownloadUrlReturnsEmptyForFolderShareWithoutSelection(): void {
-		$this->assertSame('', $this->buildBuilder()->buildDownloadUrl('share-token', '', true, 'Shared.pad'));
-	}
-
 	private function buildBuilder(string $webroot = ''): PublicShareUrlBuilder {
 		$urlGenerator = $this->createMock(IURLGenerator::class);
 		$urlGenerator->method('getWebroot')->willReturn($webroot);

@@ -94,13 +94,6 @@ class EtherpadClient {
 		return $authorId;
 	}
 
-	public function setAuthorName(string $authorId, string $name): void {
-		$this->apiCall('setAuthorName', [
-			'authorID' => $authorId,
-			'name' => $name,
-		], 'POST');
-	}
-
 	public function createSession(string $groupId, string $authorId, int $validUntil): string {
 		$data = $this->apiCall('createSession', [
 			'groupID' => $groupId,
