@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <psalm
     errorLevel="4"
+    phpVersion="8.1"
     resolveFromConfigFile="true"
     findUnusedCode="false"
     autoloader="tests/psalm/ocp-autoload.php"
