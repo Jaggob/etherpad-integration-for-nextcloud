@@ -12,6 +12,16 @@ use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
 use OCP\IConfig;
 
 class EtherpadClient {
+	/**
+	 * Failsafe fallback API version, used only when auto-detection fails AND no
+	 * etherpad_api_version is stored. Deliberately kept LOW, not bumped to the
+	 * newest release: Etherpad's API version list is cumulative, so a newer
+	 * server accepts any older version while rejecting one higher than it
+	 * supports. Requesting a low version therefore maximises compatibility in
+	 * exactly the degraded path where this constant matters, and the plugin
+	 * uses no method newer than ~1.2.1 (it never passes the authorId param that
+	 * 1.3.0 added). Only raise this if we start relying on a newer-API feature.
+	 */
 	public const DEFAULT_API_VERSION = '1.2.15';
 
 	private const EXTERNAL_REQUEST_TIMEOUT_SECONDS = 15;
