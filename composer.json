@@ -4,7 +4,9 @@
   "type": "project",
   "license": "AGPL-3.0-or-later",
   "require-dev": {
-    "phpunit/phpunit": "^11.5"
+    "phpunit/phpunit": "^11.5",
+    "vimeo/psalm": "^6.16",
+    "nextcloud/ocp": "^31"
   },
   "autoload": {
     "psr-4": {
@@ -17,6 +19,8 @@
     }
   },
   "scripts": {
-    "test:phpunit": "phpunit --testsuite unit"
+    "test:phpunit": "phpunit --testsuite unit",
+    "psalm": "psalm --no-progress",
+    "psalm:baseline": "psalm --set-baseline=psalm-baseline.xml --no-progress"
   }
 }
