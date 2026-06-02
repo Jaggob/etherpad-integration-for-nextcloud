@@ -83,6 +83,7 @@ RSYNC_EXCLUDES=(
 	--exclude='vite.config.js'
 	--exclude='vitest.config.js'
 	--exclude='psalm.xml'
+	--exclude='psalm-baseline.xml'
 	--exclude='dist/'
 )
 
