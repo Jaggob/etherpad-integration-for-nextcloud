@@ -55,14 +55,19 @@ jobs:
           INFO_VERSION="$(grep -oE '<version>[^<]+</version>' appinfo/info.xml | sed -E 's|</?version>||g' | head -n1)"
           PKG_VERSION="$(jq -r '.version' package.json)"
           LOCK_VERSION="$(jq -r '.version' package-lock.json)"
-          echo "info.xml:          $INFO_VERSION"
-          echo "package.json:      $PKG_VERSION"
-          echo "package-lock.json: $LOCK_VERSION"
+          # npm stores the version twice in the lockfile: the top-level
+          # .version and the root package entry .packages[""].version. Check
+          # both so drift inside the lockfile is caught too.
+          LOCK_PKG_VERSION="$(jq -r '.packages[""].version' package-lock.json)"
+          echo "info.xml:                       $INFO_VERSION"
+          echo "package.json:                   $PKG_VERSION"
+          echo "package-lock.json (.version):   $LOCK_VERSION"
+          echo "package-lock.json (packages[\"\"]): $LOCK_PKG_VERSION"
           if [ -z "$INFO_VERSION" ]; then
             echo "::error::could not read <version> from appinfo/info.xml" >&2
             exit 1
           fi
-          if [ "$PKG_VERSION" != "$INFO_VERSION" ] || [ "$LOCK_VERSION" != "$INFO_VERSION" ]; then
-            echo "::error::Version mismatch. appinfo/info.xml is the source of truth ($INFO_VERSION); align package.json and package-lock.json to it." >&2
+          if [ "$PKG_VERSION" != "$INFO_VERSION" ] || [ "$LOCK_VERSION" != "$INFO_VERSION" ] || [ "$LOCK_PKG_VERSION" != "$INFO_VERSION" ]; then
+            echo "::error::Version mismatch. appinfo/info.xml is the source of truth ($INFO_VERSION); align package.json and both version fields in package-lock.json to it." >&2
             exit 1
           fi
