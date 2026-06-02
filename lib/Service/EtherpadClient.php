@@ -12,7 +12,7 @@ use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
 use OCP\IConfig;
 
 class EtherpadClient {
-	public const DEFAULT_API_VERSION = '1.2.15';
+	public const DEFAULT_API_VERSION = '1.3.0';
 
 	private const EXTERNAL_REQUEST_TIMEOUT_SECONDS = 15;
 
