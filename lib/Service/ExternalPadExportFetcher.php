@@ -21,11 +21,6 @@ class ExternalPadExportFetcher {
 	) {
 	}
 
-	public function getPublicTextFromPadUrl(string $padUrl): string {
-		$resolved = $this->resolveAndValidateExternalPublicPadUrl($padUrl);
-		return $this->getPublicTextFromResolvedExternalPad($resolved);
-	}
-
 	/** @return array{origin:string,pad_id:string,pad_url:string,text:string} */
 	public function normalizeAndFetchExternalPublicPadText(string $padUrl): array {
 		$resolved = $this->resolveAndValidateExternalPublicPadUrl($padUrl);
@@ -57,10 +52,6 @@ class ExternalPadExportFetcher {
 			'text' => $text,
 			'snapshot_unavailable' => $snapshotUnavailable,
 		];
-	}
-
-	public function assertPublicPadAvailable(string $padUrl): void {
-		$this->getPublicTextFromPadUrl($padUrl);
 	}
 
 	/** @return array{origin:string,pad_id:string,pad_url:string} */

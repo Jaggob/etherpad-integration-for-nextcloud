@@ -70,32 +70,4 @@ class PublicShareUrlBuilder {
 
 		return $base . '?path=' . rawurlencode($dir) . '&files=' . rawurlencode($fileName);
 	}
-
-	public function buildDownloadUrl(string $token, string $selectedRelativePath, bool $isFolderShare, string $fileName): string {
-		$base = $this->buildShareBaseUrl($token) . '/download';
-		if (!$isFolderShare) {
-			return $base;
-		}
-
-		$path = trim($selectedRelativePath, '/');
-		if ($path === '') {
-			return '';
-		}
-
-		$dir = dirname($path);
-		if ($dir === '.' || $dir === '') {
-			$dir = '/';
-		} else {
-			$dir = '/' . $dir;
-		}
-		$name = basename($path);
-		if ($name === '') {
-			$name = $fileName;
-		}
-		if ($name === '') {
-			return '';
-		}
-
-		return $base . '?path=' . rawurlencode($dir) . '&files=' . rawurlencode($name);
-	}
 }
