@@ -8,6 +8,11 @@
     "vimeo/psalm": "^6.16",
     "nextcloud/ocp": "^31"
   },
+  "config": {
+    "platform": {
+      "php": "8.2.27"
+    }
+  },
   "autoload": {
     "psr-4": {
       "OCA\\EtherpadNextcloud\\": "lib/"
