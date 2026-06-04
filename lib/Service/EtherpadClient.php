@@ -9,6 +9,8 @@ declare(strict_types=1);
 namespace OCA\EtherpadNextcloud\Service;
 
 use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
+use OCP\Http\Client\IClientService;
+use OCP\Http\Client\IResponse;
 use OCP\IConfig;
 
 class EtherpadClient {
@@ -24,11 +26,12 @@ class EtherpadClient {
 	 */
 	public const DEFAULT_API_VERSION = '1.2.15';
 
-	private const EXTERNAL_REQUEST_TIMEOUT_SECONDS = 15;
+	private const REQUEST_TIMEOUT_SECONDS = 15;
 
 	public function __construct(
 		private IConfig $config,
 		private AdminSettingsRepository $settingsRepository,
+		private IClientService $clientService,
 	) {
 	}
 
@@ -212,38 +215,23 @@ class EtherpadClient {
 	 */
 	private function sendRequest(string $url, array $query, string $httpMethod): string {
 		$method = strtoupper($httpMethod);
-		$queryString = http_build_query($query, '', '&', PHP_QUERY_RFC3986);
-		$targetUrl = $method === 'GET' ? ($url . '?' . $queryString) : $url;
-		$context = $this->buildHttpContext(
-			$method,
-			"Accept: application/json\r\n",
-			$method === 'POST' ? $queryString : null,
-		);
-		$body = @file_get_contents($targetUrl, false, $context);
-		if ($body === false) {
-			$error = error_get_last();
-			$reason = $error['message'] ?? 'Unknown network error';
-			throw new EtherpadClientException('Etherpad transport error: ' . $reason);
+		$options = $this->baseRequestOptions();
+		if ($method === 'GET') {
+			$options['query'] = $query;
+		} else {
+			// Keep the historical form-urlencoded body so the Etherpad API
+			// (apikey + params) is sent exactly as before.
+			$options['body'] = http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+			$options['headers']['Content-Type'] = 'application/x-www-form-urlencoded';
 		}
 
-		$statusCode = $this->extractStatusCode($http_response_header ?? []);
+		$response = $this->doRequest($method, $url, $options);
+		$statusCode = $response->getStatusCode();
 		if ($statusCode >= 400) {
 			throw new EtherpadClientException('Etherpad API HTTP error (' . $statusCode . ')');
 		}
 
-		return $body;
-	}
-
-	/**
-	 * @param list<string> $headers
-	 */
-	private function extractStatusCode(array $headers): int {
-		foreach ($headers as $line) {
-			if (preg_match('#^HTTP/\S+\s+(\d{3})#', $line, $matches) === 1) {
-				return (int)$matches[1];
-			}
-		}
-		return 0;
+		return (string)$response->getBody();
 	}
 
 	private function getPublicHost(): string {
@@ -312,43 +300,51 @@ class EtherpadClient {
 	}
 
 	private function sendPublicGetRequest(string $url): string {
-		$context = $this->buildHttpContext(
-			'GET',
-			"Accept: application/json\r\n",
-			null,
-			self::EXTERNAL_REQUEST_TIMEOUT_SECONDS
-		);
-		$body = @file_get_contents($url, false, $context);
-		if ($body === false) {
-			$error = error_get_last();
-			$reason = $error['message'] ?? 'Unknown network error';
-			throw new EtherpadClientException('HTTP transport error: ' . $reason);
-		}
-
-		$statusCode = $this->extractStatusCode($http_response_header ?? []);
+		$response = $this->doRequest('GET', $url, $this->baseRequestOptions());
+		$statusCode = $response->getStatusCode();
 		if ($statusCode >= 400) {
 			throw new EtherpadClientException('HTTP error (' . $statusCode . ')');
 		}
 
-		return (string)$body;
+		return (string)$response->getBody();
 	}
 
-	private function buildHttpContext(string $method, string $headers, ?string $content = null, int $timeout = 15): mixed {
-		$options = [
-			'http' => [
-				'method' => strtoupper($method),
-				'timeout' => $timeout,
-				'ignore_errors' => true,
-				'follow_location' => 0,
-				'max_redirects' => 0,
-				'header' => $headers,
-			],
+	/**
+	 * Shared request options for every Etherpad call: a fixed timeout, the
+	 * JSON Accept header, and redirects disabled (Etherpad never legitimately
+	 * redirects an API call, and following one could leak the apikey to a
+	 * foreign host).
+	 *
+	 * @return array<string,mixed>
+	 */
+	private function baseRequestOptions(): array {
+		return [
+			'timeout' => self::REQUEST_TIMEOUT_SECONDS,
+			'allow_redirects' => ['max' => 0],
+			'headers' => ['Accept' => 'application/json'],
 		];
-		if ($content !== null) {
-			$options['http']['header'] .= "Content-Type: application/x-www-form-urlencoded\r\n";
-			$options['http']['content'] = $content;
+	}
+
+	/**
+	 * Perform the HTTP request through Nextcloud's HTTP client (honouring the
+	 * instance's proxy / TLS configuration). The NC client throws on >= 400,
+	 * so we recover the real response via getResponseFromThrowable() to keep
+	 * the status-code handling at the call site; a throwable without a
+	 * response is a genuine transport failure.
+	 *
+	 * @param array<string,mixed> $options
+	 */
+	private function doRequest(string $method, string $url, array $options): IResponse {
+		$client = $this->clientService->newClient();
+		try {
+			return $client->request($method, $url, $options);
+		} catch (\Throwable $e) {
+			try {
+				return $client->getResponseFromThrowable($e);
+			} catch (\Throwable) {
+				throw new EtherpadClientException('Etherpad transport error: ' . $e->getMessage());
+			}
 		}
-		return stream_context_create($options);
 	}
 
 }

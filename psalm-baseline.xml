@@ -230,7 +230,6 @@
   <file src="lib/Service/EtherpadClient.php">
     <RedundantCast>
       <code><![CDATA[(int)$parts['port']]]></code>
-      <code><![CDATA[(string)$body]]></code>
       <code><![CDATA[(string)$parts['host']]]></code>
       <code><![CDATA[(string)$parts['scheme']]]></code>
     </RedundantCast>

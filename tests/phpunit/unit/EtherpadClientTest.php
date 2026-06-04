@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace OCA\EtherpadNextcloud\Tests\Unit;
 
+use OCA\EtherpadNextcloud\Exception\EtherpadClientException;
 use OCA\EtherpadNextcloud\Service\AdminSettingsRepository;
 use OCA\EtherpadNextcloud\Service\EtherpadClient;
+use OCP\Http\Client\IClient;
+use OCP\Http\Client\IClientService;
+use OCP\Http\Client\IResponse;
 use OCP\IConfig;
 use PHPUnit\Framework\TestCase;
 
@@ -59,13 +63,139 @@ class EtherpadClientTest extends TestCase {
 		$this->assertSame('', $client->getConfiguredOrigin());
 	}
 
+	public function testApiCallReturnsDataOnSuccess(): void {
+		$client = $this->clientWithResponse(
+			$this->response(200, '{"code":0,"data":{"groupID":"g.abc123"}}')
+		);
+		$this->assertSame('g.abc123', $client->createGroup());
+	}
+
+	public function testApiCallSendsApiKeyFromSettingsRepository(): void {
+		// Regression guard for #105: the apikey must come from
+		// AdminSettingsRepository::getApiKey() (the decrypting IAppConfig path),
+		// not from IConfig. Capture the outgoing request and assert it.
+		$captured = null;
+		$client = $this->clientWithResponse(
+			$this->response(200, '{"code":0,"data":{"groupID":"g.abc123"}}'),
+			$captured,
+		);
+
+		$client->createGroup();
+
+		$this->assertNotNull($captured);
+		// createGroup is a POST: apikey travels in the form-urlencoded body.
+		$this->assertStringContainsString('apikey=stored-key', (string)$captured['options']['body']);
+	}
+
+	public function testApiCallThrowsOnNonZeroApiCode(): void {
+		$client = $this->clientWithResponse(
+			$this->response(200, '{"code":1,"message":"groupID does not exist"}')
+		);
+		$this->expectException(EtherpadClientException::class);
+		$this->expectExceptionMessage('Etherpad API error (createGroup): groupID does not exist');
+		$client->createGroup();
+	}
+
+	public function testApiCallThrowsOnInvalidJson(): void {
+		$client = $this->clientWithResponse($this->response(200, '<html>nope</html>'));
+		$this->expectException(EtherpadClientException::class);
+		$this->expectExceptionMessage('Invalid JSON response from Etherpad API.');
+		$client->createGroup();
+	}
+
+	public function testApiCallSurfacesHttpErrorStatusAsCause(): void {
+		// e.g. a wrong apikey makes Etherpad answer 401 — the failure mode the
+		// #105 regression produced. apiCall() wraps every sendRequest failure
+		// as "request failed: <method>" and preserves the HTTP error as the
+		// cause (exactly what the server log showed during #105).
+		$client = $this->clientWithResponse($this->response(401, 'Unauthorized'));
+
+		try {
+			$client->createGroup();
+			$this->fail('Expected EtherpadClientException.');
+		} catch (EtherpadClientException $e) {
+			$this->assertSame('Etherpad API request failed: createGroup', $e->getMessage());
+			$this->assertInstanceOf(EtherpadClientException::class, $e->getPrevious());
+			$this->assertStringContainsString('Etherpad API HTTP error (401)', $e->getPrevious()->getMessage());
+		}
+	}
+
+	public function testApiCallWrapsTransportFailure(): void {
+		// request() throws and the throwable carries no response, so
+		// getResponseFromThrowable() rethrows -> wrapped as a request failure.
+		$http = $this->createMock(IClient::class);
+		$http->method('request')->willThrowException(new \RuntimeException('connection refused'));
+		$http->method('getResponseFromThrowable')->willThrowException(new \RuntimeException('connection refused'));
+		$service = $this->createMock(IClientService::class);
+		$service->method('newClient')->willReturn($http);
+
+		$client = new EtherpadClient($this->configForApi(), $this->repositoryWithKey('stored-key'), $service);
+
+		$this->expectException(EtherpadClientException::class);
+		$this->expectExceptionMessage('Etherpad API request failed: createGroup');
+		$client->createGroup();
+	}
+
 	/**
-	 * Construct the client with a bare settings-repository mock. None of
-	 * these tests exercise the API-key read path (no network calls), so the
-	 * default empty getApiKey() return is fine.
+	 * Construct the client for the URL-helper tests with a never-called HTTP
+	 * client (these tests do not make requests).
 	 */
 	private function client(IConfig $config): EtherpadClient {
-		return new EtherpadClient($config, $this->createMock(AdminSettingsRepository::class));
+		return new EtherpadClient(
+			$config,
+			$this->createMock(AdminSettingsRepository::class),
+			$this->createMock(IClientService::class),
+		);
+	}
+
+	/**
+	 * Build a client whose single HTTP call returns the given response.
+	 * Optionally captures the outgoing [method, url, options].
+	 *
+	 * @param array{method:string,url:string,options:array<string,mixed>}|null $captured
+	 */
+	private function clientWithResponse(IResponse $response, ?array &$captured = null): EtherpadClient {
+		$http = $this->createMock(IClient::class);
+		$http->method('request')->willReturnCallback(
+			static function (string $method, string $url, array $options) use ($response, &$captured): IResponse {
+				$captured = ['method' => $method, 'url' => $url, 'options' => $options];
+				return $response;
+			}
+		);
+		$service = $this->createMock(IClientService::class);
+		$service->method('newClient')->willReturn($http);
+
+		return new EtherpadClient($this->configForApi(), $this->repositoryWithKey('stored-key'), $service);
+	}
+
+	private function response(int $status, string $body): IResponse {
+		$response = $this->createMock(IResponse::class);
+		$response->method('getStatusCode')->willReturn($status);
+		$response->method('getBody')->willReturn($body);
+		return $response;
+	}
+
+	private function repositoryWithKey(string $key): AdminSettingsRepository {
+		$repository = $this->createMock(AdminSettingsRepository::class);
+		$repository->method('getApiKey')->willReturn($key);
+		return $repository;
+	}
+
+	private function configForApi(): IConfig {
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(
+			static function (string $appName, string $key, string $default = ''): string {
+				if ($appName !== 'etherpad_nextcloud') {
+					return $default;
+				}
+				return match ($key) {
+					'etherpad_host', 'etherpad_api_host' => 'https://pad.example.test',
+					'etherpad_api_version' => '1.2.15',
+					default => $default,
+				};
+			}
+		);
+		return $config;
 	}
 
 	private function configWithHost(string $host): IConfig {
