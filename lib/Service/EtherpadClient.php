@@ -315,6 +315,14 @@ class EtherpadClient {
 	 * redirects an API call, and following one could leak the apikey to a
 	 * foreign host).
 	 *
+	 * `allow_local_address` is enabled because the Etherpad API host is
+	 * admin-configured and very commonly a loopback/LAN address (e.g.
+	 * http://localhost:9001 behind the same box). Nextcloud's HTTP client
+	 * blocks local addresses by default for SSRF safety; that protection is
+	 * meant for user-supplied URLs, not this trusted, admin-only endpoint.
+	 * External (user-reachable) pad fetching lives in ExternalPadExportFetcher
+	 * and keeps its own public-IP / DNS-rebinding guards.
+	 *
 	 * @return array<string,mixed>
 	 */
 	private function baseRequestOptions(): array {
@@ -322,6 +330,7 @@ class EtherpadClient {
 			'timeout' => self::REQUEST_TIMEOUT_SECONDS,
 			'allow_redirects' => ['max' => 0],
 			'headers' => ['Accept' => 'application/json'],
+			'nextcloud' => ['allow_local_address' => true],
 		];
 	}
 
