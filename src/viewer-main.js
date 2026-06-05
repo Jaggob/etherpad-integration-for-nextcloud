@@ -194,6 +194,18 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 				}
 				return this._padSync
 			},
+			// Final flush + full teardown on destroy. Guard on the existing
+			// controller so we never spin one up just to tear it down (a viewer
+			// destroyed before its first open). The lazy create stays in the
+			// resolve path, which actually needs to sync.
+			teardownSync() {
+				if (!this._padSync) {
+					return
+				}
+				this._padSync.fireAndForget(true, true)
+				this._padSync.stop()
+				this._padSync.removeLifecycleHandlers()
+			},
 			async resolveOpenUrl() {
 				const generation = ++this.resolveGeneration
 				const isCurrent = () => generation === this.resolveGeneration
@@ -408,15 +420,11 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 		},
 		beforeDestroy() {
 			this.resolveGeneration += 1
-			this.padSync().fireAndForget(true, true)
-			this.padSync().stop()
-			this.padSync().removeLifecycleHandlers()
+			this.teardownSync()
 		},
 		beforeUnmount() {
 			this.resolveGeneration += 1
-			this.padSync().fireAndForget(true, true)
-			this.padSync().stop()
-			this.padSync().removeLifecycleHandlers()
+			this.teardownSync()
 		},
 		render(createElement) {
 			if (this.loadError) {
