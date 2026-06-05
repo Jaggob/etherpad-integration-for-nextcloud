@@ -102,7 +102,7 @@ class EtherpadHealthCheckService {
 			return $this->l10n->t('Hint: Etherpad returned a server error. Check the Etherpad server logs.');
 		}
 
-		// Transport-level — file_get_contents / curl wrapper failures.
+		// Transport-level — Nextcloud HTTP client (IClientService) connection failures.
 		if (str_contains($message, 'transport error')) {
 			if (str_contains($message, 'getaddrinfo') || str_contains($message, 'name or service not known') || str_contains($message, 'could not resolve host')) {
 				return $this->l10n->t('Hint: The configured Etherpad host did not resolve. Check the hostname for typos and that DNS reaches it from this server.');

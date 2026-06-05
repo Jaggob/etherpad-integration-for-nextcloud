@@ -120,6 +120,24 @@ class EtherpadClientTest extends TestCase {
 		}
 	}
 
+	public function testDetectApiVersionUsesGetAgainstApiEndpointWithoutBody(): void {
+		$captured = null;
+		$client = $this->clientWithResponse(
+			$this->response(200, '{"currentVersion":"1.3.0"}'),
+			$captured,
+		);
+
+		$this->assertSame('1.3.0', $client->detectApiVersion('https://pad.example.test/'));
+
+		$this->assertNotNull($captured);
+		$this->assertSame('GET', $captured['method']);
+		$this->assertSame('https://pad.example.test/api', $captured['url']);
+		// Detection is a plain GET: no request body, redirects disabled.
+		$this->assertArrayNotHasKey('body', $captured['options']);
+		$this->assertSame(['max' => 0], $captured['options']['allow_redirects']);
+		$this->assertSame(['allow_local_address' => true], $captured['options']['nextcloud']);
+	}
+
 	public function testApiCallWrapsTransportFailure(): void {
 		// request() throws and the throwable carries no response, so
 		// getResponseFromThrowable() rethrows -> wrapped as a request failure.
