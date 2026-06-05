@@ -16,7 +16,6 @@ use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
 use OCP\BackgroundJob\IJobList;
-use OCP\Files\IMimeTypeDetector;
 use OCP\Files\Template\FileCreatedFromTemplateEvent;
 use OCP\Files\Template\RegisterTemplateCreatorEvent;
 use OCP\Security\CSP\AddContentSecurityPolicyEvent;
@@ -26,10 +25,12 @@ class Application extends App implements IBootstrap {
 
 	public function __construct() {
 		parent::__construct(self::APP_ID);
-
-		$detector = $this->getContainer()->query(IMimeTypeDetector::class);
-		$detector->getAllMappings();
-		$detector->registerType('pad', 'application/x-etherpad-nextcloud');
+		// NB: no runtime MIME registration here. The `.pad` MIME type is
+		// persisted by the RegisterMimeType repair step (config mimetype
+		// mapping/aliases + filecache backfill), which is the supported
+		// Nextcloud mechanism. The old constructor used
+		// IMimeTypeDetector::registerType() — not part of the public OCP
+		// interface, and it ran getAllMappings() on every app instantiation.
 	}
 
 	public function register(IRegistrationContext $context): void {
