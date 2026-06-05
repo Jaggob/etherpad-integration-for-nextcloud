@@ -220,8 +220,14 @@ import { parsePadPathFromDavHref, parsePublicShareTokenFromLocation } from './li
 				this.externalOpenMessage = ''
 				this.snapshotMode = ''
 				this.snapshot = { text: '', html: '' }
-				this.padSync().stop()
-				this.padSync().configure({ syncUrl: '' })
+				// Reset only an existing controller; don't construct one just to
+				// stop/clear it (e.g. the initial immediate watcher with no pad).
+				// The success path below lazily creates it when there's a pad to
+				// actually sync.
+				if (this._padSync) {
+					this._padSync.stop()
+					this._padSync.configure({ syncUrl: '' })
+				}
 
 				if (!this.filePath) {
 					if (!isCurrent()) return
