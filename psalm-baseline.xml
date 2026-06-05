@@ -8,9 +8,6 @@
     <UndefinedClass>
       <code><![CDATA[LoadAdditionalScriptsEvent]]></code>
     </UndefinedClass>
-    <UndefinedInterfaceMethod>
-      <code><![CDATA[registerType]]></code>
-    </UndefinedInterfaceMethod>
   </file>
   <file src="lib/BackgroundJob/AbstractPendingDeleteRetryJob.php">
     <MissingOverrideAttribute>
