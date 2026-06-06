@@ -105,13 +105,18 @@ import { sanitizeSnapshotHtml } from './lib/sanitize-html.js'
 		actions.className = 'epnc-embed__snapshot-actions'
 		actions.appendChild(link)
 
-		const hasSnapshotHtml = String(snapshotHtml || '').trim() !== ''
+		// Sanitize first, then decide on the HTML path from the *sanitized*
+		// result: if DOMPurify empties it (e.g. all-dangerous markup) we fall
+		// back to the text / empty-message path instead of rendering a blank
+		// HTML block (mirrors viewer-main's renderSnapshotView).
+		const sanitizedSnapshotHtml = sanitizeSnapshotHtml(snapshotHtml)
+		const hasSnapshotHtml = sanitizedSnapshotHtml.trim() !== ''
 		const preview = document.createElement(hasSnapshotHtml ? 'div' : 'pre')
 		preview.className = hasSnapshotHtml
 			? 'epnc-embed__snapshot-text epnc-embed__snapshot-text--html'
 			: 'epnc-embed__snapshot-text'
 		if (hasSnapshotHtml) {
-			preview.innerHTML = sanitizeSnapshotHtml(snapshotHtml)
+			preview.innerHTML = sanitizedSnapshotHtml
 		} else {
 			preview.textContent = String(snapshotText || '').trim() !== '' ? String(snapshotText) : externalEmptyText
 		}
