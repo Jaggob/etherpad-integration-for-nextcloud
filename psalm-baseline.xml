@@ -14,11 +14,6 @@
       <code><![CDATA[protected function run($argument): void {]]></code>
     </MissingOverrideAttribute>
   </file>
-  <file src="lib/BackgroundJob/RetryPendingDeleteJob.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[protected function run($argument): void {]]></code>
-    </MissingOverrideAttribute>
-  </file>
   <file src="lib/Controller/AdminController.php">
     <RedundantCondition>
       <code><![CDATA[is_array($params)]]></code>

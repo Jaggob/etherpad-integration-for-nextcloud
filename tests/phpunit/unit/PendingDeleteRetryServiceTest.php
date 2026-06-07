@@ -124,14 +124,15 @@ class PendingDeleteRetryServiceTest extends TestCase {
 		], $result);
 	}
 
-	public function testRetryWithoutAgeFilterStillWorksForLegacyCallers(): void {
-		// retry() preserves the older "no age filter" semantics so a queued
-		// legacy RetryPendingDeleteJob instance keeps working until removed.
+	public function testRetryWithoutAgeFilterProcessesAllPendingDeletes(): void {
+		// retry() is the no-age-filter entry point used by the admin "retry
+		// pending deletes" action (AdminController); it processes every
+		// PENDING_DELETE row up to the limit.
 		$binding = $this->buildBindingServiceWithStateRows([
-			['file_id' => 16, 'pad_id' => 'pad-legacy'],
+			['file_id' => 16, 'pad_id' => 'pad-pending'],
 		]);
 		$etherpad = $this->createMock(EtherpadClient::class);
-		$etherpad->expects($this->once())->method('deletePad')->with('pad-legacy');
+		$etherpad->expects($this->once())->method('deletePad')->with('pad-pending');
 
 		$result = (new PendingDeleteRetryService(
 			$binding,
@@ -216,4 +217,5 @@ class PendingDeleteRetryServiceTest extends TestCase {
 			}
 		};
 	}
+
 }
