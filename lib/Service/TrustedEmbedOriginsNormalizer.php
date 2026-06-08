@@ -50,25 +50,25 @@ class TrustedEmbedOriginsNormalizer {
 		if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
 			return $this->invalid($throwOnInvalid, 'Trusted embed origins must be absolute origins: {origin}', $entry);
 		}
-		if (isset($parts['path']) && trim((string)$parts['path'], '/') !== '') {
+		if (isset($parts['path']) && trim($parts['path'], '/') !== '') {
 			return $this->invalid($throwOnInvalid, 'Trusted embed origins must not include a path: {origin}', $entry);
 		}
 		if (isset($parts['query']) || isset($parts['fragment']) || isset($parts['user']) || isset($parts['pass'])) {
 			return $this->invalid($throwOnInvalid, 'Trusted embed origins must not include credentials, query, or fragment: {origin}', $entry);
 		}
 
-		$scheme = strtolower((string)$parts['scheme']);
+		$scheme = strtolower($parts['scheme']);
 		if ($scheme !== 'https') {
 			return $this->invalid($throwOnInvalid, 'Trusted embed origins must use https: {origin}', $entry);
 		}
 
-		$host = strtolower((string)$parts['host']);
+		$host = strtolower($parts['host']);
 		if (str_contains($host, ':') && !str_starts_with($host, '[')) {
 			$host = '[' . $host . ']';
 		}
 		$origin = $scheme . '://' . $host;
 		if (isset($parts['port'])) {
-			$port = (int)$parts['port'];
+			$port = $parts['port'];
 			if ($port < 1 || $port > 65535) {
 				return $this->invalid($throwOnInvalid, 'Trusted embed origins must use a valid TCP port: {origin}', $entry);
 			}

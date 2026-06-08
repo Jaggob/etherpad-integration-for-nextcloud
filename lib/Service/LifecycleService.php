@@ -202,7 +202,7 @@ class LifecycleService {
 						if ($this->isTestFaultActive(self::TEST_FAULT_TRASH_WRITE_FAIL)) {
 							throw new \RuntimeException('Injected test fault: trash_write_fail');
 						}
-						$file->putContent((string)$updatedContent);
+						$file->putContent($updatedContent);
 						$snapshotPersisted = true;
 					} catch (LockedException $e) {
 						// Trash operation can hold a lock on the file node; do not block state transition/deletion.

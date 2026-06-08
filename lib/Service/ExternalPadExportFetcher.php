@@ -284,9 +284,9 @@ class ExternalPadExportFetcher {
 		if (!is_array($parts)) {
 			return '';
 		}
-		$scheme = strtolower((string)($parts['scheme'] ?? ''));
-		$host = strtolower((string)($parts['host'] ?? ''));
-		$port = isset($parts['port']) ? (int)$parts['port'] : 443;
+		$scheme = strtolower($parts['scheme'] ?? '');
+		$host = strtolower($parts['host'] ?? '');
+		$port = isset($parts['port']) ? $parts['port'] : 443;
 		if ($scheme !== 'https' || $host === '' || $port <= 0 || $port > 65535) {
 			return '';
 		}
@@ -308,10 +308,10 @@ class ExternalPadExportFetcher {
 			throw new EtherpadClientException('Public pad URL must not contain credentials.');
 		}
 
-		$scheme = strtolower((string)($parts['scheme'] ?? ''));
-		$host = strtolower((string)($parts['host'] ?? ''));
-		$port = isset($parts['port']) ? (int)$parts['port'] : 443;
-		$path = (string)($parts['path'] ?? '');
+		$scheme = strtolower($parts['scheme'] ?? '');
+		$host = strtolower($parts['host'] ?? '');
+		$port = isset($parts['port']) ? $parts['port'] : 443;
+		$path = $parts['path'] ?? '';
 		// `+` is literal in URL path segments — only query/form bodies treat
 		// it as a space. Using urldecode here turned `/p/team+pad` into
 		// pad-id `team pad`, then re-encoded to `/p/team%20pad` at fetch
@@ -325,8 +325,8 @@ class ExternalPadExportFetcher {
 			throw new EtherpadClientException('Public pad URL must match /p/{padId}.');
 		}
 
-		$basePath = rtrim((string)$matches[1], '/');
-		$padId = trim((string)$matches[2]);
+		$basePath = rtrim($matches[1], '/');
+		$padId = trim($matches[2]);
 		if ($padId === '') {
 			throw new EtherpadClientException('Invalid public pad URL.');
 		}

@@ -16,4 +16,30 @@
             <directory name="vendor" />
         </ignoreFiles>
     </projectFiles>
+    <issueHandlers>
+        <!-- The #[\Override] attribute is PHP 8.3+, but the app supports PHP
+             8.1+ (see appinfo/info.xml), so requiring it project-wide isn't
+             appropriate. -->
+        <MissingOverrideAttribute errorLevel="suppress" />
+        <!-- Classes that exist at runtime but aren't shipped in nextcloud/ocp
+             (and can't be cleanly stubbed because we call their API, or they
+             pull in further unshipped internals). IRootFolder & friends DO
+             resolve, via tests/psalm/missing-class-stubs.php. -->
+        <UndefinedClass>
+            <errorLevel type="suppress">
+                <referencedClass name="OCP\Image" />
+                <referencedClass name="OC" />
+                <referencedClass name="OC\Security\CSRF\CsrfTokenManager" />
+                <referencedClass name="Doctrine\DBAL\Schema\Table" />
+                <referencedClass name="OCA\Files\Event\LoadAdditionalScriptsEvent" />
+                <referencedClass name="OCA\Files_Sharing\Event\BeforeTemplateRenderedEvent" />
+                <referencedClass name="OCA\Viewer\Event\LoadViewer" />
+            </errorLevel>
+        </UndefinedClass>
+        <UndefinedDocblockClass>
+            <errorLevel type="suppress">
+                <referencedClass name="Doctrine\DBAL\Schema\Table" />
+            </errorLevel>
+        </UndefinedDocblockClass>
+    </issueHandlers>
 </psalm>

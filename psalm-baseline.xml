@@ -1,18 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <files psalm-version="6.16.1@f1f5de594dc76faf8784e02d3dc4716c91c6f6ac">
   <file src="lib/AppInfo/Application.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[public function boot(IBootContext $context): void {]]></code>
-      <code><![CDATA[public function register(IRegistrationContext $context): void {]]></code>
-    </MissingOverrideAttribute>
-    <UndefinedClass>
-      <code><![CDATA[LoadAdditionalScriptsEvent]]></code>
-    </UndefinedClass>
-  </file>
-  <file src="lib/BackgroundJob/AbstractPendingDeleteRetryJob.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[protected function run($argument): void {]]></code>
-    </MissingOverrideAttribute>
+    <InvalidArgument>
+      <code><![CDATA[registerEventListener]]></code>
+    </InvalidArgument>
   </file>
   <file src="lib/Controller/AdminController.php">
     <RedundantCondition>
@@ -21,13 +12,6 @@
     <TypeDoesNotContainType>
       <code><![CDATA[[]]]></code>
     </TypeDoesNotContainType>
-  </file>
-  <file src="lib/Controller/PublicViewerController.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[protected function getPasswordHash(): ?string {]]></code>
-      <code><![CDATA[protected function isPasswordProtected(): bool {]]></code>
-      <code><![CDATA[public function isValidToken(): bool {]]></code>
-    </MissingOverrideAttribute>
   </file>
   <file src="lib/Controller/PublicViewerControllerErrorMapper.php">
     <MismatchingDocblockParamType>
@@ -39,171 +23,53 @@
       <code><![CDATA[callable(mixed): RedirectResponse|TemplateResponse]]></code>
     </MismatchingDocblockParamType>
   </file>
-  <file src="lib/Exception/PadFileLockRetryExhaustedException.php">
-    <RedundantCast>
-      <code><![CDATA[(int)$lockedException->getCode()]]></code>
-    </RedundantCast>
-  </file>
   <file src="lib/Listeners/CSPListener.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[public function handle(Event $event): void {]]></code>
-    </MissingOverrideAttribute>
     <MissingTemplateParam>
       <code><![CDATA[IEventListener]]></code>
     </MissingTemplateParam>
-    <RedundantCast>
-      <code><![CDATA[(int)$parts['port']]]></code>
-      <code><![CDATA[(string)($parts['host'] ?? '')]]></code>
-      <code><![CDATA[(string)($parts['scheme'] ?? '')]]></code>
-    </RedundantCast>
   </file>
   <file src="lib/Listeners/FileCreatedFromTemplateListener.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[public function handle(Event $event): void {]]></code>
-    </MissingOverrideAttribute>
     <MissingTemplateParam>
       <code><![CDATA[IEventListener]]></code>
     </MissingTemplateParam>
   </file>
   <file src="lib/Listeners/LoadFilesScriptsListener.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[public function handle(Event $event): void {]]></code>
-    </MissingOverrideAttribute>
     <MissingTemplateParam>
       <code><![CDATA[IEventListener]]></code>
     </MissingTemplateParam>
-    <UndefinedClass>
-      <code><![CDATA[LoadAdditionalScriptsEvent]]></code>
-    </UndefinedClass>
   </file>
   <file src="lib/Listeners/LoadPublicShareScriptsListener.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[public function handle(Event $event): void {]]></code>
-    </MissingOverrideAttribute>
     <MissingTemplateParam>
       <code><![CDATA[IEventListener]]></code>
     </MissingTemplateParam>
-    <UndefinedClass>
-      <code><![CDATA[BeforeTemplateRenderedEvent]]></code>
-    </UndefinedClass>
   </file>
   <file src="lib/Listeners/LoadViewerListener.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[public function handle(Event $event): void {]]></code>
-    </MissingOverrideAttribute>
     <MissingTemplateParam>
       <code><![CDATA[IEventListener]]></code>
     </MissingTemplateParam>
-    <UndefinedClass>
-      <code><![CDATA[LoadViewer]]></code>
-    </UndefinedClass>
   </file>
   <file src="lib/Listeners/MoveToTrashListener.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[public function handle(Event $event): void {]]></code>
-    </MissingOverrideAttribute>
     <MissingTemplateParam>
       <code><![CDATA[IEventListener]]></code>
     </MissingTemplateParam>
   </file>
   <file src="lib/Listeners/RegisterTemplateCreatorListener.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[public function handle(Event $event): void {]]></code>
-    </MissingOverrideAttribute>
     <MissingTemplateParam>
       <code><![CDATA[IEventListener]]></code>
     </MissingTemplateParam>
   </file>
   <file src="lib/Listeners/RestoreFromTrashListener.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[public function handle(Event $event): void {]]></code>
-    </MissingOverrideAttribute>
     <MissingTemplateParam>
       <code><![CDATA[IEventListener]]></code>
     </MissingTemplateParam>
-    <UndefinedClass>
-      <code><![CDATA[$this->rootFolder]]></code>
-      <code><![CDATA[private]]></code>
-    </UndefinedClass>
-  </file>
-  <file src="lib/Migration/BackfillPadMimeType.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[public function getName(): string {]]></code>
-      <code><![CDATA[public function run(IOutput $output): void {]]></code>
-    </MissingOverrideAttribute>
-  </file>
-  <file src="lib/Migration/MarkApiKeySensitive.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[public function getName(): string {]]></code>
-      <code><![CDATA[public function run(IOutput $output): void {]]></code>
-    </MissingOverrideAttribute>
-  </file>
-  <file src="lib/Migration/RegisterMimeType.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[public function getName(): string {]]></code>
-      <code><![CDATA[public function run(IOutput $output): void {]]></code>
-    </MissingOverrideAttribute>
-    <UndefinedClass>
-      <code><![CDATA[\OC]]></code>
-      <code><![CDATA[\OC]]></code>
-      <code><![CDATA[\OC]]></code>
-      <code><![CDATA[\OC]]></code>
-      <code><![CDATA[\OC]]></code>
-      <code><![CDATA[\OC]]></code>
-    </UndefinedClass>
-  </file>
-  <file src="lib/Migration/Version000001Date20260304222000.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[public function changeSchema(IOutput $output, Closure $schemaClosure, array $options): ?ISchemaWrapper {]]></code>
-    </MissingOverrideAttribute>
-    <UndefinedDocblockClass>
-      <code><![CDATA[$schema->createTable('ep_pad_bindings')]]></code>
-      <code><![CDATA[$table]]></code>
-      <code><![CDATA[$table]]></code>
-      <code><![CDATA[$table]]></code>
-      <code><![CDATA[$table]]></code>
-      <code><![CDATA[$table]]></code>
-      <code><![CDATA[$table]]></code>
-      <code><![CDATA[$table]]></code>
-      <code><![CDATA[$table]]></code>
-      <code><![CDATA[$table]]></code>
-      <code><![CDATA[$table]]></code>
-      <code><![CDATA[$table]]></code>
-      <code><![CDATA[$table]]></code>
-    </UndefinedDocblockClass>
-  </file>
-  <file src="lib/Migration/Version000002Date20260512170000.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[public function postSchemaChange(IOutput $output, Closure $schemaClosure, array $options): void {]]></code>
-    </MissingOverrideAttribute>
-  </file>
-  <file src="lib/Migration/Version000003Date20260512230000.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[public function postSchemaChange(IOutput $output, Closure $schemaClosure, array $options): void {]]></code>
-    </MissingOverrideAttribute>
   </file>
   <file src="lib/Preview/PadPreviewProvider.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[public function getMimeType(): string {]]></code>
-      <code><![CDATA[public function getThumbnail(File $file, int $maxX, int $maxY): ?IImage {]]></code>
-      <code><![CDATA[public function isAvailable(FileInfo $file): bool {]]></code>
-    </MissingOverrideAttribute>
-    <UndefinedClass>
-      <code><![CDATA[\OCP\Image]]></code>
-    </UndefinedClass>
-  </file>
-  <file src="lib/Service/AdminSettingsValidator.php">
-    <RedundantCast>
-      <code><![CDATA[(string)$parts['scheme']]]></code>
-    </RedundantCast>
-  </file>
-  <file src="lib/Service/AllowlistNormalizer.php">
-    <RedundantCast>
-      <code><![CDATA[(int)$parts['port']]]></code>
-      <code><![CDATA[(string)($parts['host'] ?? '')]]></code>
-      <code><![CDATA[(string)($parts['path'] ?? '')]]></code>
-      <code><![CDATA[(string)($parts['scheme'] ?? '')]]></code>
-    </RedundantCast>
+    <InvalidReturnStatement>
+      <code><![CDATA[$image]]></code>
+    </InvalidReturnStatement>
+    <InvalidReturnType>
+      <code><![CDATA[?IImage]]></code>
+    </InvalidReturnType>
   </file>
   <file src="lib/Service/ConsistencyCheckService.php">
     <RedundantCondition>
@@ -213,43 +79,16 @@
       <code><![CDATA[[]]]></code>
     </TypeDoesNotContainType>
   </file>
-  <file src="lib/Service/EmbedResponseBuilder.php">
-    <UndefinedClass>
-      <code><![CDATA[$this->csrfTokenManager]]></code>
-      <code><![CDATA[private]]></code>
-    </UndefinedClass>
-  </file>
-  <file src="lib/Service/EtherpadClient.php">
-    <RedundantCast>
-      <code><![CDATA[(int)$parts['port']]]></code>
-      <code><![CDATA[(string)$parts['host']]]></code>
-      <code><![CDATA[(string)$parts['scheme']]]></code>
-    </RedundantCast>
-  </file>
   <file src="lib/Service/EtherpadHealthCheckService.php">
     <InvalidOperand>
       <code><![CDATA[($this->now() - $startedAt) * 1000]]></code>
     </InvalidOperand>
-    <RedundantCast>
-      <code><![CDATA[(string)$this->l10n->t('Etherpad connection test failed: {detail}')]]></code>
-    </RedundantCast>
   </file>
   <file src="lib/Service/ExternalPadExportFetcher.php">
     <InvalidArgument>
       <code><![CDATA[$resolved]]></code>
       <code><![CDATA[$resolved]]></code>
     </InvalidArgument>
-    <RedundantCast>
-      <code><![CDATA[(int)$parts['port']]]></code>
-      <code><![CDATA[(int)$parts['port']]]></code>
-      <code><![CDATA[(string)$matches[1]]]></code>
-      <code><![CDATA[(string)$matches[2]]]></code>
-      <code><![CDATA[(string)($parts['host'] ?? '')]]></code>
-      <code><![CDATA[(string)($parts['host'] ?? '')]]></code>
-      <code><![CDATA[(string)($parts['path'] ?? '')]]></code>
-      <code><![CDATA[(string)($parts['scheme'] ?? '')]]></code>
-      <code><![CDATA[(string)($parts['scheme'] ?? '')]]></code>
-    </RedundantCast>
     <TypeDoesNotContainType>
       <code><![CDATA[$sizeExceeded]]></code>
       <code><![CDATA[$sizeExceeded]]></code>
@@ -267,15 +106,6 @@
       <code><![CDATA[array{status: string, reason?: string, file_id: int, old_pad_id?: string, new_pad_id?: string}]]></code>
       <code><![CDATA[array{status: string, reason?: string, file_id: int, old_pad_id?: string, new_pad_id?: string}]]></code>
     </InvalidReturnType>
-    <RedundantCast>
-      <code><![CDATA[(string)$updatedContent]]></code>
-    </RedundantCast>
-  </file>
-  <file src="lib/Service/PadCreateRollbackService.php">
-    <UndefinedClass>
-      <code><![CDATA[$this->rootFolder]]></code>
-      <code><![CDATA[private]]></code>
-    </UndefinedClass>
   </file>
   <file src="lib/Service/PadCreationService.php">
     <InvalidReturnStatement>
@@ -330,58 +160,11 @@
     <TypeDoesNotContainType>
       <code><![CDATA[$fileName === '']]></code>
     </TypeDoesNotContainType>
-    <UndefinedClass>
-      <code><![CDATA[$this->rootFolder]]></code>
-      <code><![CDATA[private]]></code>
-    </UndefinedClass>
-  </file>
-  <file src="lib/Service/PadFileService.php">
-    <RedundantCast>
-      <code><![CDATA[(string)$matches[1]]]></code>
-      <code><![CDATA[(string)$padMatches[1]]]></code>
-    </RedundantCast>
-  </file>
-  <file src="lib/Service/PadOpenService.php">
-    <RedundantCast>
-      <code><![CDATA[(string)$content]]></code>
-      <code><![CDATA[(string)$content]]></code>
-    </RedundantCast>
   </file>
   <file src="lib/Service/PublicShareUrlBuilder.php">
     <TypeDoesNotContainType>
       <code><![CDATA[$dir === '']]></code>
       <code><![CDATA[$fileName === '']]></code>
     </TypeDoesNotContainType>
-  </file>
-  <file src="lib/Service/TrustedEmbedOriginsNormalizer.php">
-    <RedundantCast>
-      <code><![CDATA[(int)$parts['port']]]></code>
-      <code><![CDATA[(string)$parts['host']]]></code>
-      <code><![CDATA[(string)$parts['path']]]></code>
-      <code><![CDATA[(string)$parts['scheme']]]></code>
-    </RedundantCast>
-  </file>
-  <file src="lib/Service/UserNodeResolver.php">
-    <UndefinedClass>
-      <code><![CDATA[$this->rootFolder]]></code>
-      <code><![CDATA[$this->rootFolder]]></code>
-      <code><![CDATA[$this->rootFolder]]></code>
-      <code><![CDATA[private]]></code>
-    </UndefinedClass>
-  </file>
-  <file src="lib/Settings/AdminSection.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[public function getID(): string {]]></code>
-      <code><![CDATA[public function getIcon(): string {]]></code>
-      <code><![CDATA[public function getName(): string {]]></code>
-      <code><![CDATA[public function getPriority(): int {]]></code>
-    </MissingOverrideAttribute>
-  </file>
-  <file src="lib/Settings/AdminSettings.php">
-    <MissingOverrideAttribute>
-      <code><![CDATA[public function getForm(): TemplateResponse {]]></code>
-      <code><![CDATA[public function getPriority(): int {]]></code>
-      <code><![CDATA[public function getSection(): string {]]></code>
-    </MissingOverrideAttribute>
   </file>
 </files>
