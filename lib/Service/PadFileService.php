@@ -102,7 +102,7 @@ class PadFileService {
 			return null;
 		}
 
-		$url = trim((string)$matches[1]);
+		$url = trim($matches[1]);
 		if ($url === '' || preg_match('#^https?://#i', $url) !== 1) {
 			return null;
 		}
@@ -118,7 +118,7 @@ class PadFileService {
 		if (preg_match('~/p/([^/?#]+)$~', $decodedPath, $padMatches) !== 1) {
 			return null;
 		}
-		$padId = trim((string)$padMatches[1]);
+		$padId = trim($padMatches[1]);
 		if ($padId === '') {
 			return null;
 		}

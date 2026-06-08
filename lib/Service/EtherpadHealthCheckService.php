@@ -51,7 +51,7 @@ class EtherpadHealthCheckService {
 			// path leaks the literal '{detail}' through to consumers in
 			// some catalog setups. Doing the substitution here removes that
 			// surface area.
-			$template = (string)$this->l10n->t('Etherpad connection test failed: {detail}');
+			$template = $this->l10n->t('Etherpad connection test failed: {detail}');
 			throw new AdminHealthCheckException(
 				str_replace('{detail}', $detail, $template),
 				0,

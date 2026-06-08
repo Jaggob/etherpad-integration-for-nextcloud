@@ -270,9 +270,9 @@ class EtherpadClient {
 		if ($parts === false || empty($parts['scheme']) || empty($parts['host'])) {
 			return '';
 		}
-		$scheme = strtolower((string)$parts['scheme']);
-		$host = strtolower((string)$parts['host']);
-		$port = isset($parts['port']) ? (int)$parts['port'] : null;
+		$scheme = strtolower($parts['scheme']);
+		$host = strtolower($parts['host']);
+		$port = isset($parts['port']) ? $parts['port'] : null;
 		$isDefaultPort = ($scheme === 'https' && $port === 443) || ($scheme === 'http' && $port === 80);
 		if ($port === null || $isDefaultPort) {
 			return $scheme . '://' . $host;

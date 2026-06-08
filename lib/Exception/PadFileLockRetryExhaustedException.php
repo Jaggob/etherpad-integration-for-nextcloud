@@ -16,7 +16,7 @@ class PadFileLockRetryExhaustedException extends \RuntimeException {
 		private int $retryAttempts,
 		private LockedException $lockedException,
 	) {
-		parent::__construct($lockedException->getMessage(), (int)$lockedException->getCode(), $lockedException);
+		parent::__construct($lockedException->getMessage(), $lockedException->getCode(), $lockedException);
 	}
 
 	public function getRetryAttempts(): int {

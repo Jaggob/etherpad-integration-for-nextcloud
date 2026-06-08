@@ -69,13 +69,13 @@ class PadOpenService {
 				throw new \RuntimeException('Could not resolve file ID.');
 			}
 
-			$pad = $this->padFileService->readPad((string)$content);
+			$pad = $this->padFileService->readPad($content);
 			$padId = $pad->padId;
 			$accessMode = $pad->accessMode;
 			$padUrl = $pad->padUrl;
 			$isExternal = $pad->isExternal;
 			$snapshot = $isExternal
-				? $this->snapshotExtractor->extract((string)$content)
+				? $this->snapshotExtractor->extract($content)
 				: new SnapshotPayload('', '');
 			if (!$isExternal) {
 				$this->bindingService->assertConsistentMapping($fileId, $padId, $accessMode);

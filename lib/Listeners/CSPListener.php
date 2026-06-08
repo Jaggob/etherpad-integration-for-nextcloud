@@ -86,9 +86,9 @@ class CSPListener implements IEventListener {
 			if (!is_array($parts)) {
 				return null;
 			}
-			$scheme = strtolower((string)($parts['scheme'] ?? ''));
-			$host = strtolower((string)($parts['host'] ?? ''));
-			$port = isset($parts['port']) ? (int)$parts['port'] : 443;
+			$scheme = strtolower($parts['scheme'] ?? '');
+			$host = strtolower($parts['host'] ?? '');
+			$port = isset($parts['port']) ? $parts['port'] : 443;
 			if ($scheme !== 'https' || $host === '' || $port <= 0 || $port > 65535) {
 				return null;
 			}

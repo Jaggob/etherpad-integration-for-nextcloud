@@ -124,7 +124,7 @@ class AdminSettingsValidator {
 			throw new AdminValidationException('etherpad_api_host', $this->l10n->t('Etherpad API URL must not include query or fragment.'));
 		}
 
-		$scheme = strtolower((string)$parts['scheme']);
+		$scheme = strtolower($parts['scheme']);
 		if (!in_array($scheme, ['http', 'https'], true)) {
 			throw new AdminValidationException('etherpad_api_host', $this->l10n->t('Etherpad API URL must use http or https.'));
 		}
