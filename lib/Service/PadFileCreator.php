@@ -32,6 +32,10 @@ class PadFileCreator {
 
 		$parentPath = dirname($relativePath);
 		$fileName = basename($relativePath);
+		// Psalm infers basename() as non-empty-string, but it returns '' for
+		// slash-only inputs (e.g. basename('/')), so the empty-string guard is
+		// a real defensive check, not dead code.
+		/** @psalm-suppress TypeDoesNotContainType */
 		if ($fileName === '' || $fileName === '.' || $fileName === '..') {
 			throw new \RuntimeException('Invalid target filename.');
 		}

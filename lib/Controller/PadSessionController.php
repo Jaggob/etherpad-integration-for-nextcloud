@@ -29,6 +29,7 @@ use Psr\Log\LoggerInterface;
  * pad session state for a viewer: actual open flow, lazy frontmatter
  * init on first open, and the metadata + resolve readouts used by
  * embed-side surfaces.
+ * @psalm-api
  */
 class PadSessionController extends AbstractPadController {
 	public function __construct(

@@ -50,7 +50,7 @@ class PublicViewerControllerErrorMapper {
 
 	/**
 	 * @param callable(): mixed $action
-	 * @param callable(mixed): RedirectResponse|TemplateResponse $success
+	 * @param callable(mixed): (RedirectResponse|TemplateResponse) $success
 	 */
 	public function runForTemplate(callable $action, callable $success, string $token): RedirectResponse|TemplateResponse {
 		try {

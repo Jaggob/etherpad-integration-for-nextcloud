@@ -22,6 +22,9 @@ use OCP\IURLGenerator;
 use OCP\IUser;
 use OCP\IUserSession;
 
+/**
+ * @psalm-api
+ */
 class EmbedController extends Controller {
 	public function __construct(
 		string $appName,

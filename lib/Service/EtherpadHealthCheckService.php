@@ -64,7 +64,7 @@ class EtherpadHealthCheckService {
 			$settings->etherpadApiHost,
 			$settings->etherpadApiVersion,
 			(int)($result['pad_count'] ?? 0),
-			(int)round(($this->now() - $startedAt) * 1000),
+			(int)round(($this->now() - $startedAt) * 1000.0),
 			rtrim($settings->etherpadApiHost, '/') . '/api/' . $settings->etherpadApiVersion . '/listAllPads',
 			$this->pendingDeleteRetryService->countPendingDeletes(),
 		);

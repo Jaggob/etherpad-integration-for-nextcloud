@@ -120,7 +120,6 @@ class PadOpenService {
 			throw new EtherpadClientException('External pad metadata requires public access_mode.');
 		}
 
-		$effectivePadUrl = '';
 		$originalPadUrl = '';
 
 		if ($isExternal) {

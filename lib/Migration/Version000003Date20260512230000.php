@@ -17,6 +17,9 @@ use OCP\IDBConnection;
 use OCP\Migration\IOutput;
 use OCP\Migration\SimpleMigrationStep;
 
+/**
+ * @psalm-api
+ */
 class Version000003Date20260512230000 extends SimpleMigrationStep {
 	public function __construct(
 		private IDBConnection $db,
@@ -24,7 +27,6 @@ class Version000003Date20260512230000 extends SimpleMigrationStep {
 	}
 
 	public function postSchemaChange(IOutput $output, Closure $schemaClosure, array $options): void {
-		/** @var ISchemaWrapper $schema */
 		$schema = $schemaClosure();
 		if (!$schema->hasTable(BindingService::TABLE)) {
 			return;

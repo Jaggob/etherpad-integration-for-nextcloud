@@ -63,6 +63,6 @@ class ConsistencyCheckService {
 		$result = $qb->executeQuery();
 		$rows = $result->fetchAll();
 		$result->closeCursor();
-		return is_array($rows) ? $rows : [];
+		return $rows;
 	}
 }

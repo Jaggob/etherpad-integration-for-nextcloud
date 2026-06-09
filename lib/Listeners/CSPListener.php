@@ -14,6 +14,10 @@ use OCP\EventDispatcher\IEventListener;
 use OCP\IConfig;
 use OCP\Security\CSP\AddContentSecurityPolicyEvent;
 
+/**
+ * @template-implements IEventListener<Event>
+ * @psalm-api
+ */
 class CSPListener implements IEventListener {
 	public function __construct(
 		private IConfig $config,

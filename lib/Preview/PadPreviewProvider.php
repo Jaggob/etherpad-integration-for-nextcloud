@@ -28,6 +28,7 @@ use OCP\Preview\IProviderV2;
  * A future iteration could render the actual snapshot text into the
  * preview (similar to how the Text app previews Markdown), but that's
  * a separate feature — this exists to silence the 4xx noise.
+ * @psalm-api
  */
 class PadPreviewProvider implements IProviderV2 {
 	private const ASSET_PATH = __DIR__ . '/../../img/preview-fallback.png';
@@ -44,6 +45,13 @@ class PadPreviewProvider implements IProviderV2 {
 		return is_readable(self::ASSET_PATH);
 	}
 
+	/**
+	 * `OCP\Image` is the concrete implementation of `OCP\IImage` at runtime,
+	 * but it isn't shipped in the `nextcloud/ocp` stubs Psalm analyses against,
+	 * so Psalm can't see that it satisfies the `?IImage` return type.
+	 *
+	 * @psalm-suppress InvalidReturnType, InvalidReturnStatement
+	 */
 	public function getThumbnail(File $file, int $maxX, int $maxY): ?IImage {
 		if (!is_readable(self::ASSET_PATH)) {
 			return null;

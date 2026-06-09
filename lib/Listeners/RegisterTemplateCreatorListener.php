@@ -15,6 +15,10 @@ use OCP\Files\Template\RegisterTemplateCreatorEvent;
 use OCP\Files\Template\TemplateFileCreator;
 use OCP\IL10N;
 
+/**
+ * @template-implements IEventListener<Event>
+ * @psalm-api
+ */
 class RegisterTemplateCreatorListener implements IEventListener {
 	public function __construct(
 		private IL10N $l10n,

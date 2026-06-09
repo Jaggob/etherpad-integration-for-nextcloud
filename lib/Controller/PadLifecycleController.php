@@ -27,6 +27,7 @@ use Psr\Log\LoggerInterface;
  * Lifecycle + sync endpoints — trash, restore, recover-from-snapshot,
  * sync state, and the find-original lookup that the copy-of-a-pad
  * recovery affordance hangs off.
+ * @psalm-api
  */
 class PadLifecycleController extends AbstractPadController {
 	public function __construct(

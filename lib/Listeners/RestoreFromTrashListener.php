@@ -19,6 +19,10 @@ use OCP\Files\NotFoundException;
 use OCP\IUserSession;
 use Psr\Log\LoggerInterface;
 
+/**
+ * @template-implements IEventListener<Event>
+ * @psalm-api
+ */
 class RestoreFromTrashListener implements IEventListener {
 	public function __construct(
 		private LifecycleService $lifecycleService,

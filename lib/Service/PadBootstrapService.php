@@ -91,8 +91,6 @@ class PadBootstrapService {
 		$binding = $this->bindingService->findByFileId($fileId);
 		$createdNewBinding = false;
 		$createdNewPad = false;
-		$padId = '';
-		$accessMode = BindingService::ACCESS_PROTECTED;
 
 		if ($binding !== null) {
 			$padId = (string)$binding['pad_id'];

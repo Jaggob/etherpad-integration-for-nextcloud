@@ -58,13 +58,13 @@ class PublicShareUrlBuilder {
 		}
 
 		$dir = dirname($path);
-		if ($dir === '.' || $dir === '') {
+		if ($dir === '.') {
 			$dir = '/';
 		} else {
 			$dir = '/' . $dir;
 		}
 		$fileName = basename($path);
-		if ($fileName === '' || !str_ends_with(strtolower($fileName), '.pad')) {
+		if (!str_ends_with(strtolower($fileName), '.pad')) {
 			throw new NotAPadFileException('The selected file is not a .pad document.');
 		}
 

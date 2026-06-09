@@ -279,7 +279,7 @@ class LifecycleService {
 		}
 	}
 
-	/** @return array{status: string, reason?: string, file_id: int, old_pad_id?: string, new_pad_id?: string} */
+	/** @return array{status: string, reason?: string, file_id: int, pad_id?: string, old_pad_id?: string, new_pad_id?: string} */
 	public function handleRestore(File $file): array {
 		$fileId = (int)$file->getId();
 		if (!$this->isPadFile($file)) {
@@ -396,7 +396,7 @@ class LifecycleService {
 	 * caller has already verified the user owns the file, and the security
 	 * model demands we never reuse the `pad_id` from frontmatter.
 	 *
-	 * @return array{status: string, reason?: string, file_id: int, old_pad_id?: string, new_pad_id?: string}
+	 * @return array{status: string, reason?: string, file_id: int, pad_id?: string, old_pad_id?: string, new_pad_id?: string}
 	 */
 	public function recoverFromSnapshot(File $file): array {
 		$fileId = (int)$file->getId();
@@ -418,11 +418,10 @@ class LifecycleService {
 		return $result;
 	}
 
-	/** @return array{status: string, reason?: string, file_id: int, old_pad_id?: string, new_pad_id?: string} */
+	/** @return array{status: string, reason?: string, file_id: int, pad_id?: string, old_pad_id?: string, new_pad_id?: string} */
 	private function restoreWithoutBinding(File $file, int $fileId): array {
 		$oldPadId = '';
 		$newPadId = '';
-		$currentContent = '';
 		$fileContentUpdated = false;
 		$managedPadCreated = false;
 		$bindingCreated = false;
@@ -547,7 +546,7 @@ class LifecycleService {
 	private function provisionRestorePadId(string $accessMode, string $oldPadId): string {
 		if ($accessMode === BindingService::ACCESS_PROTECTED) {
 			$groupId = $this->etherpadClient->createGroup();
-			$padName = $this->buildProtectedRestorePadName($oldPadId);
+			$padName = $this->buildProtectedRestorePadName();
 			return $this->etherpadClient->createGroupPad($groupId, $padName);
 		}
 
@@ -591,7 +590,7 @@ class LifecycleService {
 		return 'r-' . trim($normalized, '-') . '-' . $suffix;
 	}
 
-	private function buildProtectedRestorePadName(string $oldPadId): string {
+	private function buildProtectedRestorePadName(): string {
 		$suffix = $this->secureRandom->generate(14, ISecureRandom::CHAR_LOWER . ISecureRandom::CHAR_DIGITS);
 		return 'restored-' . $suffix;
 	}

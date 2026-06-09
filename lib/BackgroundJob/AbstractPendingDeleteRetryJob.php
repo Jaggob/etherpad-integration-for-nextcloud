@@ -13,6 +13,9 @@ use OCA\EtherpadNextcloud\Service\PendingDeleteRetryService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\TimedJob;
 
+/**
+ * @psalm-api
+ */
 abstract class AbstractPendingDeleteRetryJob extends TimedJob {
 	protected const INTERVAL_SECONDS = 24 * 60 * 60;
 	protected const MIN_AGE_SECONDS = 0;

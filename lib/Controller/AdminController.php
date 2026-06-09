@@ -26,6 +26,9 @@ use OCP\IL10N;
 use OCP\IRequest;
 use OCP\IUserSession;
 
+/**
+ * @psalm-api
+ */
 class AdminController extends Controller {
 	private const CONSISTENCY_SAMPLE_LIMIT = 25;
 	private const PENDING_DELETE_RETRY_BATCH_SIZE = 500;
@@ -159,8 +162,7 @@ class AdminController extends Controller {
 
 	/** @return array<string,mixed> */
 	private function readJsonPayload(): array {
-		$params = $this->request->getParams();
-		return is_array($params) ? $params : [];
+		return $this->request->getParams();
 	}
 
 	private function requireAdmin(): void {

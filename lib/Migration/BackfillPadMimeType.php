@@ -12,6 +12,9 @@ use OCP\Migration\IOutput;
 use OCP\Migration\IRepairStep;
 use OCP\IDBConnection;
 
+/**
+ * @psalm-api
+ */
 class BackfillPadMimeType implements IRepairStep {
 	private const MIME_PAD = 'application/x-etherpad-nextcloud';
 	private const MIME_PART = 'application';

@@ -19,6 +19,9 @@ use OCP\IURLGenerator;
 use OCP\Settings\ISettings;
 use OCP\Util;
 
+/**
+ * @psalm-api
+ */
 class AdminSettings implements ISettings {
 	public function __construct(
 		private IConfig $config,

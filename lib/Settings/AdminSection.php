@@ -12,6 +12,9 @@ use OCP\IL10N;
 use OCP\IURLGenerator;
 use OCP\Settings\IIconSection;
 
+/**
+ * @psalm-api
+ */
 class AdminSection implements IIconSection {
 	public function __construct(
 		private IL10N $l10n,

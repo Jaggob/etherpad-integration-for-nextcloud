@@ -70,7 +70,7 @@ class ExternalPadExportFetcher {
 	}
 
 	/**
-	 * @param array{pad_url:string,host:string,port:int,resolved_ips:list<string>} $resolved
+	 * @param array{origin:string,pad_id:string,pad_url:string,host:string,port:int,resolved_ips:list<string>} $resolved
 	 */
 	private function getPublicTextFromResolvedExternalPad(array $resolved): string {
 		$url = $this->buildPublicExportUrl($resolved['pad_url'], 'txt');
@@ -156,6 +156,11 @@ class ExternalPadExportFetcher {
 			curl_close($curl);
 
 			if ($success === false) {
+				// $sizeExceeded is flipped to true inside the CURLOPT_WRITEFUNCTION
+				// closure above when the response exceeds the cap; Psalm doesn't
+				// model curl invoking that callback, so it wrongly infers the flag
+				// stays false here.
+				/** @psalm-suppress TypeDoesNotContainType */
 				if ($sizeExceeded) {
 					throw new EtherpadClientException(
 						'External public pad export exceeds maximum size (' . self::EXTERNAL_EXPORT_MAX_BYTES . ' bytes).'

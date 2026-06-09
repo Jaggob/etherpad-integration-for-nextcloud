@@ -13,6 +13,9 @@ namespace OCA\EtherpadNextcloud\Hooks;
 use OCA\EtherpadNextcloud\Listeners\RestoreFromTrashListener;
 use Psr\Log\LoggerInterface;
 
+/**
+ * @psalm-api
+ */
 class TrashbinHookHandler {
 	/**
 	 * @param array<string,mixed> $params

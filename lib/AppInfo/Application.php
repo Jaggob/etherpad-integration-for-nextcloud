@@ -20,6 +20,9 @@ use OCP\Files\Template\FileCreatedFromTemplateEvent;
 use OCP\Files\Template\RegisterTemplateCreatorEvent;
 use OCP\Security\CSP\AddContentSecurityPolicyEvent;
 
+/**
+ * @psalm-api
+ */
 class Application extends App implements IBootstrap {
 	public const APP_ID = 'etherpad_nextcloud';
 
@@ -42,6 +45,10 @@ class Application extends App implements IBootstrap {
 		);
 
 		$context->registerEventListener(AddContentSecurityPolicyEvent::class, \OCA\EtherpadNextcloud\Listeners\CSPListener::class);
+		// LoadAdditionalScriptsEvent is provided by the Files app, not by
+		// nextcloud/ocp, so Psalm can't prove it is-a OCP\EventDispatcher\Event
+		// and rejects the generic IEventListener<Event> listener here.
+		/** @psalm-suppress InvalidArgument */
 		$context->registerEventListener(
 			LoadAdditionalScriptsEvent::class,
 			\OCA\EtherpadNextcloud\Listeners\LoadFilesScriptsListener::class,

@@ -23,6 +23,7 @@ use Psr\Log\LoggerInterface;
 /**
  * Create-side endpoints for `.pad` files. Spans empty creates, copies in
  * a parent folder, template-based creates, and external-URL imports.
+ * @psalm-api
  */
 class PadCreateController extends AbstractPadController {
 	public function __construct(

@@ -1,170 +1,235 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <files psalm-version="6.16.1@f1f5de594dc76faf8784e02d3dc4716c91c6f6ac">
-  <file src="lib/AppInfo/Application.php">
-    <InvalidArgument>
-      <code><![CDATA[registerEventListener]]></code>
-    </InvalidArgument>
+  <file src="lib/Controller/AdminControllerErrorMapper.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
   </file>
-  <file src="lib/Controller/AdminController.php">
-    <RedundantCondition>
-      <code><![CDATA[is_array($params)]]></code>
-    </RedundantCondition>
-    <TypeDoesNotContainType>
-      <code><![CDATA[[]]]></code>
-    </TypeDoesNotContainType>
+  <file src="lib/Controller/EmbedControllerErrorMapper.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Controller/PadControllerErrorMapper.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
   </file>
   <file src="lib/Controller/PublicViewerControllerErrorMapper.php">
-    <MismatchingDocblockParamType>
-      <code><![CDATA[callable(mixed): RedirectResponse|TemplateResponse]]></code>
-    </MismatchingDocblockParamType>
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
   </file>
   <file src="lib/Controller/ViewerControllerErrorMapper.php">
-    <MismatchingDocblockParamType>
-      <code><![CDATA[callable(mixed): RedirectResponse|TemplateResponse]]></code>
-    </MismatchingDocblockParamType>
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
   </file>
-  <file src="lib/Listeners/CSPListener.php">
-    <MissingTemplateParam>
-      <code><![CDATA[IEventListener]]></code>
-    </MissingTemplateParam>
+  <file src="lib/Migration/RegisterMimeType.php">
+    <UnusedMethod>
+      <code><![CDATA[appendToJsonFile]]></code>
+      <code><![CDATA[ensureCoreFiletypeIcon]]></code>
+    </UnusedMethod>
+    <UnusedParam>
+      <code><![CDATA[$output]]></code>
+    </UnusedParam>
+    <UnusedProperty>
+      <code><![CDATA[$config]]></code>
+    </UnusedProperty>
   </file>
-  <file src="lib/Listeners/FileCreatedFromTemplateListener.php">
-    <MissingTemplateParam>
-      <code><![CDATA[IEventListener]]></code>
-    </MissingTemplateParam>
+  <file src="lib/Service/AdminConsistencyCheckResponseBuilder.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
   </file>
-  <file src="lib/Listeners/LoadFilesScriptsListener.php">
-    <MissingTemplateParam>
-      <code><![CDATA[IEventListener]]></code>
-    </MissingTemplateParam>
+  <file src="lib/Service/AdminSettingsRepository.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
   </file>
-  <file src="lib/Listeners/LoadPublicShareScriptsListener.php">
-    <MissingTemplateParam>
-      <code><![CDATA[IEventListener]]></code>
-    </MissingTemplateParam>
+  <file src="lib/Service/AdminSettingsValidator.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
   </file>
-  <file src="lib/Listeners/LoadViewerListener.php">
-    <MissingTemplateParam>
-      <code><![CDATA[IEventListener]]></code>
-    </MissingTemplateParam>
+  <file src="lib/Service/AdminTestFaultService.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
   </file>
-  <file src="lib/Listeners/MoveToTrashListener.php">
-    <MissingTemplateParam>
-      <code><![CDATA[IEventListener]]></code>
-    </MissingTemplateParam>
+  <file src="lib/Service/AllowlistNormalizer.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
   </file>
-  <file src="lib/Listeners/RegisterTemplateCreatorListener.php">
-    <MissingTemplateParam>
-      <code><![CDATA[IEventListener]]></code>
-    </MissingTemplateParam>
+  <file src="lib/Service/AppConfigService.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
   </file>
-  <file src="lib/Listeners/RestoreFromTrashListener.php">
-    <MissingTemplateParam>
-      <code><![CDATA[IEventListener]]></code>
-    </MissingTemplateParam>
-  </file>
-  <file src="lib/Preview/PadPreviewProvider.php">
-    <InvalidReturnStatement>
-      <code><![CDATA[$image]]></code>
-    </InvalidReturnStatement>
-    <InvalidReturnType>
-      <code><![CDATA[?IImage]]></code>
-    </InvalidReturnType>
+  <file src="lib/Service/BindingService.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+      <code><![CDATA[hasFileCacheEntry]]></code>
+    </PossiblyUnusedMethod>
   </file>
   <file src="lib/Service/ConsistencyCheckService.php">
-    <RedundantCondition>
-      <code><![CDATA[is_array($rows)]]></code>
-    </RedundantCondition>
-    <TypeDoesNotContainType>
-      <code><![CDATA[[]]]></code>
-    </TypeDoesNotContainType>
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Service/EmbedResponseBuilder.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Service/EtherpadClient.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
   </file>
   <file src="lib/Service/EtherpadHealthCheckService.php">
-    <InvalidOperand>
-      <code><![CDATA[($this->now() - $startedAt) * 1000]]></code>
-    </InvalidOperand>
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
   </file>
   <file src="lib/Service/ExternalPadExportFetcher.php">
-    <InvalidArgument>
-      <code><![CDATA[$resolved]]></code>
-      <code><![CDATA[$resolved]]></code>
-    </InvalidArgument>
-    <TypeDoesNotContainType>
-      <code><![CDATA[$sizeExceeded]]></code>
-      <code><![CDATA[$sizeExceeded]]></code>
-    </TypeDoesNotContainType>
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Service/ExternalPadSeeder.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
   </file>
   <file src="lib/Service/LifecycleService.php">
-    <InvalidReturnStatement>
-      <code><![CDATA[$this->buildSkippedResult('binding_not_pending_delete', $fileId, $oldPadId)]]></code>
-      <code><![CDATA[$this->buildSkippedResult('binding_state_transition_conflict', $fileId, $oldPadId)]]></code>
-      <code><![CDATA[$this->buildSkippedResult('delete_on_trash_disabled', $fileId)]]></code>
-      <code><![CDATA[$this->buildSkippedResult('external_pad', $fileId, $oldPadId)]]></code>
-      <code><![CDATA[$this->buildSkippedResult('not_pad_file', $fileId)]]></code>
-    </InvalidReturnStatement>
-    <InvalidReturnType>
-      <code><![CDATA[array{status: string, reason?: string, file_id: int, old_pad_id?: string, new_pad_id?: string}]]></code>
-      <code><![CDATA[array{status: string, reason?: string, file_id: int, old_pad_id?: string, new_pad_id?: string}]]></code>
-    </InvalidReturnType>
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Service/PadBootstrapService.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Service/PadCreateRollbackService.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
   </file>
   <file src="lib/Service/PadCreationService.php">
-    <InvalidReturnStatement>
-      <code><![CDATA[$this->withCreateRollback(
-			function () use ($uid, $path, $padUrl, &$fileCreated): array {
-				$fileNode = $this->padFileCreator->createUserFile($uid, $path);
-				$fileCreated = true;
-				$fileId = (int)$fileNode->getId();
-				if ($fileId <= 0) {
-					throw new \RuntimeException('Could not resolve new file ID.');
-				}
-
-				$seeded = $this->externalPadSeeder->seed($fileNode, $fileId, $padUrl);
-				// Preserve the historical key ordering for the external-create
-				// response: `file` is the first key so tests asserting via
-				// `assertSame` keep matching after the refactor.
-				$result = ['file' => $path] + $seeded;
-				return $result;
-			},
-			function () use ($uid, $path, &$fileCreated): void {
-				$this->rollbackService->rollbackExternalCreate($uid, $path, $fileCreated);
-			},
-			function (\Throwable $e) use ($path, $padUrl): ?array {
-				if ($e instanceof EtherpadClientException) {
-					return [
-						'message' => 'External pad URL validation failed',
-						'context' => [
-							'file' => $path,
-							'padUrl' => $padUrl,
-						],
-					];
-				}
-
-				return null;
-			},
-			function () use ($path, $padUrl): array {
-				return [
-					'message' => 'External pad create failed',
-					'context' => [
-						'file' => $path,
-						'padUrl' => $padUrl,
-					],
-				];
-			},
-		)]]></code>
-    </InvalidReturnStatement>
-    <InvalidReturnType>
-      <code><![CDATA[array{file:string,file_id:int,pad_id:string,access_mode:string,pad_url:string}]]></code>
-    </InvalidReturnType>
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
   </file>
   <file src="lib/Service/PadFileCreator.php">
-    <TypeDoesNotContainType>
-      <code><![CDATA[$fileName === '']]></code>
-    </TypeDoesNotContainType>
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Service/PadFileLockRetryService.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Service/PadInitializationService.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Service/PadLegacyMigrationService.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Service/PadMetadataService.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Service/PadOpenService.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Service/PadPlaceholderResolver.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Service/PadResponseService.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Service/PadSessionService.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Service/PadSyncService.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Service/ParsedPadFile.php">
+    <PossiblyUnusedProperty>
+      <code><![CDATA[$frontmatter]]></code>
+    </PossiblyUnusedProperty>
+  </file>
+  <file src="lib/Service/PendingDeleteRetryService.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+    <PossiblyUnusedReturnValue>
+      <code><![CDATA[array{
+	 *   attempted:int,
+	 *   resolved:int,
+	 *   failed:int,
+	 *   remaining:int
+	 * }]]></code>
+    </PossiblyUnusedReturnValue>
+  </file>
+  <file src="lib/Service/PublicPadContextService.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Service/PublicPadOpenService.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Service/PublicShareResolver.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
   </file>
   <file src="lib/Service/PublicShareUrlBuilder.php">
-    <TypeDoesNotContainType>
-      <code><![CDATA[$dir === '']]></code>
-      <code><![CDATA[$fileName === '']]></code>
-    </TypeDoesNotContainType>
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Service/ResolvedPadShare.php">
+    <PossiblyUnusedProperty>
+      <code><![CDATA[$isFolderShare]]></code>
+      <code><![CDATA[$selectedRelativePath]]></code>
+    </PossiblyUnusedProperty>
+  </file>
+  <file src="lib/Service/SnapshotExtractor.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Service/TrustedEmbedOriginsNormalizer.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
+  </file>
+  <file src="lib/Service/UserNodeResolver.php">
+    <PossiblyUnusedMethod>
+      <code><![CDATA[__construct]]></code>
+    </PossiblyUnusedMethod>
   </file>
 </files>

@@ -16,6 +16,10 @@ use OCP\EventDispatcher\IEventListener;
 use OCP\Files\File;
 use Psr\Log\LoggerInterface;
 
+/**
+ * @template-implements IEventListener<Event>
+ * @psalm-api
+ */
 class MoveToTrashListener implements IEventListener {
 	public function __construct(
 		private LifecycleService $lifecycleService,

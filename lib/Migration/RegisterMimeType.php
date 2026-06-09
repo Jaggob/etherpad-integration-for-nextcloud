@@ -14,6 +14,9 @@ use OCP\IConfig;
 use OCP\Migration\IOutput;
 use OCP\Migration\IRepairStep;
 
+/**
+ * @psalm-api
+ */
 class RegisterMimeType implements IRepairStep {
 	private const MIME = 'application/x-etherpad-nextcloud';
 	private const MIME_ALIAS = 'etherpad-nextcloud-pad';

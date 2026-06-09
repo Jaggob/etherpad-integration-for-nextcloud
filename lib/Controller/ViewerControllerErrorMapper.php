@@ -32,7 +32,7 @@ class ViewerControllerErrorMapper {
 
 	/**
 	 * @param callable(): mixed $action
-	 * @param callable(mixed): RedirectResponse|TemplateResponse $success
+	 * @param callable(mixed): (RedirectResponse|TemplateResponse) $success
 	 * @param string|null $notFoundMessage context-specific message for `NotFoundException`; defaults to the open-pad wording
 	 */
 	public function runForTemplate(
