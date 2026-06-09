@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.1.0-alpha.3 — 2026-06-09
+
+Third public-review release. Focus: security hardening of the Etherpad/admin surface, a browser end-to-end test suite, and a deep static-analysis / tech-debt pass. No user-facing feature changes since alpha.2.
+
+### Security
+
+- **API key stored as sensitive app config.** The Etherpad API key is now persisted via the sensitive-value app-config path so it is masked in `occ config` output and admin diagnostics instead of being readable in clear text. (#105)
+- **External-pad framing requires an explicit allowlist.** The CSP `frame-src` for external Etherpad hosts is no longer opened implicitly; embedding an external pad now requires the host to be on the trusted-origin allowlist. (#102)
+- **Client-side snapshot sanitisation.** Snapshot HTML is sanitised with DOMPurify in the browser before rendering, closing a stored-HTML surface in the viewer/recovery path. (#110)
+
+### Changed
+
+- **Etherpad HTTP via `IClientService`.** Outbound Etherpad API calls go through Nextcloud's HTTP client instead of raw transport, picking up proxy/TLS configuration and consistent timeouts. (#103)
+- **Shared pad-sync frontend module.** The viewer and embed entry points now share one extracted pad-sync module instead of duplicating the loop. (#106)
+- **No per-request MIME registration.** Dropped the MIME-type registration from the `Application` constructor (it ran on every request); the `.pad` MIME type is owned solely by the `RegisterMimeType` repair step. (#108)
+- **Legacy retry job retired.** Removed the compatibility `RetryPendingDeleteJob` shim; the tiered Hot/Warm/Cold `TimedJob`s are the sole retry path for pending pad deletes. (#111)
+- Removed a batch of dead code surfaced during the refactors. (#104)
+
+### Tooling / tests / CI
+
+- **Playwright end-to-end suite.** 23 browser tests against a live Nextcloud + Etherpad covering create/open, templates + placeholders, trash/restore, move/rename, orphan recovery, ownership boundary, snapshot round-trip, user-to-user share, public-share view, and the admin health check. (#54)
+- **Psalm static analysis** enabled in CI with a baseline (#82), then the baseline was burned down: noise reduction via config + stubs + redundant-cast removal (#122/#133), all real type issues fixed so the type baseline is empty, and `findUnusedCode` turned on with `@psalm-api`-annotated entry points (#122/#134).
+- CI now fails the build when committed `js/` assets are stale. (#101)
+- Version metadata aligned across `appinfo/info.xml`, `package.json`, and `package-lock.json`, guarded by a version-consistency CI check. (#107, #119)
+
 ## 1.1.0-alpha.2 — 2026-05-27
 
 Second public-review release. Focus: localisation cleanup, embed-create host signalling, and CI / release infrastructure.
