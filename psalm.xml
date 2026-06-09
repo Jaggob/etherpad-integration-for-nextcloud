@@ -3,7 +3,7 @@
     errorLevel="4"
     phpVersion="8.1"
     resolveFromConfigFile="true"
-    findUnusedCode="false"
+    findUnusedCode="true"
     autoloader="tests/psalm/ocp-autoload.php"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xmlns="https://getpsalm.org/schema/config"

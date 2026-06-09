@@ -183,14 +183,14 @@ class PadCreationService {
 	}
 
 	/**
-	 * @return array{file:string,file_id:int,pad_id:string,access_mode:string,pad_url:string}
+	 * @return array{file:string,file_id:int,pad_id:string,access_mode:string,pad_url:string,snapshot_warning_code?:string}
 	 */
 	public function createFromUrl(string $uid, string $file, string $padUrl): array {
 		$path = $this->padPaths->normalizeCreatePath($file);
 		$fileCreated = false;
 
 		return $this->withCreateRollback(
-			function () use ($uid, $path, $padUrl, &$fileCreated): array {
+			function () use ($uid, $path, $padUrl, &$fileCreated) {
 				$fileNode = $this->padFileCreator->createUserFile($uid, $path);
 				$fileCreated = true;
 				$fileId = (int)$fileNode->getId();

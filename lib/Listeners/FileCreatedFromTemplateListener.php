@@ -37,6 +37,9 @@ use Psr\Log\LoggerInterface;
  * On any skip / failure inside the source-template branch the target is
  * reset to empty *and* re-initialised so a fresh blank pad still opens
  * cleanly on the first call.
+ *
+ * @template-implements IEventListener<Event>
+ * @psalm-api
  */
 class FileCreatedFromTemplateListener implements IEventListener {
 	public function __construct(

@@ -51,7 +51,6 @@ class PadMetadataService {
 			return new PadOriginalLookup(found: false);
 		}
 
-		$padId = '';
 		try {
 			$padId = $this->padFileService->readPad((string)$node->getContent())->padId;
 		} catch (\Throwable) {

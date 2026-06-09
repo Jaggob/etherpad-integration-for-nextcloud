@@ -23,6 +23,9 @@ use OCP\IRequest;
 use OCP\ISession;
 use OCP\Share\IShare;
 
+/**
+ * @psalm-api
+ */
 class PublicViewerController extends PublicShareController {
 	private ?IShare $share = null;
 

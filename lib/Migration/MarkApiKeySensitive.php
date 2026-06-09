@@ -23,6 +23,7 @@ use OCP\Migration\IRepairStep;
  * {@see AdminSettingsRepository::persist()}; this only backfills the flag
  * onto the value installs stored before that change. Idempotent: writing
  * the same value with `sensitive: true` is a no-op once the flag is set.
+ * @psalm-api
  */
 class MarkApiKeySensitive implements IRepairStep {
 	public function __construct(

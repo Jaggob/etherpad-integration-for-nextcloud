@@ -32,6 +32,7 @@ use Psr\Log\LoggerInterface;
  *
  * Each concrete controller keeps its constructor narrow — it only
  * declares the services it actually uses on top of the base deps.
+ * @psalm-api
  */
 abstract class AbstractPadController extends Controller {
 	public function __construct(
