@@ -67,6 +67,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.unstubAllGlobals()
+	window.happyDOM?.setURL?.('http://localhost/')
 })
 
 // Build a non-reactive stand-in for a mounted instance: data fields seeded
@@ -98,6 +99,12 @@ const jsonResponse = (body, ok = true, status = 200) => ({
 	status,
 	json: () => Promise.resolve(body),
 })
+
+// Drain queued microtasks so fire-and-forget continuations (e.g. the
+// original-pad hint lookup) settle before we assert on their results.
+const flush = async () => {
+	for (let i = 0; i < 8; i += 1) await Promise.resolve()
+}
 
 const stubFetch = (impl) => {
 	const mock = typeof impl === 'function' ? vi.fn(impl) : vi.fn().mockResolvedValue(impl)
@@ -179,6 +186,16 @@ describe('viewer component — computed path/id derivation', () => {
 		expect(makeInstance({ fileid: 0 }).resolvedFileId).toBeNull()
 		expect(makeInstance({}).resolvedFileId).toBeNull()
 	})
+
+	it('falls back to the file id in the Files URL when openfile=true and no prop id is set', () => {
+		window.happyDOM.setURL('http://localhost/apps/files/files/77?openfile=true')
+		expect(makeInstance({}).resolvedFileId).toBe(77)
+	})
+
+	it('ignores the Files-URL id when openfile is not set', () => {
+		window.happyDOM.setURL('http://localhost/apps/files/files/77')
+		expect(makeInstance({}).resolvedFileId).toBeNull()
+	})
 })
 
 describe('viewer component — resolveOpenUrl', () => {
@@ -251,12 +268,28 @@ describe('viewer component — resolveOpenUrl', () => {
 		expect(vm.loadError).toBe('')
 	})
 
+	it('initializes by file id (not by path) when an id is available', async () => {
+		const fetchMock = stubFetch()
+		fetchMock
+			.mockResolvedValueOnce(jsonResponse({ message: 'Missing YAML frontmatter' }, false, 422)) // open by-id
+			.mockResolvedValueOnce(jsonResponse({ message: 'Missing YAML frontmatter' }, false, 422)) // open by-path
+			.mockResolvedValueOnce(jsonResponse({ status: 'migrated_from_legacy' }))                  // initialize-by-id
+			.mockResolvedValueOnce(jsonResponse({ url: 'https://pad.example/by-id', sync_url: '' }))   // re-open by-id
+		const vm = makeInstance({ fileid: 42, fileInfo: { path: '/x.pad' } })
+
+		await vm.resolveOpenUrl()
+
+		expect(fetchMock.mock.calls[2][0]).toContain('/pads/initialize-by-id/42')
+		expect(vm.iframeSrc).toBe('https://pad.example/by-id')
+	})
+
 	it('missing_binding for an addressable, non-public file: offers recovery and looks up the original', async () => {
 		stubFetch(jsonResponse({ message: 'no binding', code: 'missing_binding' }, false, 404))
 		apiFindOriginalPad.mockResolvedValue({ found: true, viewer_url: 'https://nc/viewer/123', path: '/orig.pad' })
 		const vm = makeInstance({ fileid: 42, fileInfo: { path: '/copy.pad' } })
 
 		await vm.resolveOpenUrl()
+		await flush() // let the fire-and-forget original-pad hint settle
 
 		expect(vm.loadError).toBe('no binding')
 		expect(vm.canRecover).toBe(true)
